@@ -222,8 +222,18 @@ main {
   border: 1px solid var(--bordure);
   border-radius: 10px;
   padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .profil-item.full { grid-column: span 2; }
+.profil-item .cle {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--texte-faible);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
 .profil-item label {
   display: block;
   font-size: 10px;

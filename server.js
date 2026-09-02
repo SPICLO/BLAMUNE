@@ -18,7 +18,7 @@ app.use((req, res, next) => {
   const origin = req.headers.origin || '';
   const allowed = [
     /localhost:\d+$/, /127\.0\.0\.1:\d+$/,
-    /\.vercel\.app$/, /\.ngrok-free\.dev$/, /\.ngrok\.io$/
+    /\.vercel\.app$/, /\.render\.onrender\.com$/, /\.ngrok-free\.dev$/, /\.ngrok\.io$/
   ];
   let corsOrigin = '*';
   if (origin && origin !== 'null') {
@@ -276,10 +276,10 @@ function nettoyerReponse(texte) {
   t = t.replace(/^>\s*/gm, '');
   t = t.replace(/\n{2,}/g, '\n');
   t = t.trim();
-  if (t.length > 500) {
+  if (t.length > 1000) {
     const phrases = t.match(/[^.!?]+[.!?]+/g) || [t];
-    t = phrases.slice(0, 3).join(' ').trim();
-    if (t.length > 500) t = t.substring(0, 497) + '...';
+    t = phrases.slice(0, 5).join(' ').trim();
+    if (t.length > 1000) t = t.substring(0, 997) + '...';
   }
   return t || '...';
 }
@@ -309,11 +309,106 @@ app.get('/health', (req, res) => {
   res.json({ ok: true, timestamp: Date.now(), uptime: process.uptime() });
 });
 
+// Helper: check if user is admin
+function isAdminUid(uid) {
+  for (const cle of Object.keys(comptes)) {
+    if (comptes[cle].uid === uid && comptes[cle].pseudo?.toLowerCase() === 'admin') return true;
+  }
+  return false;
+}
+
 // Active connections
 app.get('/connexions', (req, res) => {
   const now = Date.now();
   const connexions = Object.values(connexionsActives).filter(c => now - c.derniereActivite < 300000);
   res.json({ ok: true, connexions });
+});
+
+// Admin: all data
+app.get('/admin/data', (req, res) => {
+  const auth = extraireAuth(req);
+  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
+  const now = Date.now();
+  const connexions = Object.values(connexionsActives).filter(c => now - c.derniereActivite < 300000);
+  const messages = [];
+  const usersDir = path.join(RACINE, 'users');
+  if (fs.existsSync(usersDir)) {
+    const dirs = fs.readdirSync(usersDir, { withFileTypes: true }).filter(d => d.isDirectory());
+    for (const d of dirs) {
+      for (const mode of ['1', '2']) {
+        const f = path.join(usersDir, d.name, `historique_mode${mode}.json`);
+        if (fs.existsSync(f)) {
+          try {
+            const hist = JSON.parse(fs.readFileSync(f, 'utf8'));
+            hist.forEach(h => {
+              messages.push({
+                uid: d.name,
+                pseudo: h.qui === 'moi' ? d.name : 'BLAMUNE',
+                message: h.qui === 'moi' ? h.texte : '',
+                reponse: h.qui === 'bot' ? h.texte : '',
+                heure: h.t ? new Date(h.t * 1000).toLocaleTimeString('fr-FR') : '-'
+              });
+            });
+          } catch (e) {}
+        }
+      }
+    }
+  }
+  const savoir = [];
+  try {
+    const f = path.join(RACINE, 'savoir.txt');
+    if (fs.existsSync(f)) {
+      fs.readFileSync(f, 'utf8').split('\n').filter(l => l.trim()).forEach(l => {
+        const pos = l.indexOf('|');
+        if (pos >= 0) savoir.push({ topic: l.substring(0, pos).trim(), contenu: l.substring(pos + 1).trim() });
+      });
+    }
+  } catch (e) {}
+  const vocab = [];
+  try {
+    const f = path.join(RACINE, 'vocabulaire.txt');
+    if (fs.existsSync(f)) {
+      fs.readFileSync(f, 'utf8').split('\n').filter(l => l.trim()).forEach(l => vocab.push(l.trim()));
+    }
+  } catch (e) {}
+  res.json({
+    ok: true,
+    stats,
+    connexions,
+    messages,
+    savoir,
+    vocabulaire: vocab,
+    profil: {},
+    mode: '2',
+    config: {
+      api_provider: config.api_provider,
+      api_configured: !!config.api_key && config.api_key !== 'ego'
+    }
+  });
+});
+
+// Admin: users list
+app.get('/admin/users', (req, res) => {
+  const auth = extraireAuth(req);
+  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
+  const users = [];
+  for (const cle of Object.keys(comptes)) {
+    const c = comptes[cle];
+    let msgCount = 0;
+    for (const mode of ['1', '2']) {
+      const f = path.join(USERS_DIR, c.uid, `historique_mode${mode}.json`);
+      if (fs.existsSync(f)) {
+        try { msgCount += JSON.parse(fs.readFileSync(f, 'utf8')).length; } catch (e) {}
+      }
+    }
+    users.push({
+      pseudo: c.pseudo,
+      email: c.email,
+      cree: c.cree || '-',
+      messages: msgCount
+    });
+  }
+  res.json({ ok: true, users });
 });
 
 // All messages (admin only)
@@ -447,6 +542,9 @@ app.post('/send', async (req, res) => {
   modeParUser[auth.uid] = mode;
 
   if (connexionsActives[auth.uid]) connexionsActives[auth.uid].derniereActivite = Date.now();
+  else if (!auth.uid.startsWith('inv_')) {
+    connexionsActives[auth.uid] = { uid: auth.uid, pseudo: extraireChamp(req, 'pseudo') || auth.uid, ip: getIp(req), debut: new Date().toISOString(), derniereActivite: Date.now(), mode };
+  }
 
   const debut = Date.now();
   let reponses = [];
@@ -515,8 +613,7 @@ app.get('/historique', (req, res) => {
   const mode = modeParUser[auth.uid] || '2';
   const hist = chargerHistorique(auth.uid, mode);
   const isGemini = config.api_provider === 'gemini';
-  let ollama = true;
-  if (!isGemini) ollama = false;
+  const ollama = !isGemini;
   res.json({ ok: true, etat, mode, historique: hist, ollama, provider: config.api_provider });
 });
 
@@ -608,6 +705,7 @@ app.post('/config-api', (req, res) => {
 
 // Static files
 const SITE_DIR = path.join(RACINE, 'site');
+const ADMIN_DIR = path.join(RACINE, 'admin');
 const BLOCKED_EXT = ['.json', '.txt', '.ps1', '.bat', '.cmd', '.exe', '.dll', '.config', '.log', '.db', '.sqlite'];
 const MIME_TYPES = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript',
@@ -615,6 +713,31 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml', '.txt': 'text/plain', '.json': 'application/json'
 };
 
+// Admin panel
+app.get('/admin', (req, res) => {
+  const index = path.join(ADMIN_DIR, 'admin.html');
+  if (fs.existsSync(index)) return res.sendFile(index);
+  return res.status(404).send('Admin panel not found');
+});
+
+app.get('/admin/*', (req, res) => {
+  let filePath = req.path.replace(/^\/admin\/?/, '/');
+  if (filePath === '/' || filePath === '') filePath = '/admin.html';
+  const ext = path.extname(filePath).toLowerCase();
+  if (BLOCKED_EXT.includes(ext)) return res.status(404).send('Non autorise');
+  const fullPath = path.join(ADMIN_DIR, filePath);
+  if (!fs.existsSync(fullPath)) return res.status(404).send('Page introuvable');
+  if (fs.statSync(fullPath).isDirectory()) {
+    const index = path.join(fullPath, 'admin.html');
+    if (fs.existsSync(index)) return res.sendFile(index);
+    return res.status(404).send('Page introuvable');
+  }
+  const mime = MIME_TYPES[ext] || 'application/octet-stream';
+  res.setHeader('Content-Type', mime);
+  res.sendFile(fullPath);
+});
+
+// Site static files
 app.get('*', (req, res) => {
   let filePath = req.path === '/' ? '/index.html' : req.path;
   filePath = filePath.replace(/\.\./g, '');
@@ -647,5 +770,14 @@ setInterval(() => {
   const now = Date.now();
   for (const [uid, c] of Object.entries(connexionsActives)) {
     if (now - c.derniereActivite > 300000) delete connexionsActives[uid];
+  }
+  // Cleanup rate limits memory leak
+  for (const key of Object.keys(rateLimits)) {
+    rateLimits[key] = rateLimits[key].filter(t => now - t < 60000);
+    if (rateLimits[key].length === 0) delete rateLimits[key];
+  }
+  for (const uid of Object.keys(userRateLimits)) {
+    userRateLimits[uid] = userRateLimits[uid].filter(t => now - t < 60000);
+    if (userRateLimits[uid].length === 0) delete userRateLimits[uid];
   }
 }, 300000);

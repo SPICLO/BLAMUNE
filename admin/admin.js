@@ -2,6 +2,7 @@
 var API = '';
 var adminToken = null;
 var adminPseudo = null;
+var refreshInterval = null;
 
 // ---- LOGIN ----
 (function() {
@@ -72,9 +73,12 @@ function initDashboard() {
     localStorage.removeItem('dashmin_token');
     localStorage.removeItem('dashmin_pseudo');
     localStorage.removeItem('dashmin_time');
+    if (refreshInterval) clearInterval(refreshInterval);
     window.location.reload();
   };
   chargerDonnees();
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(chargerDonnees, 30000);
 }
 
 function setSectionErreur(id, msg) {
@@ -94,6 +98,7 @@ async function chargerDonnees() {
         localStorage.removeItem('dashmin_token');
         localStorage.removeItem('dashmin_pseudo');
         localStorage.removeItem('dashmin_time');
+        if (refreshInterval) clearInterval(refreshInterval);
         window.location.reload();
         return;
       }
@@ -121,11 +126,11 @@ async function chargerDonnees() {
     document.getElementById('statTemps').textContent = (s.tempsMoyen || 0) + 'ms';
     document.getElementById('uptime').textContent = 'Bot demarre le ' + (s.demarrage || '?');
 
-    // Utilisateurs
+    // Utilisateurs en ligne
     var connexions = j.connexions || [];
     document.getElementById('statEnLigne').textContent = connexions.length;
 
-    // Utilisateurs inscrits (avec email)
+    // Utilisateurs inscrits
     var rUsers = await fetch(API + '/admin/users', { headers: headers });
     var jUsers = rUsers.ok ? await rUsers.json() : { users: [] };
     var users = jUsers.users || [];
@@ -195,7 +200,7 @@ async function chargerDonnees() {
       tableC.style.borderCollapse = 'collapse';
       var theadC = document.createElement('thead');
       var trHC = document.createElement('tr');
-      ['Pseudo','Mode','Debut'].forEach(function(txt) {
+      ['Pseudo','UID','Debut'].forEach(function(txt) {
         var th = document.createElement('th');
         th.style.cssText = 'text-align:left;padding:8px;border-bottom:1px solid var(--bordure);color:var(--texte-doux);';
         th.textContent = txt;
@@ -210,14 +215,14 @@ async function chargerDonnees() {
         var tdP = document.createElement('td');
         tdP.style.cssText = 'padding:8px;color:var(--texte);font-weight:600;';
         tdP.textContent = c.pseudo || c.uid || '?';
-        var tdM = document.createElement('td');
-        tdM.style.cssText = 'padding:8px;color:var(--accent);font-size:13px;';
-        tdM.textContent = c.mode === '1' ? 'EGO' : 'BLAMUNE';
+        var tdU = document.createElement('td');
+        tdU.style.cssText = 'padding:8px;color:var(--accent);font-size:12px;font-family:monospace;';
+        tdU.textContent = c.uid || '-';
         var tdD = document.createElement('td');
         tdD.style.cssText = 'padding:8px;color:var(--texte-doux);font-size:12px;';
         tdD.textContent = c.debut || '-';
         tr.appendChild(tdP);
-        tr.appendChild(tdM);
+        tr.appendChild(tdU);
         tr.appendChild(tdD);
         tbodyC.appendChild(tr);
       });
@@ -280,15 +285,14 @@ async function chargerDonnees() {
     var profilEl = document.getElementById('profilContenu');
     profilEl.replaceChildren();
     var profilChamps = [
-      ['Pseudo', profil.pseudo || '-'],
-      ['Surnom', profil.surnom || '-'],
+      ['Nom', profil.nom || '-'],
+      ['Plat prefere', profil.plat || '-'],
+      ['Hobby', profil.hobby || '-'],
+      ['Mots favoris', (profil.motsFavoris || []).join(', ') || '-'],
       ['Genre', profil.genre || '-'],
-      ['Age', profil.age || '-'],
-      ['Langage', profil.langagePrefere || '-'],
-      ['Style', profil.styleReponse || '-'],
-      ['Favoris', (profil.motsFavoris || []).join(', ') || '-'],
-      ['Centre interets', (profil.centresInteret || []).join(', ') || '-'],
-      ['Mode', profil.mode || '-']
+      ['Aime', profil.aime || '-'],
+      ['Aime pas', profil.aimePas || '-'],
+      ['Age', profil.age || '-']
     ];
     profilChamps.forEach(function(c) {
       var d = document.createElement('div');
@@ -297,7 +301,7 @@ async function chargerDonnees() {
       k.className = 'cle';
       k.textContent = c[0];
       var val = document.createElement('span');
-      val.className = 'valeur' + (c[1] ? '' : ' vide');
+      val.className = 'valeur' + (c[1] && c[1] !== '-' ? '' : ' vide');
       val.textContent = c[1];
       d.appendChild(k);
       d.appendChild(val);
@@ -322,7 +326,7 @@ async function chargerDonnees() {
         topic.textContent = (s.topic || '?') + ' : ';
         d.appendChild(topic);
         var cont = document.createElement('span');
-        cont.textContent = s.contenu || s.content || '-';
+        cont.textContent = s.contenu || '-';
         d.appendChild(cont);
         savoirEl.appendChild(d);
       });
@@ -355,7 +359,7 @@ async function chargerDonnees() {
     var cfg = j.config || {};
     var rows = [
       ['Provider', cfg.api_provider || '?', cfg.api_configured ? 'ok' : 'err'],
-      ['Mode actif', j.mode === '1' ? 'EGO' : 'BLAMUNE INTELLIGENT', '']
+      ['Mode actif', j.mode === '1' ? 'EGO (Gemini)' : 'BLAMUNE', '']
     ];
     rows.forEach(function (r) {
       var d = document.createElement('div');
@@ -372,7 +376,7 @@ async function chargerDonnees() {
     });
 
   } catch (e) {
-    document.getElementById('uptime').textContent = 'Serveur bot eteint';
+    document.getElementById('uptime').textContent = 'Serveur eteint';
     setSectionErreur('connexionsContenu', 'Serveur eteint');
     setSectionErreur('inscritsContenu', 'Serveur eteint');
     setSectionErreur('tousMessagesContenu', 'Serveur eteint');
@@ -386,7 +390,4 @@ async function chargerDonnees() {
 }
 
 // ---- INIT ----
-if (adminToken && adminPseudo) {
-  chargerDonnees();
-  setInterval(chargerDonnees, 30000);
-}
+// Already handled by the IIFE above and initDashboard()
