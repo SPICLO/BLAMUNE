@@ -1,0 +1,1115 @@
+un ordi|veut dire ordinateur
+un robot|signifie une machine automatique
+tokyo|c'est la capitale du japon
+match|Rencontre sportive entre deux équipes ou adversaires.
+but|Action de marquer un point au football ou au hockey.
+course|Action de courir pour aller vite.
+équipe|Groupe de personnes qui jouent ou travaillent ensemble.
+stade|Grand terrain aménagé pour les sports.
+ballon|Objet rond et gonflé qu'on lance ou tape.
+arbitre|Personne qui fait respecter les règles.
+entraîneur|Personne qui prépare et guide les sportifs.
+compétition|Épreuve où on essaie de gagner.
+record|Meilleure performance jamais réalisée.
+repas|Moment où on mange, généralement trois fois par jour.
+pain|Aliment cuit à base de farine, d'eau et de levure.
+viande|Chair des animaux qu'on consomme.
+légume|Plante potagère qu'on mange.
+fruit|Aliment sucré issu des arbres ou des plantes.
+café|Boisson chaude et stimulante faite à partir de graines.
+fromage|Produit laitier fermenté, souvent affiné.
+chocolat|Douceur faite à base de cacao et de sucre.
+cuisine|Pièce où on prépare les repas.
+recette|Liste des ingrédients et instructions pour cuisiner.
+valise|Bagage pour transporter ses affaires en voyage.
+avion|Véhicule qui vole dans le ciel.
+hôtel|Établissement où on dort contre de l'argent.
+plage|Bord de mer ou de lac avec du sable.
+montagne|Relief naturel très élevé.
+carte|Plan géographique pour s'orienter.
+pays|Territoire délimité par des frontières.
+voyager|Se déplacer d'un endroit à un autre.
+touriste|Personne qui visite un lieu pour le plaisir.
+aventure|Expérience nouvelle et excitante.
+chanson|Mélodie chantée avec des paroles.
+guitare|Instrument à cordes qu'on gratte.
+rythme|Battement régulier de la musique.
+concert|Spectacle musical public.
+artiste|Personne qui crée ou interprète de la musique.
+paroles|Texte d'une chanson.
+instrument|Objet utilisé pour faire de la musique.
+chanteur|Personne qui chante.
+mélodie|Suite de notes agréables à l'oreille.
+festival|Événement musical avec plusieurs artistes.
+livre|Ensemble de pages reliées contenant un texte.
+film|Histoire racontée en images animées.
+musée|Lieu où sont exposées des œuvres d'art.
+peinture|Art de représenter avec des couleurs.
+théâtre|Spectacle joué par des comédiens.
+traditions|Coutumes transmises de génération en génération.
+histoire|Récit des événements du passé.
+poésie|Art d'écrire des vers.
+sculpture|Art de tailler ou modeler des formes.
+patrimoine|Ensemble des biens culturels d'un pays.
+bureau|Lieu où on travaille assis à un bureau.
+patron|Chef ou propriétaire d'une entreprise.
+collègue|Personne qui travaille avec nous.
+salaire|Somme d'argent reçue en échange du travail.
+réunion|Rassemblement pour discuter de sujets professionnels.
+ordinateur|Machine électronique utilisée pour travailler.
+télétravail|Travailler depuis son domicile.
+objectif|But à atteindre dans le travail.
+contrat|Document signé qui fixe les règles.
+formation|Période d'apprentissage pour se perfectionner.
+médecin|Professionnel qui soigne les gens.
+sommeil|Période de repos nocturne.
+sport|Activité physique pratiquée pour rester en forme.
+alimentation|Ce qu'on mange pour se nourrir.
+douleur|Sensation désagréable dans le corps.
+médicament|Substance utilisée pour guérir.
+stress|Tension nerveuse due à la pression.
+fatigue|État de grande lassitude, besoin de repos.
+hygiène|Ensemble des pratiques pour rester propre et en bonne santé.
+bien-être|État agréable de santé physique et mentale.
+optimiste|Personne qui voit le bon côté des choses.
+pessimiste|Personne qui voit plutôt le mauvais côté.
+patient|Personne qui sait attendre sans s'énerver.
+généreux|Personne qui donne facilement aux autres.
+audacieux|Personne qui ose faire des choses risquées.
+timide|Personne réservée, qui ose peu parler.
+franc|Personne qui dit ce qu'elle pense.
+introverti|Personne qui préfère être seule ou avec peu de monde.
+extraverti|Personne qui aime être entourée et sociable.
+fidèle|Personne sur qui on peut compter et qui reste loyal.
+smartphone|Téléphone portable intelligent.
+internet|Réseau mondial qui permet de communiquer.
+réseaux sociaux|Plateformes comme Facebook ou Instagram.
+intelligence artificielle|Programme qui imite l'intelligence humaine.
+cloud|Stockage de données en ligne.
+application|Programme utilisé sur un téléphone.
+données|Informations stockées ou transmises.
+streaming|Visionnage de vidéos sans téléchargement.
+hacker|Personne qui s'introduit dans les systèmes informatiques.
+abonnement|Paiement régulier pour un service.
+routine|Habitudes qu'on répète chaque jour.
+bricolage|Activité manuelle dans la maison.
+jardin|Espace vert autour de la maison.
+lecture|Activité de lire un livre.
+balade|Promenade tranquille sans but précis.
+ménage|Nettoyage de la maison.
+courses|Achat de nourriture et de produits.
+bricoler|Réparer ou construire quelque chose.
+forêt|Grand espace boisé.
+océan|Grande étendue d'eau salée.
+maison|Lieu où on habite.
+famille|Ensemble des parents et enfants.
+mère|Femme qui a des enfants.
+père|Homme qui a des enfants.
+frère|Garçon né des mêmes parents.
+sœur|Fille née des mêmes parents.
+ami|Personne avec qui on a des liens affectifs.
+enfant|Jeune personne.
+adulte|Personne qui a atteint l'âge adulte.
+vie|Période entre la naissance et la mort.
+mort|Fin de la vie.
+jour|Période de 24 heures.
+nuit|Période d'obscurité entre le coucher et le lever du soleil.
+semaine|Période de 7 jours.
+mois|Division du calendrier.
+année|Période de 365 jours.
+soleil|Étoile qui éclaire la Terre.
+lune|Satellite naturel de la Terre.
+étoile|Corps céleste lumineux.
+ciel|Espace au-dessus de nos têtes.
+terre|Planète où nous vivons.
+eau|Liquide transparent et vital.
+feu|Flamme qui produit chaleur et lumière.
+vent|Mouvement d'air.
+neige|Précipitation de cristaux de glace.
+pluie|Gouttes d'eau tombant du ciel.
+chaleur|Température élevée.
+froid|Température basse.
+gens|Êtres humains.
+homme|Être humain adulte de sexe masculin.
+femme|Être humain adulte de sexe féminin.
+main|Partie du corps au bout du bras.
+pied|Partie du corps au bout de la jambe.
+tête|Partie du corps contenant le cerveau.
+cœur|Organe qui fait circuler le sang.
+sang|Liquide rouge dans le corps.
+corps|Ensemble physique d'une personne.
+docteur|Personne qui soigne les gens.
+hôpital|Lieu où on soigne les malades.
+école|Lieu où on apprend.
+professeur|Personne qui enseigne.
+étudiant|Personne qui apprend.
+écrire|Tracer des mots sur du papier.
+parler|S'exprimer avec des mots.
+entendre|Percevoir les sons.
+voir|Percevoir avec les yeux.
+toucher|Entrer en contact avec quelque chose.
+sentir|Percevoir par l'odorat ou le toucher.
+manger|Absorber de la nourriture.
+boire|Avaler un liquide.
+dormir|Être en état de repos.
+marcher|Se déplacer à pied.
+courir|Se déplacer vite à pied.
+aller|Se déplacer vers un endroit.
+venir|Se déplacer vers celui qui parle.
+partir|Quitter un lieu.
+revenir|Retourner à un endroit.
+arriver|Parvenir à un endroit.
+prendre|Saisir quelque chose.
+donner|Offrir quelque chose à quelqu'un.
+avoir|Posséder quelque chose.
+être|Exister.
+faire|Accomplir une action.
+vouloir|Désirer quelque chose.
+pouvoir|Avoir la capacité de faire.
+devoir|Être obligé de faire.
+savoir|Connaître ou être capable.
+penser|Réfléchir avec son esprit.
+croire|Être convaincu de quelque chose.
+rire|Exprimer de la joie par un son.
+pleurer|Verser des larmes.
+sourire|Courber les lèvres pour montrer de la joie.
+musique|Art des sons et des mélodies.
+dessin|Image faite à la main.
+couleur|Apparence des choses selon la lumière.
+rouge|Couleur du sang.
+bleu|Couleur du ciel.
+vert|Couleur de la nature.
+jaune|Couleur du soleil.
+noir|Absence de couleur.
+blanc|Couleur de la neige.
+grand|Qui a une grande taille.
+petit|Qui a une petite taille.
+rapide|Qui va vite.
+lent|Qui va doucement.
+chaud|Qui a une température élevée.
+fort|Qui a beaucoup de force.
+faible|Qui a peu de force.
+beau|Qui est agréable à regarder.
+laid|Qui n'est pas beau.
+bon|Qui a des qualités positives.
+mauvais|Qui a des qualités négatives.
+facile|Qui ne présente pas de difficulté.
+difficile|Qui présente des difficultés.
+clair|Bien éclairé.
+sombre|Peu éclairé.
+plein|Qui contient tout ce qu'il peut contenir.
+vide|Qui ne contient rien.
+long|Qui a une grande longueur.
+court|Qui a une petite longueur.
+temps|Durée mesurable.
+espace|Étendue, endroit.
+groupe|Ensemble de personnes.
+société|Ensemble des gens qui vivent en communauté.
+ville|Grande agglomération.
+village|Petite agglomération.
+rue|Espace public entre les maisons.
+voiture|Véhicule à quatre roues.
+bus|Gros véhicule pour transporter des gens.
+train|Véhicule roulant sur des rails.
+bateau|Moyen de transport sur l'eau.
+écouter|Porter attention à un son.
+lire|Déchiffrer un texte.
+compter|Faire le calcul.
+acheter|Acquérir quelque chose contre de l'argent.
+vendre|Céder quelque chose contre de l'argent.
+argent|Monnaie pour payer.
+prix|Coût d'un objet.
+travail|Activité professionnelle.
+métier|Profession exercée.
+entreprise|Organisation commerciale.
+commerce|Activité de vendre.
+tourisme|Activité de visiter des lieux.
+voyage|Déplacement vers un autre lieu.
+restaurant|Lieu où on mange.
+nourriture|Ce qu'on mange pour se nourrir.
+lait|Liquide blanc produit par les animaux.
+poisson|Animal aquatique.
+sucre|Aliment sucré.
+sel|Substance pour relever le goût.
+thé|Boisson chaude à base de feuilles.
+bière|Boisson alcoolisée.
+vin|Boisson fermentée à base de raisin.
+football|Sport de ballon.
+basket-ball|Sport de panier.
+tennis|Sport de raquette.
+natation|Sport aquatique.
+jeu|Activité ludique.
+joueur|Personne qui joue.
+gagner|Remporter une compétition.
+perdre|Être battu dans une compétition.
+amour|Sentiment d'affection profonde.
+bonheur|Sentiment de joie.
+tristesse|Sentiment de peine.
+colère|Sentiment d'énervement.
+peur|Sentiment d'inquiétude.
+espoir|Sentiment de confiance.
+santé|État de bien-être.
+médecine|Science des soins.
+maladie|Altération de la santé.
+vérité|Ce qui est vrai.
+mensonge|Ce qui est faux.
+liberté|Possibilité d'agir librement.
+paix|Absence de conflit.
+guerre|Conflit armé.
+nature|Ensemble du monde sans l'homme.
+animal|Être vivant non végétal.
+arbre|Grande plante à tronc.
+fleur|Partie colorée des plantes.
+mer|Grande étendue d'eau salée.
+printemps|Saison des fleurs.
+été|Saison chaude.
+automne|Saison des feuilles mortes.
+hiver|Saison froide.
+anniversaire|Date de naissance.
+fête|Célébration.
+bébé|Très jeune enfant.
+monde|L'ensemble de la Terre et des humains.
+accepter|Recevoir ou dire oui à quelque chose.
+accompagner|Aller avec quelqu'un.
+agir|Faire quelque chose.
+aider|Apporter son soutien à quelqu'un.
+aimer|Éprouver de l'affection.
+allumer|Mettre en marche une lumière.
+appeler|Contacter quelqu'un par téléphone.
+apprendre|Acquérir des connaissances.
+arrêter|Cesser de faire quelque chose.
+asseoir|Se mettre sur une chaise.
+attendre|Rester jusqu'à ce que quelque chose arrive.
+avancer|Aller vers l'avant.
+avertir|Prévenir, informer.
+bâtir|Construire un bâtiment.
+cacher|Mettre quelque chose à l'abri des regards.
+changer|Modifier, rendre différent.
+chasser|Pourchasser un animal.
+choisir|Sélectionner parmi plusieurs options.
+citer|Mentionner une source ou une personne.
+commencer|Débuter une action.
+conduire|Diriger un véhicule.
+confirmer|Valider une information.
+connaître|Savoir, être informé.
+construire|Édifier, bâtir.
+continuer|Poursuivre sans s'arrêter.
+contrôler|Vérifier ou maîtriser.
+convaincre|Persuader quelqu'un.
+couvrir|Recouvrir d'une couche.
+craindre|Avoir peur.
+créer|Donner vie à quelque chose.
+croître|Grandir, se développer.
+cultiver|Travailler la terre.
+danser|Bouger en rythme.
+débattre|Discuter en argumentant.
+décider|Prendre une décision.
+décrire|Représenter par des mots.
+défendre|Protéger ou interdire.
+déguster|Apprécier un mets.
+déléguer|Confier une tâche.
+démarrer|Mettre en route.
+dénoncer|Révéler une situation.
+désigner|Montrer ou nommer.
+détester|Haïr, ne pas aimer.
+développer|Faire progresser.
+diminuer|Réduire en quantité.
+diriger|Mener, conduire.
+discuter|Échanger des idées.
+disparaître|Cesser d'être visible.
+distinguer|Percevoir une différence.
+distribuer|Donner à plusieurs personnes.
+diviser|Séparer en parties.
+douter|Ne pas être sûr.
+échouer|Ne pas réussir.
+éduquer|Instruire, former.
+effectuer|Réaliser, accomplir.
+éliminer|Supprimer.
+embrasser|Faire un baiser.
+emmener|Conduire quelqu'un quelque part.
+émouvoir|Toucher la sensibilité.
+empêcher|Bloquer, interdire.
+employer|Utiliser ou embaucher.
+encourager|Donner du courage.
+enfouir|Mettre sous terre.
+enlever|Retirer, ôter.
+enseigner|Transmettre des connaissances.
+envahir|Occuper un espace.
+envoyer|Faire parvenir.
+éprouver|Ressentir une émotion.
+essayer|Tenter de faire.
+établir|Mettre en place, créer.
+étonner|Surprendre.
+éviter|Contourner, ne pas faire.
+examiner|Observer attentivement.
+excuser|Pardonner.
+exiger|Demander de manière stricte.
+expliquer|Rendre compréhensible.
+explorer|Parcourir pour découvrir.
+exposer|Présenter, montrer.
+exprimer|Faire connaître.
+fabriquer|Produire, construire.
+fâcher|Mettre en colère.
+fonder|Créer, établir.
+fournir|Approvisionner.
+freiner|Ralentir.
+fuir|S'échapper.
+gager|Parier.
+garder|Conserver.
+garer|Stationner un véhicule.
+gémir|Se plaindre.
+glisser|Coulisser, se déplacer en glissant.
+gouverner|Diriger un pays.
+grandir|Devenir plus grand.
+gratter|Frotter pour enlever.
+guérir|Soigner, rétablir.
+habiter|Vivre dans un lieu.
+harasser|Fatiguer énormément.
+hésiter|Être indécis.
+ignorer|Ne pas connaître ou ne pas tenir compte.
+illuminer|Éclairer vivement.
+imiter|Copier, reproduire.
+immigrer|Venir s'installer dans un pays étranger.
+impliquer|Engager, concerner.
+imposer|Mettre en place.
+impressionner|Frapper par l'importance.
+inciter|Pousser à agir.
+inclure|Intégrer, comprendre.
+indiquer|Montrer, signaler.
+influencer|Avoir un effet sur.
+informer|Donner une information.
+innover|Apporter du nouveau.
+inspirer|Remplir d'inspiration.
+installer|Mettre en place.
+instruire|Former, enseigner.
+interdire|Ne pas autoriser.
+interroger|Poser des questions.
+intervenir|S'impliquer, agir.
+intimider|Faire peur.
+introduire|Faire entrer.
+inventer|Créer de toutes pièces.
+investir|Engager des fonds.
+inviter|Demander à venir.
+isoler|Séparer du reste.
+jouer|S'amuser, pratiquer un sport.
+jurer|Promettre solennellement.
+justifier|Donner une raison valable.
+laver|Nettoyer avec de l'eau.
+lécher|Passer la langue.
+livrer|Apporter, distribuer.
+louer|Faire l'éloge ou prendre en location.
+lutter|Combattre.
+maîtriser|Contrôler parfaitement.
+manipuler|Utiliser avec adresse ou influencer.
+maturer|Arriver à maturité.
+mélanger|Mixer, combiner.
+mener|Conduire, diriger.
+mesurer|Déterminer la dimension.
+mettre|Poser, placer.
+meubler|Garnir de meubles.
+migrer|Se déplacer de région.
+modifier|Changer.
+monter|Grimper.
+mourir|Cesser de vivre.
+mouvoir|Bouger, déplacer.
+nager|Se déplacer dans l'eau.
+négocier|Discuter pour obtenir un accord.
+nettoyer|Rendre propre.
+nourrir|Donner à manger.
+obéir|Suivre les ordres.
+obtenir|Acquérir.
+occuper|Remplir un espace ou un temps.
+offrir|Donner en cadeau.
+oublier|Ne plus se souvenir.
+ouvrir|Entrouvrir, défaire.
+parvenir|Arriver à faire.
+payer|Verser une somme.
+pêcher|Capturer des poissons.
+peindre|Recouvrir de peinture.
+percer|Faire un trou.
+permettre|Autoriser.
+persuader|Convaincre.
+peser|Déterminer le poids.
+piller|Voler en masse.
+placer|Mettre à un endroit.
+planter|Mettre en terre.
+plier|Courber, ployer.
+porter|Transporter.
+poser|Déposer, installer.
+posséder|Avoir, être propriétaire.
+préparer|Organiser, apprêter.
+présenter|Montrer, introduire.
+préserver|Protéger.
+presser|Comprimer, appuyer.
+prétendre|Affirmer.
+prévenir|Informer à l'avance.
+prier|Implorer, demander.
+produire|Fabriquer.
+progresser|Avancer, évoluer.
+promener|Faire marcher.
+promettre|S'engager à faire.
+proposer|Suggérer, offrir.
+prose|Écriture ordinaire.
+protéger|Défendre.
+prouver|Démontrer.
+publier|Rendre public.
+qualifier|Attribuer une qualité.
+quitter|Laisser, partir.
+raconter|Dire, narrer.
+raser|Couper ras.
+réaliser|Accomplir, matérialiser.
+recueillir|Rassembler.
+reculer|Aller en arrière.
+réduire|Diminuer.
+abandonner|Cesser de faire quelque chose, renoncer.
+aborder|Commencer à parler d'un sujet.
+absence|Fait de ne pas être présent.
+absurde|Qui n'a pas de sens, illogique.
+abuser|Profiter de manière excessive.
+accéder|Avoir accès à quelque chose.
+accident|Événement imprévu et souvent fâcheux.
+accord|Consentement, entente entre personnes.
+accueillir|Recevoir quelqu'un chez soi.
+accuser|Dire que quelqu'un est coupable.
+achever|Finir, terminer complètement.
+acquérir|Devenir propriétaire, obtenir.
+adapter|Ajuster à une situation.
+addition|Opération qui consiste à ajouter des nombres.
+admettre|Reconnaître, accepter.
+adopter|Prendre quelque chose comme sien.
+adorer|Aimer énormément.
+aérer|Faire circuler l'air, ventiler.
+affaire|Ce qui concerne une personne, un événement.
+affiche|Panneau publicitaire.
+agiter|Remuer, secouer.
+améliorer|Rendre meilleur.
+amener|Conduire quelqu'un quelque part.
+analyse|Étude détaillée d'un sujet.
+animer|Donner de la vie, dynamiser.
+anticiper|Prévoir avant que cela arrive.
+apparaître|Devenir visible.
+appétit|Envie de manger.
+appliquer|Mettre en pratique, poser sur quelque chose.
+apprécier|Avoir une opinion favorable.
+approcher|S'approcher de quelque chose.
+argenterie|Objets en argent.
+arracher|Enlever avec force.
+arranger|Mettre en ordre, réparer.
+artisan|Personne qui exerce un métier manuel.
+aucun|Pas un seul.
+augmenter|Devenir plus grand.
+aujourd'hui|Le jour présent.
+auparavant|Avant, dans le passé.
+aussitôt|Immédiatement, tout de suite.
+autant|Une quantité égale.
+auteur|Personne qui écrit une œuvre.
+autre|Différent, un second.
+avantage|Ce qui est favorable.
+aviateur|Personne qui pilote un avion.
+avis|Opinion, point de vue.
+baigner|Tremper dans l'eau.
+baisser|Descendre, diminuer.
+balayer|Nettoyer avec un balai.
+balle|Petite boule utilisée dans les jeux.
+banlieue|Zone périphérique d'une ville.
+battre|Frapper, gagner contre quelqu'un.
+beaucoup|En grande quantité.
+belge|Personne de Belgique.
+bénéfice|Gain, avantage.
+bête|Animal, ou personne peu intelligente.
+bien|Ce qui est bon, agréable.
+blesser|Faire du mal physiquement ou moralement.
+bondir|Sauter brusquement.
+bouche|Ouverture par laquelle on mange et parle.
+bouger|Se déplacer, remuer.
+bourdonner|Faire un bruit de bourdon.
+bout|Extrémité d'un objet.
+branche|Partie d'un arbre.
+bras|Membre supérieur.
+briller|Émettre de la lumière.
+broder|Coudre des motifs.
+brûler|Consumer par le feu.
+brutal|Qui est violent, brusque.
+budgéter|Prévoir des dépenses.
+cadre|Encadrement, environnement.
+calculer|Faire une opération mathématique.
+calme|Qui est tranquille.
+camper|Vivre sous une tente.
+canal|Cours d'eau artificiel.
+cancer|Maladie grave.
+candidat|Personne qui se présente à une élection.
+capable|Qui a la capacité de faire.
+caprice|Désir soudain et irraisonné.
+caractère|Ensemble des traits de personnalité.
+casser|Briser en morceaux.
+céder|Laisser, donner.
+célébrer|Fêter un événement.
+célèbre|Très connu.
+cendres|Restes d'un feu.
+certain|Qui est sûr, indubitable.
+certificat|Document officiel.
+chacun|Chaque personne.
+chaise|Siège à une personne.
+chance|Hasard favorable.
+chaque|Tous les éléments d'un ensemble.
+chercher|Essayer de trouver.
+cheval|Grand animal à quatre pattes.
+cheveux|Poils de la tête.
+chiffre|Symbole numérique.
+chimie|Science des substances.
+chose|Objet, élément.
+classe|Groupe d'élèves, catégorie.
+clavier|Ensemble de touches.
+climat|Ensemble des conditions météorologiques.
+collège|Établissement scolaire.
+comité|Groupe de personnes chargées d'une tâche.
+comparer|Mettre en parallèle.
+compétence|Savoir-faire.
+complet|Qui est entier, total.
+composer|Créer, assembler.
+comprendre|Saisir le sens.
+comptable|Personne qui tient les comptes.
+concentration|Action de concentrer son attention.
+concept|Idée abstraite.
+condition|Situation, exigence.
+confiance|Assurance, croyance en quelqu'un.
+conflit|Désaccord, opposition.
+conscience|Connaissance de soi et des actes.
+conséquence|Résultat d'une action.
+conserver|Garder, préserver.
+considérer|Réfléchir, estimer.
+consulter|Demander un avis.
+contenir|Avoir en soi.
+contestation|Action de contester.
+contraire|Opposé.
+contribution|Part apportée à un effort commun.
+contrôle|Vérification, maîtrise.
+convenable|Adapté, correct.
+conversation|Discussion.
+conviction|Certitude profonde.
+coopérer|Agir ensemble.
+coordonner|Organiser, harmoniser.
+corriger|Rectifier une erreur.
+corruption|Malversation, acte illicite.
+côte|Bord, rivage.
+coucher|Se mettre au lit.
+coude|Articulation du bras.
+coup|Choc, frappe.
+couper|Diviser avec un outil.
+courant|Qui est habituel, en circulation.
+courbe|Ligne incurvée.
+cours|Leçon, enseignement.
+coussin|Objet pour s'asseoir ou se reposer.
+couteau|Instrument pour couper.
+crayon|Instrument pour écrire.
+création|Action de créer.
+crédit|Confiance accordée, somme prêtée.
+croissance|Augmentation, développement.
+cru|Qui n'est pas cuit.
+cuir|Matière animale.
+culte|Pratique religieuse.
+curiosité|Envie de savoir.
+cycle|Série répétitive d'événements.
+danger|Situation risquée.
+décennie|Période de dix ans.
+déclarer|Annoncer officiellement.
+décoration|Art d'embellir.
+découverte|Fait de trouver quelque chose.
+dédier|Consacrer à quelqu'un ou quelque chose.
+athlète|Personne qui pratique un sport de compétition.|0
+terrain|Surface délimitée pour jouer un sport.|0
+sifflet|Instrument utilisé par l'arbitre pour signaler une faute.|0
+adversaire|Personne contre qui on joue.|0
+pression|Tension ressentie en compétition.|0
+trophée|Récompense donnée au gagnant.|0
+performance|Résultat obtenu lors d'une épreuve.|0
+résultat|Score final d'un match.|0
+public|Spectateurs qui regardent un match.|0
+cage|But au football ou au hockey.|0
+gardien|Joueur qui protège le but.|0
+défense|Action de protéger son camp.|0
+attaque|Action d'aller vers le but adverse.|0
+passe|Transmission du ballon à un coéquipier.|0
+tir|Envoi du ballon vers le but.|0
+dribbler|Passer devant un adversaire avec le ballon.|0
+marquer|Inscrire un point.|0
+échanger|S'envoyer le ballon.|0
+sprint|Course sur courte distance à pleine vitesse.|0
+endurance|Capacité à soutenir un effort long.|0
+souplesse|Capacité à plier son corps facilement.|0
+agilité|Capacité à se déplacer rapidement et avec précision.|0
+coordination|Action de coordonner ses mouvements.|0
+équilibre|Stabilité du corps.|0
+récupération|Période de repos après l'effort.|0
+hydratation|Action de boire pour rester en forme.|0
+énergie|Force physique pour agir.|0
+muscle|Tissu qui permet les mouvements.|0
+articulation|Zone de jonction entre deux os.|0
+blessure|Lésion physique survenue pendant le sport.|0
+entorse|Blessure d'une articulation.|0
+fracture|Cassure d'un os.|0
+crampe|Contraction douloureuse d'un muscle.|0
+courbature|Douleur musculaire après l'effort.|0
+échauffement|Préparation physique avant le sport.|0
+étirement|Action d'allonger les muscles.|0
+série|Ensemble de répétitions d'un exercice.|0
+poids|Charge utilisée pour la musculation.|0
+haltère|Poids tenu à la main.|0
+barre|Longue tige utilisée en musculation.|0
+sportif|Personne qui pratique un sport.|0
+amateur|Personne qui pratique un sport sans en faire son métier.|0
+professionnel|Sportif qui vit de son sport.|0
+club|Association sportive.|0
+champion|Vainqueur d'une compétition.|0
+médaille|Récompense métallique pour un podium.|0
+podium|Estrade où montent les gagnants.|0
+hymne|Chanson jouée pour honorer un pays.|0
+drapeau|Symbole d'un pays brandi lors des compétitions.|0
+faim|Besoin de se nourrir.|1
+soif|Besoin de boire.|1
+aliment|Ce que l'on mange.|1
+calorie|Unité d'énergie fournie par la nourriture.|1
+protéine|Nutriment essentiel pour les muscles.|1
+glucide|Sucre fournissant de l'énergie.|1
+lipide|Matière grasse.|1
+fibre|Substance végétale qui facilite la digestion.|1
+goût|Sensation perçue par le palais.|1
+salé|Qui a un goût de sel.|1
+amer|Goût désagréable et fort.|1
+acide|Goût aigre.|1
+croquant|Qui fait un bruit sec en bouche.|1
+fondant|Qui fond en bouche.|1
+assaisonner|Relever un plat avec des épices.|1
+mariner|Faire tremper un aliment dans une sauce.|1
+griller|Cuire à la poêle ou sur le barbecue.|1
+rôtir|Cuire au four.|1
+bouillir|Porter un liquide à ébullition.|1
+cuire|Transformer un aliment par la chaleur.|1
+frire|Cuire dans l'huile chaude.|1
+éplucher|Enlever la peau d'un fruit ou d'un légume.|1
+hacher|Couper très finement.|1
+moudre|Réduire en poudre.|1
+gobelet|Récipient pour boire.|1
+assiette|Plat pour servir la nourriture.|1
+bol|Récipient rond et creux.|1
+couvercle|Partie qui ferme un récipient.|1
+cuisinier|Personne qui prépare les repas.|1
+cantine|Salle à manger collective.|1
+buffet|Présentation de plats à disposition.|1
+menu|Liste des plats proposés.|1
+entrée|Premier plat du repas.|1
+plat principal|Plat central du repas.|1
+dessert|Plat sucré en fin de repas.|1
+yaourt|Lait fermenté.|1
+beurre|Matière grasse issue du lait.|1
+crème|Produit laitier épais.|1
+oeuf|Aliment issu de la poule.|1
+farine|Poudre obtenue à partir de céréales.|1
+levure|Agent qui fait gonfler la pâte.|1
+miel|Substance sucrée produite par les abeilles.|1
+destination|Lieu où l'on se rend.|2
+séjour|Période passée dans un lieu.|2
+départ|Action de quitter un lieu.|2
+arrivée|Action d'arriver à destination.|2
+retour|Action de revenir.|2
+vol|Trajet en avion.|2
+moto|Véhicule à deux roues.|2
+vélo|Engin à pédales.|2
+ticket|Document pour prendre un transport.|2
+réservation|Action de réserver à l'avance.|2
+annulation|Action d'annuler.|2
+retard|Arrivée en avance ou en retard.|2
+correspondance|Changement de transport.|2
+escale|Arrêt pendant un voyage.|2
+tour du monde|Voyage qui fait le tour de la Terre.|2
+visite|Action de découvrir un lieu.|2
+guide|Personne qui fait visiter.|2
+boussole|Instrument pour trouver le nord.|2
+gps|Système de navigation.|2
+itinéraire|Chemin à suivre.|2
+trajet|Parcours effectué.|2
+voyageur|Personne en voyage.|2
+explorateur|Personne qui découvre de nouveaux lieux.|2
+expatrié|Personne vivant à l'étranger.|2
+frontière|Limite entre deux pays.|2
+douane|Service de contrôle à la frontière.|2
+visa|Document pour entrer dans un pays.|2
+devise|Monnaie utilisée à l'étranger.|2
+souvenir|Objet ramené d'un voyage.|2
+photo|Image capturée en voyage.|2
+dépaysement|Sentiment d'être ailleurs.|2
+culture|Ensemble des traditions d'un pays.|2
+langue|Moyen de communication.|2
+coutume|Habitude d'un pays.|2
+hébergement|Lieu où l'on dort.|2
+auberge|Petit hôtel.|2
+camping|Lieu de vacances en plein air.|2
+tente|Abri de camping.|2
+randonnée|Promenade en nature.|2
+excursion|Sortie d'une journée.|2
+safari|Observation des animaux sauvages.|2
+note|Son musical.|3
+symphonie|Oeuvre musicale pour orchestre.|3
+concerto|Oeuvre pour soliste et orchestre.|3
+sonate|Oeuvre pour instrument seul.|3
+opéra|Oeuvre chantée et mise en scène.|3
+ballade|Chanson douce et mélancolique.|3
+tango|Danse et musique argentine.|3
+salsa|Musique et danse cubaine.|3
+rock|Genre musical rythmé.|3
+pop|Musique populaire entraînante.|3
+reggae|Musique jamaïcaine.|3
+hip-hop|Culture urbaine incluant le rap.|3
+rap|Style musical avec des paroles scandées.|3
+blues|Musique mélancolique.|3
+jazz|Musique improvisée.|3
+classique|Musique traditionnelle.|3
+contemporain|Musique moderne.|3
+compositeur|Personne qui écrit de la musique.|3
+interprète|Personne qui joue une oeuvre.|3
+orchestre|Groupe de musiciens.|3
+choeur|Groupe de chanteurs.|3
+solo|Passage joué seul.|3
+duo|Deux musiciens.|3
+trio|Trois musiciens.|3
+quatuor|Quatre musiciens.|3
+quintette|Cinq musiciens.|3
+partition|Texte musical écrit.|3
+portée|Ensemble de lignes pour écrire la musique.|3
+clef|Signe qui indique la hauteur des notes.|3
+tempo|Vitesse de la musique.|3
+gamme|Suite de notes.|3
+harmonie|Combinaison agréable de sons.|3
+intensité|Volume sonore.|3
+timbre|Qualité d'un son.|3
+résonance|Prolongement du son.|3
+écho|Répétition d'un son.|3
+acoustique|Qualité du son dans un lieu.|3
+studio|Lieu d'enregistrement.|3
+mixage|Action de mélanger les sons.|3
+mastering|Finalisation d'un enregistrement.|3
+titre|Nom d'une chanson.|3
+album|Ensemble de chansons.|3
+single|Chanson publiée seule.|3
+clip|Vidéo accompagnant une chanson.|3
+tournée|Série de concerts.|3
+littérature|Ensemble des oeuvres écrites.|4
+poème|Texte en vers.|4
+fable|Court récit avec une morale.|4
+conte|Récit merveilleux.|4
+roman|Long récit imaginaire.|4
+nouvelle|Récit court.|4
+tragédie|Pièce de théâtre dramatique.|4
+comédie|Pièce de théâtre joyeuse.|4
+drame|Pièce de théâtre sérieuse.|4
+mise en scène|Direction d'une pièce.|4
+acteur|Personne qui joue un rôle.|4
+comédien|Acteur de théâtre.|4
+spectateur|Personne qui regarde.|4
+art|Expression créative.|4
+peintre|Personne qui peint.|4
+sculpteur|Personne qui sculpte.|4
+architecte|Personne qui conçoit des bâtiments.|4
+galerie|Lieu d'exposition d'art.|4
+exposition|Présentation d'oeuvres.|4
+tradition|Coutume transmise.|4
+folklore|Ensemble des traditions populaires.|4
+croyance|Ce en quoi on croit.|4
+rite|Cérémonie religieuse ou traditionnelle.|4
+carnaval|Fête déguisée.|4
+procession|Défilé religieux.|4
+pèlerinage|Voyage religieux.|4
+mythologie|Ensemble des mythes.|4
+légende|Récit traditionnel merveilleux.|4
+épopée|Long récit héroïque.|4
+philosophie|Réflexion sur la vie.|4
+éthique|Science de la morale.|4
+esthétique|Étude de la beauté.|4
+humanisme|Courant de pensée centré sur l'humain.|4
+renaissance|Période de renouveau artistique.|4
+baroque|Style artistique exubérant.|4
+classicisme|Style artistique sobre.|4
+romantisme|Mouvement artistique émotionnel.|4
+réalisme|Mouvement artistique qui montre la réalité.|4
+impressionnisme|Mouvement artistique jouant avec la lumière.|4
+surréalisme|Mouvement artistique onirique.|4
+cubisme|Mouvement artistique géométrique.|4
+abstrait|Art qui ne représente pas le réel.|4
+culturel|Relatif à la culture.|4
+érudit|Personne très cultivée.|4
+boulot|Langage familier pour le travail.|5
+carrière|Parcours professionnel.|5
+recrutement|Action d'embaucher.|5
+entretien|Discussion pour un emploi.|5
+stage|Période d'essai en entreprise.|5
+apprentissage|Période de formation.|5
+fiche de paie|Document qui détaille le salaire.|5
+prime|Somme supplémentaire versée.|5
+impôt|Somme versée à l'État.|5
+cotisation|Somme versée pour la sécurité sociale.|5
+retraite|Période après le travail.|5
+travailleur|Personne qui travaille.|5
+employé|Personne salariée.|5
+ouvrier|Travailleur manuel.|5
+technicien|Personne qualifiée dans un domaine technique.|5
+ingénieur|Professionnel technique et scientifique.|5
+manager|Personne qui dirige une équipe.|5
+chef|Personne responsable.|5
+horaire|Répartition des heures de travail.|5
+pointeuse|Machine pour enregistrer les horaires.|5
+planning|Organisation du temps.|5
+échéance|Date limite pour un projet.|5
+rapport|Document synthétique.|5
+compte rendu|Résumé d'une réunion.|5
+bilan|Évaluation des résultats.|5
+projet|Plan d'action.|5
+mission|Tâche confiée.|5
+séminaire|Session de formation.|5
+congé|Période de repos autorisée.|5
+vacances|Période de congés.|5
+rtt|Réduction du temps de travail.|5
+flexibilité|Capacité à s'adapter.|5
+polyvalence|Capacité à faire plusieurs tâches.|5
+responsabilité|Obligation de répondre de ses actes.|5
+décision|Choix effectué.|5
+délégation|Confier une tâche.|5
+autonomie|Capacité à agir seul.|5
+efficacité|Capacité à produire des résultats.|5
+productivité|Quantité de travail produit.|5
+rendement|Efficacité au travail.|5
+symptôme|Signe d'une maladie.|6
+fièvre|Élévation de la température corporelle.|6
+toux|Réflexe de l'organisme.|6
+rhume|Infection bénigne.|6
+grippe|Maladie virale.|6
+allergie|Réaction à une substance.|6
+asthme|Difficulté respiratoire.|6
+diabète|Maladie du sucre.|6
+hypertension|Tension artérielle élevée.|6
+cholestérol|Graisse dans le sang.|6
+anémie|Manque de globules rouges.|6
+infection|Invasion de l'organisme par des microbes.|6
+virus|Agent infectieux microscopique.|6
+bactérie|Micro-organisme.|6
+antibiotique|Médicament contre les bactéries.|6
+vaccin|Produit pour prévenir une maladie.|6
+épidémie|Propagation d'une maladie.|6
+pandémie|Épidémie mondiale.|6
+clinique|Établissement de soins.|6
+infirmier|Soignant qui aide les médecins.|6
+pharmacien|Spécialiste des médicaments.|6
+dentiste|Médecin des dents.|6
+ophtalmologue|Médecin des yeux.|6
+dermatologue|Médecin de la peau.|6
+cardiologue|Médecin du coeur.|6
+psychologue|Spécialiste du mental.|6
+psychiatre|Médecin des troubles mentaux.|6
+chirurgien|Médecin qui opère.|6
+diagnostic|Identification d'une maladie.|6
+examen|Test médical.|6
+radio|Image médicale.|6
+scanner|Examen radiologique.|6
+irm|Imagerie médicale.|6
+opération|Acte chirurgical.|6
+rééducation|Récupération de la mobilité.|6
+kinésithérapeute|Spécialiste de la rééducation.|6
+pilule|Comprimé médicament.|6
+sirop|Médicament liquide.|6
+comprimé|Médicament solide.|6
+goutte|Petite dose de liquide.|6
+pommade|Crème médicamenteuse.|6
+désinfectant|Produit qui tue les microbes.|6
+pansement|Protection sur une plaie.|6
+thermomètre|Instrument pour mesurer la fièvre.|6
+tensiomètre|Appareil pour mesurer la tension.|6
+stéthoscope|Instrument pour écouter le coeur.|6
+aimable|Gentil avec les autres.|7
+arrogant|Qui se croit supérieur.|7
+attentionné|Qui fait attention aux autres.|7
+aventureux|Qui aime l'aventure.|7
+courageux|Qui n'a pas peur.|7
+créatif|Qui invente des choses.|7
+curieux|Qui veut apprendre.|7
+déterminé|Qui est motivé.|7
+dynamique|Plein d'énergie.|7
+égoïste|Qui ne pense qu'à soi.|7
+énergique|Qui a beaucoup d'énergie.|7
+honorable|Digne de respect.|7
+honnête|Qui dit la vérité.|7
+hypocrite|Qui dit une chose et en pense une autre.|7
+impatient|Qui n'aime pas attendre.|7
+impulsif|Qui agit sans réfléchir.|7
+indépendant|Qui agit par lui-même.|7
+intelligent|Qui comprend vite.|7
+jaloux|Qui envie les autres.|7
+jeune|Qui a peu d'années.|7
+joyeux|Toujours de bonne humeur.|7
+juste|Qui est équitable.|7
+lâche|Qui a peur facilement.|7
+maladroit|Qui fait des gaffes.|7
+mature|Qui est réfléchi.|7
+méchant|Qui fait du mal.|7
+modeste|Qui ne se vante pas.|7
+nerveux|Qui est anxieux.|7
+ouvert|Qui est tolérant.|7
+prudent|Qui fait attention.|7
+rancunier|Qui n'oublie pas les offenses.|7
+rêveur|Qui imagine beaucoup.|7
+sage|Qui est prudent et réfléchi.|7
+sensuel|Qui ressent intensément.|7
+sérieux|Qui n'est pas frivole.|7
+sincère|Qui est honnête.|7
+sociable|Qui aime les gens.|7
+solitaire|Qui aime être seul.|7
+stoïque|Qui ne montre pas ses émotions.|7
+têtu|Qui ne change pas d'avis.|7
+tolérant|Qui accepte les différences.|7
+volontaire|Qui fait des efforts.|7
+zélé|Qui fait son travail avec ardeur.|7
+aube|Lever du soleil.|8
+crépuscule|Tombée de la nuit.|8
+brouillard|Nappe de nuages bas.|8
+arc-en-ciel|Bande colorée dans le ciel.|8
+tonnerre|Bruit de l'orage.|8
+éclair|Décharge électrique lumineuse.|8
+foudre|Décharge électrique puissante.|8
+ouragan|Vent très violent.|8
+inondation|Submersion par l'eau.|8
+sécheresse|Manque d'eau.|8
+oasis|Lieu fertile dans le désert.|8
+dune|Colline de sable.|8
+rocher|Pierre massive.|8
+caillou|Petite pierre.|8
+sable|Grains fins sur la plage.|8
+terreau|Terre fertile pour les plantes.|8
+engrais|Substance qui nourrit les plantes.|8
+pesticide|Produit pour tuer les insectes.|8
+pollution|Dégradation de l'environnement.|8
+recyclage|Transformation des déchets.|8
+déchet|Ce qu'on jette.|8
+poubelle|Récipient pour les déchets.|8
+compost|Engrais naturel.|8
+écologie|Science de l'environnement.|8
+durable|Qui dure dans le temps.|8
+brosse|Outil pour se coiffer.|8
+serviette|Tissu pour se sécher.|8
+mouchoir|Tissu pour se moucher.|8
+linge|Vêtements à laver.|8
+éponge|Objet pour nettoyer.|8
+détergent|Produit pour laver.|8
+amidon|Produit pour repasser.|8
+tapis|Couverture de sol.|8
+rideau|Tissu pour cacher une fenêtre.|8
+store|Protège fenêtre.|8
+lampadaire|Lumière sur pied.|8
+horloge|Appareil pour l'heure.|8
+calendrier|Tableau des jours.|8
+agenda|Carnet de rendez-vous.|8
+ciseaux|Outil pour couper.|8
+colle|Substance pour coller.|8
+ruban|Bande adhésive.|8
+trombone|Attache-papier.|8
+agrafeuse|Outil pour agrafer.|8
+perforatrice|Outil pour trouer.|8
+classeur|Dossier pour ranger des feuilles.|8
+chemise|Dossier cartonné.|8
+boîte|Contenant rigide.|8
+sac|Contenant pour transporter.|8
+écran|Surface pour afficher des images.|10
+souris|Périphérique pour cliquer.|10
+micro|Appareil qui capte le son.|10
+caméra|Appareil pour filmer.|10
+haut-parleur|Appareil qui diffuse le son.|10
+casque|Appareil pour écouter seul.|10
+microphone|Appareil pour enregistrer la voix.|10
+câble|Filaire pour transmettre des données.|10
+batterie|Source d'énergie pour les appareils.|10
+chargeur|Appareil pour recharger.|10
+port|Connecteur pour brancher des périphériques.|10
+mémoire|Espace de stockage.|10
+disque dur|Appareil de stockage de données.|10
+serveur|Ordinateur central.|10
+réseau|Ensemble d'ordinateurs connectés.|10
+wi-fi|Réseau sans fil.|10
+bluetooth|Technologie de connexion sans fil.|10
+sécurité|Protection des données.|10
+mot de passe|Code secret.|10
+piratage|Intrusion illégale.|10
+spam|Courrier indésirable.|10
+virus informatique|Programme malveillant.|10
+antivirus|Logiciel de protection.|10
+backup|Copie de sécurité.|10
+périphérique|Appareil connecté à un ordinateur.|10
+écran tactile|Écran qu'on touche.|10
+reconnaissance faciale|Identification par le visage.|10
+reconnaissance vocale|Identification par la voix.|10
+impression 3d|Création d'objets en trois dimensions.|10
+robot|Machine automatisée.|10
+ia|Intelligence artificielle.|10
+algorithme|Série d'instructions.|10
+programmation|Écriture de codes.|10
+code|Langage informatique.|10
+développeur|Personne qui programme.|10
+open source|Logiciel libre.|10
+interface|Point de contact utilisateur-machine.|10
+simulation|Reproduction virtuelle.|10
+virtualisation|Création de versions virtuelles.|10
+puce|Petit circuit électronique.|10
+capteur|Appareil qui détecte.|10
+biométrie|Identification par le corps.|10
+cryptage|Protection des données par codage.|10
+décryptage|Décodage des données.|10
+api|Interface de programmation.|10
+intégration|Assemblage de systèmes.|10
+mise à jour|Nouvelle version d'un logiciel.|10
+téléchargement|Transfert de données.|10
+upload|Transfert de données vers le serveur.|10
+abstraction|Capacité à penser à des concepts éloignés du concret.|9
+acuité|Finesse et rapidité de compréhension.|9
+attention|Concentration de l'esprit sur un objet.|9
+capacité|Aptitude à faire quelque chose.|9
+cerveau|Organe physique de la pensée.|9
+clairvoyance|Capacité à voir clair dans une situation.|9
+compréhension|Action de saisir le sens.|9
+connaissance|Savoir acquis.|9
+créativité|Capacité à inventer du nouveau.|9
+déduction|Action de tirer une conclusion logique.|9
+discernement|Capacité à juger correctement.|9
+éducation|Processus de transmission des savoirs.|9
+empathie|Capacité à comprendre les émotions des autres.|9
+esprit critique|Capacité à remettre en question.|9
+évaluation|Estimation de la valeur de quelque chose.|9
+expérience|Savoir acquis par la pratique.|9
+génie|Intelligence exceptionnelle.|9
+habileté|Capacité à faire avec adresse.|9
+imagination|Faculté de créer des images mentales.|9
+ingéniosité|Capacité à trouver des solutions astucieuses.|9
+innovation|Création de nouveautés.|9
+inspiration|Idée soudaine, élan créatif.|9
+intellect|Faculté de comprendre et de raisonner.|9
+intuition|Perception rapide, sans raisonnement.|9
+jugement|Capacité à porter une évaluation.|9
+logique|Raisonnement cohérent.|9
+métacognition|Réflexion sur ses propres processus mentaux.|9
+méthode|Manière de faire ordonnée.|9
+neurone|Cellule du système nerveux.|9
+observation|Action d'examiner attentivement.|9
+perspicacité|Finesse de perception.|9
+prévision|Anticipation d'un événement.|9
+problème|Question à résoudre.|9
+réflexion|Action de réfléchir, de peser.|9
+sagacité|Qualité de jugement clairvoyant.|9
+savant|Personne qui possède un grand savoir.|9
+sens critique|Aptitude à distinguer le vrai du faux.|9
+stratégie|Plan d'action réfléchi.|9
+synthèse|Combinaison d'éléments en un tout cohérent.|9
+talent|Aptitude naturelle.|9
+vive intelligence|Intelligence rapide et alerte.|9
+temperature elevee|Quelqu'un qui a de la fièvre.|6
+salut|Je ne sais pas encore...|3
+le python|L'utilisateur connait ce sujet.|5
+la lune|L'utilisateur connait ce sujet.
+connais|Je ne sais pas encore...|10
+suite|Je ne sais pas encore...|6
+rex|c'est mon chien prefere
+foot|c'est un sport|0

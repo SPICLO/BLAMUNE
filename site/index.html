@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>BLAMUNE - Discussion</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ECRAN D'AUTHENTIFICATION -->
+<div id="ecranAuth">
+  <div class="auth-box">
+    <div class="auth-avatar">B</div>
+    <h2>Bienvenue sur BLAMUNE</h2>
+    <p class="auth-sous">Connecte-toi pour garder ton historique et personnaliser ton experience.</p>
+
+    <div id="authFormLogin" class="auth-form">
+      <input id="authEmail" type="email" placeholder="Ton email" autocomplete="email" maxlength="100" aria-label="Ton email">
+      <input id="authMdp" type="password" placeholder="Mot de passe" autocomplete="current-password" maxlength="100" aria-label="Mot de passe">
+      <button id="btnLogin" class="auth-btn" type="button">Se connecter</button>
+      <p class="auth-err" id="authErrLogin"></p>
+      <p class="auth-switch">Pas encore de compte ? <a href="#" id="authShowRegister">Creer un compte</a></p>
+    </div>
+
+    <div id="authFormRegister" class="auth-form" style="display:none">
+      <input id="authPseudoReg" type="text" placeholder="Choisis un pseudo" autocomplete="username" maxlength="30" aria-label="Choisis un pseudo">
+      <input id="authEmailReg" type="email" placeholder="Ton email" autocomplete="email" maxlength="100" aria-label="Ton email">
+      <input id="authMdpReg" type="password" placeholder="Choisis un mot de passe" autocomplete="new-password" maxlength="100" aria-label="Choisis un mot de passe">
+      <button id="btnRegister" class="auth-btn" type="button">Creer mon compte</button>
+      <p class="auth-err" id="authErrRegister"></p>
+      <p class="auth-switch">Deja un compte ? <a href="#" id="authShowLogin">Se connecter</a></p>
+    </div>
+
+    <div class="auth-sep"><span>ou</span></div>
+    <button id="btnInvite" class="auth-btn auth-invite" type="button">Continuer en tant qu'invite</button>
+    <p class="auth-note">L'invite ne sauvegarde pas tes messages.</p>
+  </div>
+</div>
+
+<!-- HEADER + CHAT (caches tant que pas auth) -->
+<div id="appContenu">
+<header id="tete">
+  <div class="infos">
+    <div class="avatar avatar-bot" aria-hidden="true">B</div>
+    <div class="titres">
+      <h1>BLAMUNE</h1>
+      <div class="statut" id="statut">
+        <span class="point" id="pointStatut"></span>
+        <span id="texteStatut">Connexion...</span>
+      </div>
+    </div>
+  </div>
+  <div id="boutons">
+    <span id="noteInvite" style="display:none;color:var(--texte-doux);font-size:11px;margin-right:8px;" aria-hidden="true">Mode invite</span>
+    <div class="segmente" role="group" aria-label="Mode de l'IA">
+      <button id="mode1" title="EGO : IA locale gratuite, aucune cle API" aria-pressed="false" type="button">EGO</button>
+      <button id="mode2" title="BLAMUNE INTELLIGENT : le moteur C++ adaptatif" class="actif" aria-pressed="true" type="button">BLAMUNE</button>
+    </div>
+    <button id="btnDeconnexion" title="Deconnexion" type="button" style="display:none;margin-left:8px;background:var(--surface);border:1px solid var(--bordure);border-radius:8px;color:var(--texte-doux);padding:4px 10px;font-size:12px;cursor:pointer;">Deconnexion</button>
+  </div>
+</header>
+
+<main id="chat" aria-live="polite"><noscript><p style="text-align:center;padding:40px;color:#9fb3c8;">JavaScript est requis pour utiliser BLAMUNE.</p></noscript></main>
+
+<footer id="barre">
+  <input id="zone" type="text" placeholder="Écris un message..." autocomplete="off" autocapitalize="sentences" spellcheck="false" maxlength="2000" enterkeyhint="send" aria-label="Écris un message">
+  <button id="envoyer" title="Envoyer (Entrée)" type="button" aria-label="Envoyer">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+  </button>
+</footer>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>BLAMUNE Keep-Alive Setup</title>
+<style>
+  body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #0b1020; color: #e2e8f0; }
+  h1 { color: #22d3ee; }
+  .step { background: #111a33; padding: 15px; border-radius: 10px; margin: 15px 0; border-left: 4px solid #22d3ee; }
+  .url { background: #1e293b; padding: 10px; border-radius: 5px; font-family: monospace; word-break: break-all; color: #38bdf8; }
+  .note { color: #fbbf24; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>BLAMUNE - Keep-Alive Setup</h1>
+
+<div class="step">
+<h2>Etape 1 : Copie cette URL</h2>
+<div class="url" id="url">En attente du deploiement...</div>
+<p class="note">Remplace TON_URL par l'URL de ton app sur Render.com</p>
+</div>
+
+<div class="step">
+<h2>Etape 2 : Crée un compte sur cron-job.org</h2>
+<p>1. Va sur <a href="https://cron-job.org" style="color:#22d3ee">cron-job.org</a></p>
+<p>2. Crée un compte gratuit</p>
+</div>
+
+<div class="step">
+<h2>Etape 3 : Crée un cron job</h2>
+<p>1. Clique "Create schedule"</p>
+<p>2. URL : <code>https://TON_URL/health</code></p>
+<p>3. Schedule : <code>Every 10 minutes</code></p>
+<p>4. Request method : <code>GET</code></p>
+<p>5. Clique "Save"</p>
+</div>
+
+<div class="step">
+<h2>C'est fait !</h2>
+<p>Le cron job va ping ton serveur toutes les 10 minutes.</p>
+<p>Render.com ne se mettra plus en veille.</p>
+<p class="note">Resultat : AUCUNE interruption, conversation 24/7</p>
+</div>
+
+</body>
+</html>

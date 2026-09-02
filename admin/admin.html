@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1020">
+<title>Dashmin - Admin</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- ECRAN DE CONNEXION ADMIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-avatar">D</div>
+    <h1>Dashmin</h1>
+    <p class="login-sub">Connexion admin requise</p>
+    <form id="loginAdminForm">
+      <input type="text" id="loginPseudo" placeholder="Pseudo" autocomplete="username" required>
+      <input type="password" id="loginMdp" placeholder="Mot de passe" autocomplete="current-password" required>
+      <button type="submit" class="btn-primary btn-full">Se connecter</button>
+      <p id="loginErreur" class="erreur masquee"></p>
+    </form>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="masquee">
+  <header>
+    <div class="header-gauche">
+      <div class="avatar-admin">B</div>
+      <h1>Dashmin</h1>
+    </div>
+    <div class="header-droite">
+      <span id="uptime" class="badge"></span>
+      <button id="btnRefresh" class="btn-secondary" type="button">Actualiser</button>
+      <button id="btnReload" class="btn-secondary" type="button">Recharger</button>
+      <button id="btnLogout" class="btn-danger" type="button">Deconnexion</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- STATS -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-chiffre" id="statMessages">0</div>
+        <div class="stat-label">Messages total</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-chiffre" id="statSessions">0</div>
+        <div class="stat-label">Sessions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-chiffre" id="statDemarrages">0</div>
+        <div class="stat-label">Demarrages</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-chiffre" id="statTemps">0ms</div>
+        <div class="stat-label">Temps moyen</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-chiffre" id="statUtilisateurs">0</div>
+        <div class="stat-label">Utilisateurs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-chiffre" id="statEnLigne">0</div>
+        <div class="stat-label">En ligne</div>
+      </div>
+    </section>
+
+    <!-- UTILISATEURS CONNECTES -->
+    <section class="panel">
+      <h2>Utilisateurs connectes <span class="subtitle" id="connexionsCount"></span></h2>
+      <div id="connexionsContenu" class="panel-body">
+        <p class="vide">Chargement...</p>
+      </div>
+    </section>
+
+    <!-- UTILISATEURS INSCRITS -->
+    <section class="panel">
+      <h2>Utilisateurs inscrits <span class="subtitle" id="inscritsCount"></span></h2>
+      <div id="inscritsContenu" class="panel-body">
+        <p class="vide">Chargement...</p>
+      </div>
+    </section>
+
+    <!-- TOUS LES MESSAGES -->
+    <section class="panel">
+      <h2>Tous les messages <span class="subtitle" id="tousMessagesCount"></span></h2>
+      <div id="tousMessagesContenu" class="panel-body historique">
+        <p class="vide">Chargement...</p>
+      </div>
+    </section>
+
+    <!-- PROFIL UTILISATEUR -->
+    <section class="panel">
+      <h2>Profil utilisateur <span class="subtitle">(ce que l'IA a appris)</span></h2>
+      <div id="profilContenu" class="panel-body">
+        <p class="vide">Chargement...</p>
+      </div>
+    </section>
+
+    <!-- SAVOIR -->
+    <section class="panel">
+      <h2>Savoir <span class="subtitle">(connaissances apprises)</span></h2>
+      <div id="savoirContenu" class="panel-body">
+        <p class="vide">Chargement...</p>
+      </div>
+    </section>
+
+    <!-- VOCABULAIRE -->
+    <section class="panel">
+      <h2>Vocabulaire <span class="subtitle">(mots memorises)</span></h2>
+      <div id="vocabContenu" class="panel-body">
+        <p class="vide">Chargement...</p>
+      </div>
+    </section>
+
+    <!-- CONFIG API -->
+    <section class="panel">
+      <h2>Configuration API</h2>
+      <div id="configContenu" class="panel-body">
+        <p class="vide">Chargement...</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="admin.js"></script>
+<noscript>
+  <div style="max-width:400px;margin:80px auto;text-align:center;color:#e2e8f0;font-family:sans-serif;">
+    <h2 style="color:#f87171;">JavaScript requis</h2>
+    <p>Activez JavaScript pour utiliser Dashmin.</p>
+  </div>
+</noscript>
+
+</body>
+</html>

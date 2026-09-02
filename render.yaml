@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: blamune
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: API_KEY
+        sync: false
+      - key: API_PROVIDER
+        value: gemini
+      - key: API_MODEL
+        value: gemini-3.6-flash
+      - key: API_URL
+        value: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent
+    healthCheckPath: /ping
