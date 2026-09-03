@@ -44,11 +44,13 @@ app.use((req, res, next) => {
 let config = {
   api_provider: 'gemini',
   api_key: process.env.API_KEY || '',
-  api_model: 'gemini-3.6-flash',
-  api_url: process.env.API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',
-  api_max_tokens: 512,
-  api_temperature: 0.5
+  api_model: 'gemini-3.5-flash',
+  api_url: process.env.API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',
+  api_max_tokens: 8192,
+  api_temperature: 0.7
 };
+
+const FALLBACK_MODELS = ['gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
 
 // Env vars first
 if (process.env.API_KEY) config.api_key = process.env.API_KEY;
@@ -237,33 +239,46 @@ async function appelerGemini(message, histo) {
     contents.push({ role: 'user', parts: [{ text: systemText }] });
   }
 
-  const url = `${config.api_url}?key=${config.api_key}`;
-  const body = JSON.stringify({
-    contents,
-    generationConfig: {
-      maxOutputTokens: config.api_max_tokens,
-      temperature: config.api_temperature
-    }
-  });
+  // Try primary model, then fallbacks
+  const modelsToTry = [config.api_model, ...FALLBACK_MODELS.filter(m => m !== config.api_model)];
+  let lastError = null;
 
-  return new Promise((resolve, reject) => {
-    const req = https.request(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 60000 }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(data);
-          if (json.error) return reject(new Error(json.error.message));
-          const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          resolve(text);
-        } catch (e) { reject(e); }
-      });
+  for (const model of modelsToTry) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.api_key}`;
+    const body = JSON.stringify({
+      contents,
+      generationConfig: {
+        maxOutputTokens: config.api_max_tokens,
+        temperature: config.api_temperature
+      }
     });
-    req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout Gemini')); });
-    req.write(body);
-    req.end();
-  });
+
+    try {
+      const result = await new Promise((resolve, reject) => {
+        const req = https.request(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 30000 }, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            try {
+              const json = JSON.parse(data);
+              if (json.error) return reject(new Error(json.error.message));
+              const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              resolve(text);
+            } catch (e) { reject(e); }
+          });
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+        req.write(body);
+        req.end();
+      });
+      if (result) return result;
+    } catch (e) {
+      lastError = e;
+      continue;
+    }
+  }
+  throw new Error(lastError ? lastError.message : 'Tous les modeles Gemini ont echoue');
 }
 
 function nettoyerReponse(texte) {
@@ -293,6 +308,16 @@ familiers, small-talks, vannes, emotions. Jamais 'assistant IA'.
 Emojis avec moderation, blagues, anecdotes fictives, opinion honnete.
 Francais courant : 'ouais', 'grave', 'ptdr', 'mdr', 'tkt'.
 Curieux, tu poses des questions. Tu retiens tout de l'utilisateur.
+Tu es BLAMUNE, pas un robot.`;
+
+const BLAMUNE_SYSTEM_PROMPT = `Tu dois TOUJOURS repondre en francais. Reponds en 1 ou 3 phrases MAXIMUM.
+Si tu ne sais pas, dis "Je sais pas". Ne invente jamais.
+
+Tu es BLAMUNE, un ami curieux et decouvre le monde avec l'utilisateur.
+Tu apprends des choses de l'utilisateur et tu les retiens.
+Tu poses des questions pour decouvrir qui est la personne.
+Tu es amical, curieux, un peu etourdi mais toujours gentil.
+Emojis avec moderation. Francais courant : 'ouais', 'cool', 'interressant', 'dis-moi encore'.
 Tu es BLAMUNE, pas un robot.`;
 
 // ==================== ROUTES ====================
@@ -590,8 +615,44 @@ app.post('/send', async (req, res) => {
       reponses = ['Erreur avec Gemini : ' + e.message];
     }
   } else {
-    // Bot.exe mode (BLAMUNE INTELLIGENT)
-    reponses = ['Mode BLAMUNE INTELLIGENT non disponible sur Node.js. Utilise le mode EGO.'];
+    // BLAMUNE mode - Gemini with different personality
+    if (!apiHistoriqueParUser[auth.uid]) apiHistoriqueParUser[auth.uid] = [];
+    const histo = apiHistoriqueParUser[auth.uid];
+    if (histo.length === 0) {
+      let systemPrompt = BLAMUNE_SYSTEM_PROMPT;
+      const memoire = lireMemoire(auth.uid);
+      const profilParts = [];
+      if (memoire.nom) profilParts.push(`Il s'appelle ${memoire.nom}.`);
+      if (memoire.age) profilParts.push(`Il a ${memoire.age} ans.`);
+      if (memoire.genre) profilParts.push(`Genre: ${memoire.genre}.`);
+      if (memoire.plat) profilParts.push(`Son plat prefere: ${memoire.plat}.`);
+      if (memoire.hobby) profilParts.push(`Ses hobbies: ${memoire.hobby}.`);
+      if (memoire.motsFavoris?.length) profilParts.push(`Mots qu'il aime utiliser: ${memoire.motsFavoris.join(', ')}.`);
+      if (memoire.aime) profilParts.push(`Ce qu'il aime: ${memoire.aime}.`);
+      if (memoire.aimePas) profilParts.push(`Ce qu'il n'aime pas: ${memoire.aimePas}.`);
+      if (profilParts.length) systemPrompt += '\n\nINFOS SUR L\'UTILISATEUR :\n' + profilParts.join('\n');
+      histo.push({ role: 'system', content: systemPrompt });
+      const histFichier = chargerHistorique(auth.uid, '2');
+      const nbRestaurer = Math.min(histFichier.length, 10);
+      if (nbRestaurer > 0) {
+        const debutIdx = Math.max(0, histFichier.length - nbRestaurer);
+        for (let i = debutIdx; i < histFichier.length; i++) {
+          const e = histFichier[i];
+          histo.push({ role: e.qui === 'moi' ? 'user' : 'assistant', content: e.texte });
+        }
+      }
+    }
+    histo.push({ role: 'user', content: msg });
+    while (histo.length > 50) histo.splice(1, 1);
+
+    try {
+      const reponse = await appelerGemini(msg, histo);
+      const texte = nettoyerReponse(reponse);
+      histo.push({ role: 'assistant', content: texte });
+      reponses = [texte];
+    } catch (e) {
+      reponses = ['Erreur avec Gemini : ' + e.message];
+    }
   }
 
   const duree = Date.now() - debut;
