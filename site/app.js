@@ -104,6 +104,7 @@ async function authRegister() {
   if (!email || email.indexOf('@') < 0) { errEl.textContent = 'Email invalide.'; return; }
   if (mdp.length < 6) { errEl.textContent = 'Mot de passe trop court (6 min).'; return; }
   btnRegister.disabled = true;
+  btnRegister.textContent = 'Creation...';
   try {
     var body = 'pseudo=' + encodeURIComponent(pseudo) + '&email=' + encodeURIComponent(email) + '&mdp=' + encodeURIComponent(mdp);
     var r = await fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body });
@@ -119,6 +120,7 @@ async function authRegister() {
     errEl.textContent = 'Serveur injoignable.';
   }
   btnRegister.disabled = false;
+  btnRegister.textContent = 'Creer mon compte';
 }
 
 async function authLogin() {
@@ -132,6 +134,7 @@ async function authLogin() {
   errEl.textContent = '';
   if (!email || !mdp) { errEl.textContent = 'Remplis tous les champs.'; return; }
   btnLogin.disabled = true;
+  btnLogin.textContent = 'Connexion...';
   try {
     var body = 'email=' + encodeURIComponent(email) + '&mdp=' + encodeURIComponent(mdp);
     var r = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body });
@@ -147,6 +150,7 @@ async function authLogin() {
     errEl.textContent = 'Serveur injoignable.';
   }
   btnLogin.disabled = false;
+  btnLogin.textContent = 'Se connecter';
 }
 
 async function authInvite() {

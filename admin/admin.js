@@ -32,7 +32,14 @@ document.getElementById('loginAdminForm').onsubmit = async function(e) {
   var pseudo = document.getElementById('loginPseudo').value.trim();
   var mdp = document.getElementById('loginMdp').value;
   var errEl = document.getElementById('loginErreur');
+  var btn = document.querySelector('#loginAdminForm button[type="submit"]');
   errEl.classList.add('masquee');
+  if (!pseudo || !mdp) {
+    errEl.textContent = 'Remplis tous les champs.';
+    errEl.classList.remove('masquee');
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Connexion...'; }
   try {
     var r = await fetch(API + '/login', {
       method: 'POST',
@@ -44,6 +51,7 @@ document.getElementById('loginAdminForm').onsubmit = async function(e) {
       if (j.pseudo !== 'admin') {
         errEl.textContent = 'Ce compte n\'est pas admin.';
         errEl.classList.remove('masquee');
+        if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
         return;
       }
       adminToken = j.ego;
@@ -57,10 +65,12 @@ document.getElementById('loginAdminForm').onsubmit = async function(e) {
     } else {
       errEl.textContent = j.message || 'Identifiants incorrects.';
       errEl.classList.remove('masquee');
+      if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
     }
   } catch(ex) {
-    errEl.textContent = 'Erreur de connexion au serveur.';
+    errEl.textContent = 'Erreur de connexion au serveur. ' + ex.message;
     errEl.classList.remove('masquee');
+    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
   }
 };
 
