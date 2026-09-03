@@ -18,7 +18,7 @@ app.use((req, res, next) => {
   const origin = req.headers.origin || '';
   const allowed = [
     /localhost:\d+$/, /127\.0\.0\.1:\d+$/,
-    /\.vercel\.app$/, /\.render\.onrender\.com$/, /\.ngrok-free\.dev$/, /\.ngrok\.io$/
+    /\.vercel\.app$/, /\.onrender\.com$/, /\.ngrok-free\.dev$/, /\.ngrok\.io$/
   ];
   let corsOrigin = '*';
   if (origin && origin !== 'null') {
