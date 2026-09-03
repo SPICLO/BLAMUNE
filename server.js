@@ -369,19 +369,23 @@ app.get('/admin/data', (req, res) => {
         if (fs.existsSync(f)) {
           try {
             const hist = JSON.parse(fs.readFileSync(f, 'utf8'));
+            let pendingUser = null;
+            let pendingTime = null;
             for (let i = 0; i < hist.length; i++) {
               const h = hist[i];
               if (h.qui === 'moi') {
-                const botReply = (i + 1 < hist.length && hist[i + 1].qui === 'bot') ? hist[i + 1].texte : '';
-                messages.push({
-                  uid: d.name,
-                  pseudo: d.name,
-                  message: h.texte,
-                  reponse: botReply,
-                  heure: h.t ? new Date(h.t * 1000).toLocaleTimeString('fr-FR') : '-'
-                });
-                if (botReply) i++;
+                if (pendingUser) {
+                  messages.push({ uid: d.name, pseudo: d.name, message: pendingUser, reponse: '', heure: pendingTime });
+                }
+                pendingUser = h.texte;
+                pendingTime = h.t ? new Date(h.t * 1000).toLocaleTimeString('fr-FR') : '-';
+              } else if (h.qui === 'bot') {
+                messages.push({ uid: d.name, pseudo: d.name, message: pendingUser || '', reponse: h.texte, heure: pendingTime || (h.t ? new Date(h.t * 1000).toLocaleTimeString('fr-FR') : '-') });
+                pendingUser = null;
               }
+            }
+            if (pendingUser) {
+              messages.push({ uid: d.name, pseudo: d.name, message: pendingUser, reponse: '', heure: pendingTime });
             }
           } catch (e) {}
         }
@@ -485,7 +489,7 @@ app.get('/tous-les-messages', (req, res) => {
 app.post('/register', (req, res) => {
   const ip = getIp(req);
   if (!checkRateLimit(`register:${ip}`, 10)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  const pseudo = (req.body.pseudo || '').trim();
+  const pseudo = (req.body.pseudo || '').trim().replace(/[<>"'\/\\]/g, '');
   const mdp = req.body.mdp || '';
   const email = (req.body.email || '').trim();
   if (pseudo.length < 2) return res.status(400).json({ ok: false, message: 'Pseudo trop court (2 min).' });
@@ -570,16 +574,16 @@ app.post('/send', async (req, res) => {
   if (!checkRateLimit(`send:${ip}`, 30)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
   if (!checkUserRateLimit(auth.uid, 20)) return res.status(429).json({ ok: false, message: 'Trop de messages. Patiente un instant.' });
 
-  const msg = extraireChamp(req, 'msg');
+  const msg = String(extraireChamp(req, 'msg') || '').trim();
   const modeOverride = extraireChamp(req, 'mode');
-  if (!msg || !msg.trim()) return res.status(400).json({ ok: false, message: 'Message vide.' });
+  if (!msg) return res.status(400).json({ ok: false, message: 'Message vide.' });
   if (msg.length > 2000) return res.status(400).json({ ok: false, message: 'Message trop long (2000 max).' });
 
   const mode = (modeOverride === '1' || modeOverride === '2') ? modeOverride : (modeParUser[auth.uid] || '2');
   modeParUser[auth.uid] = mode;
 
   if (connexionsActives[auth.uid]) connexionsActives[auth.uid].derniereActivite = Date.now();
-  else if (!auth.uid.startsWith('inv_')) {
+  else {
     connexionsActives[auth.uid] = { uid: auth.uid, pseudo: extraireChamp(req, 'pseudo') || auth.uid, ip: getIp(req), debut: new Date().toISOString(), derniereActivite: Date.now(), mode };
   }
 
@@ -616,13 +620,13 @@ app.post('/send', async (req, res) => {
         }
       }
     }
-    histo.push({ role: 'user', content: msg });
+    histo.push({ role: 'user', content: msg, _lastTs: Date.now() });
     while (histo.length > 50) histo.splice(1, 1);
 
     try {
       const reponse = await appelerGemini(msg, histo);
       const texte = nettoyerReponse(reponse);
-      histo.push({ role: 'assistant', content: texte });
+      histo.push({ role: 'assistant', content: texte, _lastTs: Date.now() });
       reponses = [texte];
     } catch (e) {
       reponses = ['Erreur avec Gemini : ' + e.message];
@@ -656,13 +660,13 @@ app.post('/send', async (req, res) => {
         }
       }
     }
-    histo.push({ role: 'user', content: msg });
+    histo.push({ role: 'user', content: msg, _lastTs: Date.now() });
     while (histo.length > 50) histo.splice(1, 1);
 
     try {
       const reponse = await appelerGemini(msg, histo);
       const texte = nettoyerReponse(reponse);
-      histo.push({ role: 'assistant', content: texte });
+      histo.push({ role: 'assistant', content: texte, _lastTs: Date.now() });
       reponses = [texte];
     } catch (e) {
       reponses = ['Erreur avec Gemini : ' + e.message];
@@ -674,9 +678,12 @@ app.post('/send', async (req, res) => {
   if (mode === '1') stats.messagesMode1++; else stats.messagesMode2++;
   stats.tempsMoyen = Math.round((stats.tempsMoyen * (stats.messagesTotal - 1) + duree) / stats.messagesTotal);
 
-  // Save history
-  ajouterHistorique(auth.uid, 'moi', msg);
-  reponses.forEach(r => ajouterHistorique(auth.uid, 'bot', r));
+  // Save history (single batch write)
+  const mode = modeParUser[auth.uid] || '2';
+  const hist = chargerHistorique(auth.uid, mode);
+  hist.push({ qui: 'moi', texte: msg, t: Math.floor(Date.now() / 1000) });
+  reponses.forEach(r => hist.push({ qui: 'bot', texte: r, t: Math.floor(Date.now() / 1000) }));
+  sauvegarderHistorique(auth.uid, mode, hist);
 
   res.json({ etat, reponses, confiance: 'haute' });
 });
@@ -687,9 +694,7 @@ app.get('/historique', (req, res) => {
   if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
   const mode = modeParUser[auth.uid] || '2';
   const hist = chargerHistorique(auth.uid, mode);
-  const isGemini = config.api_provider === 'gemini';
-  const ollama = !isGemini;
-  res.json({ ok: true, etat, mode, historique: hist, ollama, provider: config.api_provider });
+  res.json({ ok: true, etat, mode, historique: hist, provider: config.api_provider });
 });
 
 // Delete history
@@ -848,5 +853,15 @@ setInterval(() => {
   for (const uid of Object.keys(userRateLimits)) {
     userRateLimits[uid] = userRateLimits[uid].filter(t => now - t < 60000);
     if (userRateLimits[uid].length === 0) delete userRateLimits[uid];
+  }
+  // Cleanup inactive api histories (no activity for 30 min)
+  for (const key of Object.keys(apiHistoriqueParUser)) {
+    const hist = apiHistoriqueParUser[key];
+    if (hist.length > 0) {
+      const lastMsg = hist[hist.length - 1];
+      if (!lastMsg._lastTs || now - lastMsg._lastTs > 1800000) {
+        delete apiHistoriqueParUser[key];
+      }
+    }
   }
 }, 300000);

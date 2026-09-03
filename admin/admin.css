@@ -81,7 +81,6 @@ body {
 }
 .login-box button:hover { opacity: 0.85; }
 .erreur { color: var(--danger); font-size: 13px; margin-top: 10px; }
-.cache { display: none !important; }
 
 /* ---- HEADER ---- */
 header {
@@ -293,7 +292,7 @@ main {
   font-size: 13px;
 }
 .config-row:last-child { border-bottom: none; }
-.config-row .clé { color: var(--texte-faible); }
+.config-row .cle { color: var(--texte-faible); }
 .config-row .val { color: var(--texte); font-weight: 500; }
 .config-row .val.ok { color: var(--ok); }
 .config-row .val.err { color: var(--danger); }
