@@ -160,6 +160,7 @@ function extraireChamp(req, champ) {
 
 // ==================== USER DIR ====================
 function dossierUser(uid) {
+  if (!uid || uid.length < 3) return path.join(USERS_DIR, '_invalid');
   const d = path.join(USERS_DIR, uid);
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
   return d;
@@ -184,6 +185,7 @@ function lireMemoire(uid) {
 }
 
 function ecrireMemoire(uid, champ, valeur) {
+  if (!valeur || !valeur.trim()) return false;
   const mem = lireMemoire(uid);
   const champs = ['nom', 'plat', 'hobby', 'motsFavoris', 'genre', 'aime', 'aimePas', 'age'];
   const idx = champs.indexOf(champ);
@@ -342,8 +344,10 @@ function isAdminUid(uid) {
   return false;
 }
 
-// Active connections
+// Active connections (admin only)
 app.get('/connexions', (req, res) => {
+  const auth = extraireAuth(req);
+  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
   const now = Date.now();
   const connexions = Object.values(connexionsActives).filter(c => now - c.derniereActivite < 300000);
   res.json({ ok: true, connexions });
@@ -365,15 +369,20 @@ app.get('/admin/data', (req, res) => {
         if (fs.existsSync(f)) {
           try {
             const hist = JSON.parse(fs.readFileSync(f, 'utf8'));
-            hist.forEach(h => {
-              messages.push({
-                uid: d.name,
-                pseudo: h.qui === 'moi' ? d.name : 'BLAMUNE',
-                message: h.qui === 'moi' ? h.texte : '',
-                reponse: h.qui === 'bot' ? h.texte : '',
-                heure: h.t ? new Date(h.t * 1000).toLocaleTimeString('fr-FR') : '-'
-              });
-            });
+            for (let i = 0; i < hist.length; i++) {
+              const h = hist[i];
+              if (h.qui === 'moi') {
+                const botReply = (i + 1 < hist.length && hist[i + 1].qui === 'bot') ? hist[i + 1].texte : '';
+                messages.push({
+                  uid: d.name,
+                  pseudo: d.name,
+                  message: h.texte,
+                  reponse: botReply,
+                  heure: h.t ? new Date(h.t * 1000).toLocaleTimeString('fr-FR') : '-'
+                });
+                if (botReply) i++;
+              }
+            }
           } catch (e) {}
         }
       }
@@ -546,7 +555,10 @@ app.post('/invite', (req, res) => {
 app.post('/logout', (req, res) => {
   const auth = extraireAuth(req);
   if (auth.uid && connexionsActives[auth.uid]) delete connexionsActives[auth.uid];
-  if (auth.uid && apiHistoriqueParUser[auth.uid]) delete apiHistoriqueParUser[auth.uid];
+  if (auth.uid) {
+    delete apiHistoriqueParUser[auth.uid + '_1'];
+    delete apiHistoriqueParUser[auth.uid + '_2'];
+  }
   res.json({ ok: true });
 });
 
@@ -576,8 +588,9 @@ app.post('/send', async (req, res) => {
 
   if (mode === '1') {
     // EGO mode - Gemini API
-    if (!apiHistoriqueParUser[auth.uid]) apiHistoriqueParUser[auth.uid] = [];
-    const histo = apiHistoriqueParUser[auth.uid];
+    const histoKey = auth.uid + '_1';
+    if (!apiHistoriqueParUser[histoKey]) apiHistoriqueParUser[histoKey] = [];
+    const histo = apiHistoriqueParUser[histoKey];
     if (histo.length === 0) {
       let systemPrompt = EGO_SYSTEM_PROMPT;
       const memoire = lireMemoire(auth.uid);
@@ -616,8 +629,9 @@ app.post('/send', async (req, res) => {
     }
   } else {
     // BLAMUNE mode - Gemini with different personality
-    if (!apiHistoriqueParUser[auth.uid]) apiHistoriqueParUser[auth.uid] = [];
-    const histo = apiHistoriqueParUser[auth.uid];
+    const histoKey = auth.uid + '_2';
+    if (!apiHistoriqueParUser[histoKey]) apiHistoriqueParUser[histoKey] = [];
+    const histo = apiHistoriqueParUser[histoKey];
     if (histo.length === 0) {
       let systemPrompt = BLAMUNE_SYSTEM_PROMPT;
       const memoire = lireMemoire(auth.uid);
@@ -712,8 +726,8 @@ app.post('/profil', (req, res) => {
 // Profile GET
 app.get('/profil', (req, res) => {
   const auth = extraireAuth(req);
-  const uid = auth.uid || '';
-  const memoire = uid ? lireMemoire(uid) : { nom: '', plat: '', hobby: '', motsFavoris: [], genre: '', aime: '', aimePas: '', age: '' };
+  if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
+  const memoire = lireMemoire(auth.uid);
   let savoir = [];
   try {
     const f = path.join(RACINE, 'savoir.txt');
@@ -746,18 +760,12 @@ app.get('/stats', (req, res) => {
 // Config API (admin only)
 app.post('/config-api', (req, res) => {
   const auth = extraireAuth(req);
-  if (!auth.uid) return res.status(403).json({ ok: false, message: 'Non autorise (admin requis)' });
-  let isAdmin = false;
-  for (const cle of Object.keys(comptes)) {
-    if (comptes[cle].uid === auth.uid && comptes[cle].pseudo?.toLowerCase() === 'admin') { isAdmin = true; break; }
-  }
-  if (!isAdmin) return res.status(403).json({ ok: false, message: 'Non autorise (admin requis)' });
+  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise (admin requis)' });
   try {
-    if (req.body.api_key) config.api_key = req.body.api_key;
+    if (req.body.api_key && req.body.api_key !== '***') config.api_key = req.body.api_key;
     if (req.body.api_provider) config.api_provider = req.body.api_provider;
     if (req.body.api_model) config.api_model = req.body.api_model;
     if (req.body.api_url) config.api_url = req.body.api_url;
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
     res.json({ ok: true, message: 'Configuration mise a jour.' });
   } catch (e) {
     res.json({ ok: false, message: 'Erreur de configuration' });

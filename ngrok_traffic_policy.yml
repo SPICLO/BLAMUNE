@@ -1,0 +1,65 @@
+# BLAMUNE - Traffic Policy ngrok
+# Rate limiting, compression, security au niveau du tunnel
+
+on_http_request:
+  # Rate limiting: 60 req/min par IP sur /login et /register
+  - actions:
+      - type: rate-limit
+        config:
+          name: login-limit
+          bucket:
+            key: login-ip
+            capacity: 10
+            rate: 60
+            unit: minute
+    expressions:
+      - req.url.path == '/login' || req.url.path == '/register'
+
+  # Rate limiting general: 120 req/min par IP
+  - actions:
+      - type: rate-limit
+        config:
+          name: general-limit
+          bucket:
+            key: client-ip
+            capacity: 120
+            rate: 60
+            unit: minute
+
+  # Bloquer les User-Agents suspects (bots, scrapers)
+  - actions:
+      - type: deny
+        config:
+          status_code: 403
+    expressions:
+      - req.headers['user-agent'].contains('masscan') || req.headers['user-agent'].contains('zgrab') || req.headers['user-agent'].contains('nikto')
+
+  # Bloquer les paths d'admin exposure
+  - actions:
+      - type: deny
+        config:
+          status_code: 404
+    expressions:
+      - req.url.path.startsWith('/.env') || req.url.path.startsWith('/wp-') || req.url.path.startsWith('/phpmyadmin')
+
+on_http_response:
+  # Compression automatique pour les reponses > 1KB
+  - actions:
+      - type: compress
+        config:
+          algorithms:
+            - gzip
+            - br
+            - deflate
+
+  # Ajouter security headers
+  - actions:
+      - type: add-headers
+        config:
+          headers:
+            - name: Strict-Transport-Security
+              value: "max-age=31536000; includeSubDomains"
+            - name: X-Content-Type-Options
+              value: "nosniff"
+            - name: X-Frame-Options
+              value: "DENY"
