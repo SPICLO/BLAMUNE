@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const https = require('https');
+const storage = require('./storage');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -86,6 +87,7 @@ try {
 
 function sauvegarderComptes() {
   try { fs.writeFileSync(COMPTES_PATH, JSON.stringify(comptes, null, 2), 'utf8'); } catch (e) {}
+  if (storage.estConfigure()) storage.setComptes(comptes);
 }
 
 // ==================== STATE ====================
@@ -193,6 +195,10 @@ function ecrireMemoire(uid, champ, valeur) {
   const lignes = [mem.nom, mem.plat, mem.hobby, mem.motsFavoris.join(','), mem.genre, mem.aime, mem.aimePas, mem.age];
   lignes[idx] = valeur;
   try { fs.writeFileSync(path.join(dossierUser(uid), 'memoire.txt'), lignes.join('\n'), 'utf8'); } catch (e) {}
+  if (storage.estConfigure()) {
+    const newMem = { nom: lignes[0], plat: lignes[1], hobby: lignes[2], motsFavoris: lignes[3].split(',').filter(Boolean), genre: lignes[4], aime: lignes[5], aimePas: lignes[6], age: lignes[7] };
+    storage.setMemoire(uid, newMem);
+  }
   return true;
 }
 
@@ -214,6 +220,7 @@ function chargerHistorique(uid, mode) {
 
 function sauvegarderHistorique(uid, mode, historique) {
   try { fs.writeFileSync(cheminHistorique(uid, mode), JSON.stringify(historique, null, 2), 'utf8'); } catch (e) {}
+  if (storage.estConfigure()) storage.setHistorique(uid, mode, historique);
 }
 
 function ajouterHistorique(uid, qui, texte) {
@@ -831,12 +838,32 @@ app.get('*', (req, res) => {
 
 // ==================== START ====================
 const server = http.createServer(app);
+
+// Initialize cloud storage
+storage.initialiser().then(ok => {
+  if (ok) {
+    console.log('[BLAMUNE] Stockage cloud JSONBin.io active');
+    // Restore comptes from cloud if local is empty
+    if (Object.keys(comptes).length === 0) {
+      const cloudComptes = storage.getComptes();
+      if (cloudComptes && Object.keys(cloudComptes).length > 0) {
+        comptes = cloudComptes;
+        sauvegarderComptes();
+        console.log(`[BLAMUNE] ${Object.keys(comptes).length} comptes restaures depuis le cloud`);
+      }
+    }
+  } else {
+    console.log('[BLAMUNE] Mode fichier local (pas de JSONBIN_API_KEY)');
+  }
+}).catch(e => console.log('[BLAMUNE] Erreur storage:', e.message));
+
 server.listen(PORT, () => {
   etat = 'pret';
   stats.demarrages++;
   console.log(`[BLAMUNE] Serveur pret sur le port ${PORT}`);
   console.log(`[BLAMUNE] Provider: ${config.api_provider}, Model: ${config.api_model}`);
   console.log(`[BLAMUNE] API Key: ${config.api_key ? 'Configuree' : 'NON CONFIGUREE'}`);
+  console.log(`[BLAMUNE] Cloud: ${storage.estConfigure() ? 'JSONBin.io' : 'Local'}`);
 });
 
 // Cleanup old connections every 5 min
