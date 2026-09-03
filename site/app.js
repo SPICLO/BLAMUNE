@@ -743,4 +743,7 @@ window.addEventListener('load', function () {
     sauverProfilLocal('mode', '2');
   }
   initAuth();
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(function() {});
+  }
 });
