@@ -718,7 +718,7 @@ async function changerMode(m) {
   try {
     var abortCtrl = new AbortController();
     var abortTimer = setTimeout(function () { abortCtrl.abort(); }, 120000);
-    var r = await fetch('/mode', { method: 'POST', headers: authHeaders(), body: 'm=' + m, signal: abortCtrl.signal });
+    var r = await fetch('/mode', { method: 'POST', headers: Object.assign({}, authHeaders(), { 'Content-Type': 'application/x-www-form-urlencoded' }), body: 'm=' + m, signal: abortCtrl.signal });
     clearTimeout(abortTimer);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var j = await r.json();

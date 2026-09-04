@@ -843,7 +843,7 @@ app.post('/config-api', (req, res) => {
 // Static files
 const SITE_DIR = path.join(RACINE, 'site');
 const ADMIN_DIR = path.join(RACINE, 'admin');
-const BLOCKED_EXT = ['.json', '.txt', '.ps1', '.bat', '.cmd', '.exe', '.dll', '.config', '.log', '.db', '.sqlite'];
+const BLOCKED_EXT = ['.ps1', '.bat', '.cmd', '.exe', '.dll', '.config', '.log', '.db', '.sqlite'];
 const MIME_TYPES = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript',
   '.ico': 'image/x-icon', '.png': 'image/png', '.jpg': 'image/jpeg',
