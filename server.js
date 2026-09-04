@@ -603,19 +603,7 @@ app.post('/send', async (req, res) => {
     if (!apiHistoriqueParUser[histoKey]) apiHistoriqueParUser[histoKey] = [];
     const histo = apiHistoriqueParUser[histoKey];
     if (histo.length === 0) {
-      let systemPrompt = EGO_SYSTEM_PROMPT;
-      const memoire = lireMemoire(auth.uid);
-      const profilParts = [];
-      if (memoire.nom) profilParts.push(`Il s'appelle ${memoire.nom}.`);
-      if (memoire.age) profilParts.push(`Il a ${memoire.age} ans.`);
-      if (memoire.genre) profilParts.push(`Genre: ${memoire.genre}.`);
-      if (memoire.plat) profilParts.push(`Son plat prefere: ${memoire.plat}.`);
-      if (memoire.hobby) profilParts.push(`Ses hobbies: ${memoire.hobby}.`);
-      if (memoire.motsFavoris?.length) profilParts.push(`Mots qu'il aime utiliser: ${memoire.motsFavoris.join(', ')}.`);
-      if (memoire.aime) profilParts.push(`Ce qu'il aime: ${memoire.aime}.`);
-      if (memoire.aimePas) profilParts.push(`Ce qu'il n'aime pas: ${memoire.aimePas}.`);
-      if (profilParts.length) systemPrompt += '\n\nINFOS SUR L\'UTILISATEUR :\n' + profilParts.join('\n');
-      histo.push({ role: 'system', content: systemPrompt });
+      histo.push({ role: 'system', content: EGO_SYSTEM_PROMPT });
       // Restore history
       const histFichier = chargerHistorique(auth.uid, '1');
       const nbRestaurer = Math.min(histFichier.length, 10);
