@@ -202,6 +202,52 @@ function ecrireMemoire(uid, champ, valeur) {
   return true;
 }
 
+// ==================== AUTO-APPRENTISSAGE BLAMUNE ====================
+function autoApprentissage(uid, msg) {
+  const mem = lireMemoire(uid);
+  const lower = msg.toLowerCase();
+  let changed = false;
+
+  // Nom: "je m'appelle X", "mon nom c'est X", "je suis X"
+  let m = lower.match(/(?:je m'appelle|mon nom c'est|je suis|appelle[- ]moi)\s+([a-z\u00e0-\u00fc]{2,20})/i);
+  if (m && m[1] && !mem.nom) { mem.nom = m[1].charAt(0).toUpperCase() + m[1].slice(1); changed = true; }
+
+  // Age: "j'ai X ans", "j'ai environ X ans"
+  m = lower.match(/j'ai\s+(?:environ\s+|a\s+peu\s+de\s+)?(\d{1,3})\s+ans/);
+  if (m && m[1] && !mem.age) { mem.age = m[1]; changed = true; }
+
+  // Plat prefere: "mon plat prefere c'est X", "j'adore X", "j'aime bien X"
+  m = lower.match(/(?:mon plat\s+(?:prefere|favori)\s+(?:c'est|est)|j'adore|manger des?|je mange souvent)\s+(.{2,30})/);
+  if (m && m[1] && !mem.plat) { mem.plat = m[1].replace(/[.!?]+$/, '').trim(); changed = true; }
+
+  // Hobby: "je fais du X", "je pratique X", "mon hobby c'est X"
+  m = lower.match(/(?:je fais du|je pratique|mon hobby c'est|j'aime bien)\s+(.{2,30})/);
+  if (m && m[1] && !mem.hobby) { mem.hobby = m[1].replace(/[.!?]+$/, '').trim(); changed = true; }
+
+  // Genre: "je suis un garcon/fille/homme/femme"
+  m = lower.match(/je suis\s+(un\s+)?(garcon|fille|homme|meuf|femme|mec)/);
+  if (m && m[2] && !mem.genre) { mem.genre = m[2]; changed = true; }
+
+  // Ce qu'il aime: "j'aime X", "ce que j'aime c'est X"
+  m = lower.match(/(?:j'aime|ce que j'aime c'est)\s+(.{2,40})/);
+  if (m && m[1] && !mem.aime) { mem.aime = m[1].replace(/[.!?]+$/, '').trim(); changed = true; }
+
+  // Ce qu'il n'aime pas: "je n'aime pas X", "je deteste X"
+  m = lower.match(/(?:je n'aime pas|je deteste|j'deteste)\s+(.{2,40})/);
+  if (m && m[1] && !mem.aimePas) { mem.aimePas = m[1].replace(/[.!?]+$/, '').trim(); changed = true; }
+
+  if (changed) {
+    ecrireMemoire(uid, 'nom', mem.nom);
+    if (mem.age) ecrireMemoire(uid, 'age', mem.age);
+    if (mem.plat) ecrireMemoire(uid, 'plat', mem.plat);
+    if (mem.hobby) ecrireMemoire(uid, 'hobby', mem.hobby);
+    if (mem.genre) ecrireMemoire(uid, 'genre', mem.genre);
+    if (mem.aime) ecrireMemoire(uid, 'aime', mem.aime);
+    if (mem.aimePas) ecrireMemoire(uid, 'aimePas', mem.aimePas);
+  }
+  return changed;
+}
+
 // ==================== HISTORIQUE ====================
 function cheminHistorique(uid, mode) {
   const d = dossierUser(uid);
@@ -322,8 +368,9 @@ Tu es BLAMUNE, pas un robot.`;
 const BLAMUNE_SYSTEM_PROMPT = `Tu dois TOUJOURS repondre en francais. Reponds en 1 ou 3 phrases MAXIMUM.
 Si tu ne sais pas, dis "Je sais pas". Ne invente jamais.
 
-Tu es BLAMUNE, un ami curieux et decouvre le monde avec l'utilisateur.
-Tu apprends des choses de l'utilisateur et tu les retiens.
+Tu es BLAMUNE, un ami curieux qui decouvre le monde avec l'utilisateur.
+Tu apprends des choses de l'utilisateur et tu les retiens toujours.
+Si on te dit un nom, un plat, un hobby, tu le retiens et tu le rappelles plus tard.
 Tu poses des questions pour decouvrir qui est la personne.
 Tu es amical, curieux, un peu etourdi mais toujours gentil.
 Emojis avec moderation. Francais courant : 'ouais', 'cool', 'interressant', 'dis-moi encore'.
@@ -656,6 +703,7 @@ app.post('/send', async (req, res) => {
       }
     }
     histo.push({ role: 'user', content: msg, _lastTs: Date.now() });
+    autoApprentissage(auth.uid, msg);
     while (histo.length > 50) histo.splice(1, 1);
 
     try {
