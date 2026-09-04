@@ -847,7 +847,7 @@ const BLOCKED_EXT = ['.ps1', '.bat', '.cmd', '.exe', '.dll', '.config', '.log', 
 const MIME_TYPES = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript',
   '.ico': 'image/x-icon', '.png': 'image/png', '.jpg': 'image/jpeg',
-  '.svg': 'image/svg+xml', '.txt': 'text/plain', '.json': 'application/json'
+  '.svg': 'image/svg+xml', '.txt': 'text/plain', '.json': 'application/json', '.xml': 'application/xml'
 };
 
 // Admin panel
