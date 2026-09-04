@@ -68,7 +68,7 @@ function afficherApp() {
   var ecranAuth = document.getElementById('ecranAuth');
   var appContenu = document.getElementById('appContenu');
   if (ecranAuth) ecranAuth.style.display = 'none';
-  if (appContenu) appContenu.style.display = '';
+  if (appContenu) { appContenu.style.display = 'flex'; appContenu.style.flexDirection = 'column'; }
   var pseudo = getAuthPseudo();
   var noteInvite = document.getElementById('noteInvite');
   var btnDeconnexion = document.getElementById('btnDeconnexion');
