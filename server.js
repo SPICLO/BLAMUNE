@@ -722,7 +722,6 @@ app.post('/send', async (req, res) => {
   stats.tempsMoyen = Math.round((stats.tempsMoyen * (stats.messagesTotal - 1) + duree) / stats.messagesTotal);
 
   // Save history (single batch write)
-  const mode = modeParUser[auth.uid] || '2';
   const hist = chargerHistorique(auth.uid, mode);
   hist.push({ qui: 'moi', texte: msg, t: Math.floor(Date.now() / 1000) });
   reponses.forEach(r => hist.push({ qui: 'bot', texte: r, t: Math.floor(Date.now() / 1000) }));
