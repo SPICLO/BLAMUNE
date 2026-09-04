@@ -208,34 +208,47 @@ function autoApprentissage(uid, msg) {
   const lower = msg.toLowerCase();
   let changed = false;
 
-  // Nom: "je m'appelle X", "mon nom c'est X", "appelle-moi X"
-  let m = lower.match(/(?:je m'appelle|mon nom c'est|appelle[- ]moi)\s+([a-z\u00e0-\u00fc]{2,20})/i);
-  if (m && m[1]) { mem.nom = m[1].charAt(0).toUpperCase() + m[1].slice(1); changed = true; }
+  // Nom: "je m'appelle X", "mon nom c'est X", "appelle-moi X", "je suis X"
+  let m = lower.match(/(?:je m'appelle|mon nom c'est|appelle[- ]moi|je suis)\s+([a-z\u00e0-\u00fc]{2,20})/i);
+  if (m && m[1] && m[1] !== 'un' && m[1] !== 'une' && m[1] !== 'le' && m[1] !== 'la') {
+    mem.nom = m[1].charAt(0).toUpperCase() + m[1].slice(1); changed = true;
+  }
 
-  // Age: "j'ai X ans", "j'ai environ X ans"
-  m = lower.match(/j'ai\s+(?:environ\s+|a\s+peu\s+de\s+)?(\d{1,3})\s+ans/);
+  // Age: "j'ai X ans", "j'ai environ X ans", "j'ai a peu pres X ans"
+  m = lower.match(/j'ai\s+(?:environ\s+|a\s+peu\s+pres\s+|a\s+peu\s+de\s+)?(\d{1,3})\s+ans/);
   if (m && m[1]) { mem.age = m[1]; changed = true; }
 
-  // Plat prefere: "mon plat prefere c'est X", "mon plat prefere est X"
+  // Plat prefere: "mon plat prefere c'est X", "j'adore X", "j'aime manger X", "j'aime X" (context plat)
   m = lower.match(/mon plat\s+(?:prefere|favori)\s+(?:c'est|est)\s+(.{2,30})/);
+  if (!m) m = lower.match(/(?:j'adore|m'aime bien manger|j'aime manger)\s+(.{2,30})/);
+  if (!m) m = lower.match(/(?:ma bouffe preferee c'est|mon plat c'est)\s+(.{2,30})/);
   if (m && m[1]) { mem.plat = m[1].replace(/[.!?]+$/, '').trim(); changed = true; }
 
-  // Hobby: "je fais du X", "je pratique X", "mon hobby c'est X"
-  m = lower.match(/(?:je fais du|je pratique|mon hobby c'est)\s+(.{2,30})/);
+  // Hobby: "je fais du/de la X", "je pratique X", "mon hobby c'est X", "mon passe-temps c'est X"
+  m = lower.match(/(?:je fais du|je fais de la|je fais des|je pratique|mon hobby c'est|mon passe[- ]temps c'est)\s+(.{2,30})/);
   if (m && m[1]) { mem.hobby = m[1].replace(/[.!?]+$/, '').trim(); changed = true; }
 
-  // Genre: "je suis un garcon/fille/homme/femme"
+  // Genre: "je suis un garcon/fille/homme/femme/meuf/mec"
   m = lower.match(/je suis\s+(un\s+)?(garcon|fille|homme|meuf|femme|mec)/);
   if (m && m[2]) { mem.genre = m[2]; changed = true; }
 
-  // Ce qu'il aime: "ce que j'aime c'est X", "j'aime X" (only if short, not a full sentence)
+  // Ce qu'il aime: "ce que j'aime c'est X", "j'aime X" (plus flexible)
   m = lower.match(/ce que j'aime c'est\s+(.{2,40})/);
-  if (!m) m = lower.match(/^j'aime\s+(.{2,40})$/);
+  if (!m) m = lower.match(/j'aime\s+(.{2,40})/);
   if (m && m[1]) { mem.aime = m[1].replace(/[.!?]+$/, '').trim(); changed = true; }
 
   // Ce qu'il n'aime pas: "je n'aime pas X", "je deteste X"
   m = lower.match(/(?:je n'aime pas|je deteste|j'deteste)\s+(.{2,40})/);
   if (m && m[1]) { mem.aimePas = m[1].replace(/[.!?]+$/, '').trim(); changed = true; }
+
+  // Mots favoris: detecte les mots repetes ou expressions caracteristiques
+  const motsSignificatifs = lower.match(/\b(grave|ptdr|mdr|tkt|ouais|wesh|frero|mec|meuf|la?|bro|bg)\b/g);
+  if (motsSignificatifs && motsSignificatifs.length >= 2) {
+    const uniques = [...new Set(motsSignificatifs)].slice(0, 5);
+    if (!mem.motsFavoris || mem.motsFavoris.length === 0) {
+      mem.motsFavoris = uniques; changed = true;
+    }
+  }
 
   if (changed) {
     ecrireMemoire(uid, 'nom', mem.nom);
@@ -245,6 +258,7 @@ function autoApprentissage(uid, msg) {
     if (mem.genre) ecrireMemoire(uid, 'genre', mem.genre);
     if (mem.aime) ecrireMemoire(uid, 'aime', mem.aime);
     if (mem.aimePas) ecrireMemoire(uid, 'aimePas', mem.aimePas);
+    if (mem.motsFavoris?.length) ecrireMemoire(uid, 'motsFavoris', mem.motsFavoris.join(','));
   }
   return changed;
 }
