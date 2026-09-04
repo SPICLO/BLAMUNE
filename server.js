@@ -711,6 +711,8 @@ app.delete('/historique', (req, res) => {
   const mode = modeParUser[auth.uid] || '2';
   const f = cheminHistorique(auth.uid, mode);
   try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (e) {}
+  delete apiHistoriqueParUser[auth.uid + '_1'];
+  delete apiHistoriqueParUser[auth.uid + '_2'];
   res.json({ etat, historique: [] });
 });
 
@@ -720,7 +722,11 @@ app.post('/mode', (req, res) => {
   if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
   const m = extraireChamp(req, 'm');
   if (m !== '1' && m !== '2') return res.status(400).json({ ok: false, message: 'Mode invalide (1 ou 2)' });
+  const ancienMode = modeParUser[auth.uid];
   modeParUser[auth.uid] = m;
+  if (ancienMode && ancienMode !== m) {
+    delete apiHistoriqueParUser[auth.uid + '_' + m];
+  }
   res.json({ etat, mode: m });
 });
 
