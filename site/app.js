@@ -277,13 +277,9 @@ function initAuth() {
   // Deconnexion automatique a la fermeture de l'onglet
   window.addEventListener('beforeunload', function () {
     if (estAuth()) {
-      var uid = getAuthUserId();
-      var xhr = new XMLHttpRequest();
-      xhr.open('POST', '/logout', false);
-      xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-      if (getAuthEgo()) xhr.setRequestHeader('X-EGO', getAuthEgo());
-      xhr.setRequestHeader('X-UID', uid);
-      try { xhr.send(); } catch (e) {}
+      var headers = authHeaders();
+      headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      fetch('/logout', { method: 'POST', headers: headers, body: '', keepalive: true }).catch(function(){});
     }
   });
 }

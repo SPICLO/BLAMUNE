@@ -15,6 +15,18 @@ let data = {
   memories: {}
 };
 
+// Debouncing pour la sauvegarde cloud
+let _saveTimer = null;
+const SAVE_DELAY = 3000; // 3 secondes
+
+function planifierSauvegarde() {
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    _saveTimer = null;
+    sauvegarderTout().catch(() => {});
+  }, SAVE_DELAY);
+}
+
 // Requête HTTP vers JSONBin
 function jsonbinRequest(method, urlPath, body) {
   return new Promise((resolve, reject) => {
@@ -100,14 +112,14 @@ function initialiser() {
 }
 
 function getComptes() { return data.comptes; }
-function setComptes(c) { data.comptes = c; sauvegarderTout().catch(() => {}); }
+function setComptes(c) { data.comptes = c; planifierSauvegarde(); }
 
 function getHistorique(uid, mode) {
   return data.historiques[`${uid}_${mode}`] || [];
 }
 function setHistorique(uid, mode, hist) {
   data.historiques[`${uid}_${mode}`] = hist;
-  sauvegarderTout().catch(() => {});
+  planifierSauvegarde();
 }
 
 function getMemoire(uid) {
@@ -115,7 +127,7 @@ function getMemoire(uid) {
 }
 function setMemoire(uid, memo) {
   data.memories[uid] = memo;
-  sauvegarderTout().catch(() => {});
+  planifierSauvegarde();
 }
 
 module.exports = {

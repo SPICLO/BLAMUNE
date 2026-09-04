@@ -202,6 +202,16 @@ function ecrireMemoire(uid, champ, valeur) {
   return true;
 }
 
+function sauvegarderMemoireComplete(uid, mem) {
+  const champs = ['nom', 'plat', 'hobby', 'motsFavoris', 'genre', 'aime', 'aimePas', 'age'];
+  const lignes = champs.map(c => {
+    if (c === 'motsFavoris') return Array.isArray(mem[c]) ? mem[c].join(',') : (mem[c] || '');
+    return mem[c] || '';
+  });
+  try { fs.writeFileSync(path.join(dossierUser(uid), 'memoire.txt'), lignes.join('\n'), 'utf8'); } catch (e) {}
+  if (storage.estConfigure()) storage.setMemoire(uid, mem);
+}
+
 // ==================== AUTO-APPRENTISSAGE BLAMUNE ====================
 function autoApprentissage(uid, msg) {
   const mem = lireMemoire(uid);
@@ -251,14 +261,7 @@ function autoApprentissage(uid, msg) {
   }
 
   if (changed) {
-    ecrireMemoire(uid, 'nom', mem.nom);
-    if (mem.age) ecrireMemoire(uid, 'age', mem.age);
-    if (mem.plat) ecrireMemoire(uid, 'plat', mem.plat);
-    if (mem.hobby) ecrireMemoire(uid, 'hobby', mem.hobby);
-    if (mem.genre) ecrireMemoire(uid, 'genre', mem.genre);
-    if (mem.aime) ecrireMemoire(uid, 'aime', mem.aime);
-    if (mem.aimePas) ecrireMemoire(uid, 'aimePas', mem.aimePas);
-    if (mem.motsFavoris?.length) ecrireMemoire(uid, 'motsFavoris', mem.motsFavoris.join(','));
+    sauvegarderMemoireComplete(uid, mem);
   }
   return changed;
 }
@@ -761,8 +764,7 @@ app.delete('/historique', (req, res) => {
   const mode = modeParUser[auth.uid] || '2';
   const f = cheminHistorique(auth.uid, mode);
   try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (e) {}
-  delete apiHistoriqueParUser[auth.uid + '_1'];
-  delete apiHistoriqueParUser[auth.uid + '_2'];
+  delete apiHistoriqueParUser[auth.uid + '_' + mode];
   res.json({ etat, historique: [] });
 });
 
@@ -775,7 +777,7 @@ app.post('/mode', (req, res) => {
   const ancienMode = modeParUser[auth.uid];
   modeParUser[auth.uid] = m;
   if (ancienMode && ancienMode !== m) {
-    delete apiHistoriqueParUser[auth.uid + '_' + m];
+    delete apiHistoriqueParUser[auth.uid + '_' + ancienMode];
   }
   res.json({ etat, mode: m });
 });
