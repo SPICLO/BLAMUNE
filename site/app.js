@@ -574,14 +574,6 @@ function afficherAccueil() {
 
 // ---------------- CHARGEMENT DE L'HISTORIQUE ----------------
 
-function programmerChargementApresAction() {
-  if (_chargerInterval) return;
-  _chargerInterval = setTimeout(function () {
-    _chargerInterval = null;
-    charger();
-  }, 500);
-}
-
 async function charger() {
   // FIX #5: guard against missing UID
   if (!getAuthUserId()) return;

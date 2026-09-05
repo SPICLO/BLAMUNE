@@ -86,7 +86,11 @@ try {
 } catch (e) { console.log('[comptes] Erreur lecture:', e.message); }
 
 function sauvegarderComptes() {
-  try { fs.writeFileSync(COMPTES_PATH, JSON.stringify(comptes, null, 2), 'utf8'); } catch (e) {}
+  try {
+    const tmpPath = COMPTES_PATH + '.tmp';
+    fs.writeFileSync(tmpPath, JSON.stringify(comptes, null, 2), 'utf8');
+    fs.renameSync(tmpPath, COMPTES_PATH);
+  } catch (e) {}
   if (storage.estConfigure()) storage.setComptes(comptes);
 }
 
@@ -242,9 +246,9 @@ function autoApprentissage(uid, msg) {
   m = lower.match(/je suis\s+(un\s+)?(garcon|fille|homme|meuf|femme|mec)/);
   if (m && m[2]) { mem.genre = m[2]; changed = true; }
 
-  // Ce qu'il aime: "ce que j'aime c'est X", "j'aime X" (plus flexible)
+  // Ce qu'il aime: "ce que j'aime c'est X", "j'aime X" (exclure "j'aime pas")
   m = lower.match(/ce que j'aime c'est\s+(.{2,40})/);
-  if (!m) m = lower.match(/j'aime\s+(.{2,40})/);
+  if (!m) m = lower.match(/j'aime\s+(?!pas\s|point\s)(.{2,40})/);
   if (m && m[1]) { mem.aime = m[1].replace(/[.!?]+$/, '').trim(); changed = true; }
 
   // Ce qu'il n'aime pas: "je n'aime pas X", "je deteste X"
@@ -285,13 +289,6 @@ function chargerHistorique(uid, mode) {
 function sauvegarderHistorique(uid, mode, historique) {
   try { fs.writeFileSync(cheminHistorique(uid, mode), JSON.stringify(historique, null, 2), 'utf8'); } catch (e) {}
   if (storage.estConfigure()) storage.setHistorique(uid, mode, historique);
-}
-
-function ajouterHistorique(uid, qui, texte) {
-  const mode = modeParUser[uid] || '2';
-  const hist = chargerHistorique(uid, mode);
-  hist.push({ qui, texte, t: Math.floor(Date.now() / 1000) });
-  sauvegarderHistorique(uid, mode, hist);
 }
 
 // ==================== GEMINI API ====================
@@ -360,6 +357,7 @@ function nettoyerReponse(texte) {
   t = t.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
   t = t.replace(/<\/?thinking>/gi, '');
   t = t.replace(/_([^_]+)_/g, '$1');
+  t = t.replace(/\*\*([^*]+)\*\*/g, '$1');
   t = t.replace(/\*([^*]+)\*/g, '$1');
   t = t.replace(/^>\s*/gm, '');
   t = t.replace(/\n{2,}/g, '\n');
