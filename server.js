@@ -251,8 +251,8 @@ function autoApprentissage(uid, msg) {
   if (!m) m = lower.match(/j'aime\s+(?!pas\s|point\s)(.{2,40})/);
   if (m && m[1]) { mem.aime = m[1].replace(/[.!?]+$/, '').trim(); changed = true; }
 
-  // Ce qu'il n'aime pas: "je n'aime pas X", "je deteste X"
-  m = lower.match(/(?:je n'aime pas|je deteste|j'deteste)\s+(.{2,40})/);
+  // Ce qu'il n'aime pas: "je n'aime pas X", "j'aime pas X", "je deteste X"
+  m = lower.match(/(?:je n'aime pas|j'aime pas|je deteste|j'deteste)\s+(.{2,40})/);
   if (m && m[1]) { mem.aimePas = m[1].replace(/[.!?]+$/, '').trim(); changed = true; }
 
   // Mots favoris: detecte les mots repetes ou expressions caracteristiques
