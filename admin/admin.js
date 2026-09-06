@@ -87,6 +87,40 @@ function initDashboard() {
       dashboardInit = false;
       window.location.reload();
     };
+    document.getElementById('btnChangeMdp').onclick = async function() {
+      var input = document.getElementById('nouveauMdp');
+      var msgEl = document.getElementById('mdpMessage');
+      var btn = this;
+      var mdp = input.value.trim();
+      if (!mdp || mdp.length < 6) {
+        msgEl.textContent = '6 caracteres minimum.';
+        msgEl.style.color = 'var(--danger)';
+        return;
+      }
+      btn.disabled = true;
+      msgEl.textContent = 'En cours...';
+      msgEl.style.color = 'var(--texte-doux)';
+      try {
+        var r = await fetch(API + '/admin/change-mdp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-EGO': adminToken },
+          body: 'nouveau_mdp=' + encodeURIComponent(mdp)
+        });
+        var j = await r.json();
+        if (j.ok) {
+          msgEl.textContent = 'Mot de passe change !';
+          msgEl.style.color = 'var(--ok)';
+          input.value = '';
+        } else {
+          msgEl.textContent = j.message || 'Erreur.';
+          msgEl.style.color = 'var(--danger)';
+        }
+      } catch(e) {
+        msgEl.textContent = 'Erreur reseau.';
+        msgEl.style.color = 'var(--danger)';
+      }
+      btn.disabled = false;
+    };
     dashboardInit = true;
   }
   chargerDonnees();

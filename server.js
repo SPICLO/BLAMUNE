@@ -888,6 +888,26 @@ app.post('/config-api', (req, res) => {
   }
 });
 
+// Change admin password (admin only)
+app.post('/admin/change-mdp', (req, res) => {
+  const auth = extraireAuth(req);
+  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
+  const nouveauMdp = (req.body.nouveau_mdp || '').trim();
+  if (nouveauMdp.length < 6) return res.status(400).json({ ok: false, message: 'Mot de passe trop court (6 min).' });
+  for (const cle of Object.keys(comptes)) {
+    if (comptes[cle].uid === auth.uid) {
+      const sel = crypto.randomBytes(8).toString('hex');
+      comptes[cle].sel = sel;
+      comptes[cle].hash = hashMdp(nouveauMdp, sel);
+      comptes[cle].erreursLogin = 0;
+      comptes[cle].lockoutUntil = null;
+      sauvegarderComptes();
+      return res.json({ ok: true, message: 'Mot de passe change.' });
+    }
+  }
+  res.status(404).json({ ok: false, message: 'Compte introuvable' });
+});
+
 // Static files
 const SITE_DIR = path.join(RACINE, 'site');
 const ADMIN_DIR = path.join(RACINE, 'admin');
