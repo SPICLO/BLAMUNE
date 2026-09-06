@@ -852,12 +852,14 @@ const MIME_TYPES = {
 
 // Admin panel
 app.get('/admin', (req, res) => {
+  res.set('Cache-Control', 'no-store');
   const index = path.join(ADMIN_DIR, 'admin.html');
   if (fs.existsSync(index)) return res.sendFile(index);
   return res.status(404).send('Admin panel not found');
 });
 
 app.get('/admin/*', (req, res) => {
+  res.set('Cache-Control', 'no-store');
   let filePath = req.path.replace(/^\/admin\/?/, '/');
   if (filePath === '/' || filePath === '') filePath = '/admin.html';
   const ext = path.extname(filePath).toLowerCase();
