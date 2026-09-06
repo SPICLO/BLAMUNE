@@ -928,39 +928,41 @@ app.get('/admin', (req, res) => {
 
 app.get('/admin/*', (req, res) => {
   res.set('Cache-Control', 'no-store');
-  let filePath = req.path.replace(/^\/admin\/?/, '/');
-  if (filePath === '/' || filePath === '') filePath = '/admin.html';
+  let filePath = req.path.replace(/^\/admin\/?/, '');
+  if (filePath === '/' || filePath === '' || filePath === 'admin.html') filePath = 'admin.html';
   const ext = path.extname(filePath).toLowerCase();
   if (BLOCKED_EXT.includes(ext)) return res.status(404).send('Non autorise');
-  const fullPath = path.resolve(ADMIN_DIR, filePath);
-  if (!fullPath.startsWith(path.resolve(ADMIN_DIR))) return res.status(403).send('Acces interdit');
-  if (!fs.existsSync(fullPath)) return res.status(404).send('Page introuvable');
-  if (fs.statSync(fullPath).isDirectory()) {
-    const index = path.join(fullPath, 'admin.html');
+  const fullPath = path.join(ADMIN_DIR, filePath);
+  const resolved = path.resolve(fullPath);
+  if (!resolved.startsWith(path.resolve(ADMIN_DIR))) return res.status(403).send('Acces interdit');
+  if (!fs.existsSync(resolved)) return res.status(404).send('Page introuvable');
+  if (fs.statSync(resolved).isDirectory()) {
+    const index = path.join(resolved, 'admin.html');
     if (fs.existsSync(index)) return res.sendFile(index);
     return res.status(404).send('Page introuvable');
   }
   const mime = MIME_TYPES[ext] || 'application/octet-stream';
   res.setHeader('Content-Type', mime);
-  res.sendFile(fullPath);
+  res.sendFile(resolved);
 });
 
 // Site static files
 app.get('*', (req, res) => {
-  let filePath = req.path === '/' ? '/index.html' : req.path;
+  let filePath = req.path === '/' ? 'index.html' : req.path.replace(/^\//, '');
   const ext = path.extname(filePath).toLowerCase();
   if (BLOCKED_EXT.includes(ext)) return res.status(404).send('Non autorise');
-  const fullPath = path.resolve(SITE_DIR, filePath);
-  if (!fullPath.startsWith(path.resolve(SITE_DIR))) return res.status(403).send('Acces interdit');
-  if (!fs.existsSync(fullPath)) return res.status(404).send('Page introuvable');
-  if (fs.statSync(fullPath).isDirectory()) {
-    const index = path.join(fullPath, 'index.html');
+  const fullPath = path.join(SITE_DIR, filePath);
+  const resolved = path.resolve(fullPath);
+  if (!resolved.startsWith(path.resolve(SITE_DIR))) return res.status(403).send('Acces interdit');
+  if (!fs.existsSync(resolved)) return res.status(404).send('Page introuvable');
+  if (fs.statSync(resolved).isDirectory()) {
+    const index = path.join(resolved, 'index.html');
     if (fs.existsSync(index)) return res.sendFile(index);
     return res.status(404).send('Page introuvable');
   }
   const mime = MIME_TYPES[ext] || 'application/octet-stream';
   res.setHeader('Content-Type', mime);
-  res.sendFile(fullPath);
+  res.sendFile(resolved);
 });
 
 // ==================== START ====================
