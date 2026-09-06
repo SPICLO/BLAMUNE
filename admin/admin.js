@@ -3,6 +3,7 @@ var API = '';
 var adminToken = null;
 var adminPseudo = null;
 var refreshInterval = null;
+var dashboardInit = false;
 
 // ---- LOGIN ----
 (function() {
@@ -68,24 +69,26 @@ document.getElementById('loginAdminForm').onsubmit = async function(e) {
       if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
     }
   } catch(ex) {
-    errEl.textContent = 'Erreur de connexion au serveur. ' + ex.message;
+    errEl.textContent = 'Erreur de connexion au serveur.';
     errEl.classList.remove('masquee');
     if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
   }
 };
 
 function initDashboard() {
-  document.getElementById('btnRefresh').onclick = chargerDonnees;
-  document.getElementById('btnReload').onclick = function () {
-    window.location.reload();
-  };
-  document.getElementById('btnLogout').onclick = function () {
-    localStorage.removeItem('dashmin_token');
-    localStorage.removeItem('dashmin_pseudo');
-    localStorage.removeItem('dashmin_time');
-    if (refreshInterval) clearInterval(refreshInterval);
-    window.location.reload();
-  };
+  if (!dashboardInit) {
+    document.getElementById('btnRefresh').onclick = chargerDonnees;
+    document.getElementById('btnReload').onclick = function() { window.location.reload(); };
+    document.getElementById('btnLogout').onclick = function() {
+      localStorage.removeItem('dashmin_token');
+      localStorage.removeItem('dashmin_pseudo');
+      localStorage.removeItem('dashmin_time');
+      if (refreshInterval) clearInterval(refreshInterval);
+      dashboardInit = false;
+      window.location.reload();
+    };
+    dashboardInit = true;
+  }
   chargerDonnees();
   if (refreshInterval) clearInterval(refreshInterval);
   refreshInterval = setInterval(chargerDonnees, 30000);
@@ -96,37 +99,40 @@ function setSectionErreur(id, msg) {
   if (el) { el.replaceChildren(); var p = document.createElement('p'); p.className = 'vide'; p.textContent = msg; el.appendChild(p); }
 }
 
+function afficherErreur(msg) {
+  document.getElementById('uptime').textContent = msg;
+  setSectionErreur('connexionsContenu', msg);
+  setSectionErreur('inscritsContenu', msg);
+  setSectionErreur('tousMessagesContenu', msg);
+  setSectionErreur('profilContenu', msg);
+  setSectionErreur('savoirContenu', msg);
+  setSectionErreur('vocabContenu', msg);
+  setSectionErreur('configContenu', msg);
+}
+
 async function chargerDonnees() {
   var btn = document.getElementById('btnRefresh');
-  btn.disabled = true;
+  if (btn) btn.disabled = true;
   try {
     var headers = {};
     if (adminToken) { headers['X-EGO'] = adminToken; }
     var r = await fetch(API + '/admin/data', { headers: headers });
     if (!r.ok) {
-      if (r.status === 403) {
+      if (r.status === 403 || r.status === 401) {
         localStorage.removeItem('dashmin_token');
         localStorage.removeItem('dashmin_pseudo');
         localStorage.removeItem('dashmin_time');
         if (refreshInterval) clearInterval(refreshInterval);
+        dashboardInit = false;
         window.location.reload();
         return;
       }
-      document.getElementById('uptime').textContent = 'Erreur serveur (HTTP ' + r.status + ')';
-      setSectionErreur('connexionsContenu', 'Erreur serveur');
-      setSectionErreur('inscritsContenu', 'Erreur serveur');
-      setSectionErreur('tousMessagesContenu', 'Erreur serveur');
-      setSectionErreur('profilContenu', 'Erreur serveur');
-      setSectionErreur('savoirContenu', 'Erreur serveur');
-      setSectionErreur('vocabContenu', 'Erreur serveur');
-      setSectionErreur('configContenu', 'Erreur serveur');
+      afficherErreur('Erreur serveur (HTTP ' + r.status + ')');
       return;
     }
-    var j = await r.json();
-    if (!j.ok) {
-      document.getElementById('uptime').textContent = 'Erreur serveur';
-      return;
-    }
+    var j;
+    try { j = await r.json(); } catch(e) { afficherErreur('Reponse invalide du serveur'); return; }
+    if (!j.ok) { afficherErreur('Erreur serveur'); return; }
 
     // Stats
     var s = j.stats || {};
@@ -134,7 +140,7 @@ async function chargerDonnees() {
     document.getElementById('statSessions').textContent = s.sessionsTotal || 0;
     document.getElementById('statDemarrages').textContent = s.demarrages || 0;
     document.getElementById('statTemps').textContent = (s.tempsMoyen || 0) + 'ms';
-    document.getElementById('uptime').textContent = 'Bot demarre le ' + (s.demarrage || '?');
+    document.getElementById('uptime').textContent = 'Demarre le ' + (s.demarrage || '?');
 
     // Utilisateurs en ligne
     var connexions = j.connexions || [];
@@ -161,9 +167,9 @@ async function chargerDonnees() {
       tableU.style.borderCollapse = 'collapse';
       var theadU = document.createElement('thead');
       var trHU = document.createElement('tr');
-      ['Pseudo','Email','Date d\'inscription','Messages'].forEach(function(txt) {
+      ['Pseudo','Email','Date','Msg'].forEach(function(txt) {
         var th = document.createElement('th');
-        th.style.cssText = 'text-align:left;padding:8px;border-bottom:1px solid var(--bordure);color:var(--texte-doux);';
+        th.style.cssText = 'text-align:left;padding:8px;border-bottom:1px solid var(--bordure);color:var(--texte-doux);font-size:12px;';
         th.textContent = txt;
         trHU.appendChild(th);
       });
@@ -212,7 +218,7 @@ async function chargerDonnees() {
       var trHC = document.createElement('tr');
       ['Pseudo','UID','Debut'].forEach(function(txt) {
         var th = document.createElement('th');
-        th.style.cssText = 'text-align:left;padding:8px;border-bottom:1px solid var(--bordure);color:var(--texte-doux);';
+        th.style.cssText = 'text-align:left;padding:8px;border-bottom:1px solid var(--bordure);color:var(--texte-doux);font-size:12px;';
         th.textContent = txt;
         trHC.appendChild(th);
       });
@@ -230,7 +236,7 @@ async function chargerDonnees() {
         tdU.textContent = c.uid || '-';
         var tdD = document.createElement('td');
         tdD.style.cssText = 'padding:8px;color:var(--texte-doux);font-size:12px;';
-        tdD.textContent = c.debut || '-';
+        tdD.textContent = c.debut ? new Date(c.debut).toLocaleString('fr-FR') : '-';
         tr.appendChild(tdP);
         tr.appendChild(tdU);
         tr.appendChild(tdD);
@@ -240,39 +246,41 @@ async function chargerDonnees() {
       connEl.appendChild(tableC);
     }
 
-    // Messages
+    // Messages (limite a 50)
     var messages = j.messages || [];
     var msgEl = document.getElementById('tousMessagesContenu');
     msgEl.replaceChildren();
-    document.getElementById('tousMessagesCount').textContent = '(' + messages.length + ')';
-    if (messages.length === 0) {
+    var totalMsg = messages.length;
+    document.getElementById('tousMessagesCount').textContent = '(' + totalMsg + ')';
+    if (totalMsg === 0) {
       var pVideM = document.createElement('p');
       pVideM.className = 'vide';
       pVideM.textContent = 'Aucun message.';
       msgEl.appendChild(pVideM);
     } else {
+      var afficher = messages.slice(-50).reverse();
       var tableM = document.createElement('table');
       tableM.style.width = '100%';
       tableM.style.borderCollapse = 'collapse';
       var theadM = document.createElement('thead');
       var trHM = document.createElement('tr');
-      ['Heure','Pseudo','Message','Reponse'].forEach(function(txt) {
+      ['Heure','Qui','Message','Reponse'].forEach(function(txt) {
         var th = document.createElement('th');
-        th.style.cssText = 'text-align:left;padding:8px;border-bottom:1px solid var(--bordure);color:var(--texte-doux);';
+        th.style.cssText = 'text-align:left;padding:8px;border-bottom:1px solid var(--bordure);color:var(--texte-doux);font-size:12px;';
         th.textContent = txt;
         trHM.appendChild(th);
       });
       theadM.appendChild(trHM);
       tableM.appendChild(theadM);
       var tbodyM = document.createElement('tbody');
-      messages.slice().reverse().forEach(function(m) {
+      afficher.forEach(function(m) {
         var tr = document.createElement('tr');
         tr.style.borderBottom = '1px solid var(--bordure)';
         var tdH = document.createElement('td');
         tdH.style.cssText = 'padding:8px;color:var(--texte-doux);font-size:11px;white-space:nowrap;';
         tdH.textContent = m.heure || '-';
         var tdP = document.createElement('td');
-        tdP.style.cssText = 'padding:8px;color:var(--texte);font-weight:600;font-size:13px;';
+        tdP.style.cssText = 'padding:8px;color:var(--texte);font-weight:600;font-size:12px;white-space:nowrap;';
         tdP.textContent = m.pseudo || m.uid || '?';
         var tdMsg = document.createElement('td');
         tdMsg.style.cssText = 'padding:8px;color:var(--texte);font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
@@ -288,6 +296,13 @@ async function chargerDonnees() {
       });
       tableM.appendChild(tbodyM);
       msgEl.appendChild(tableM);
+      if (totalMsg > 50) {
+        var pLimite = document.createElement('p');
+        pLimite.className = 'vide';
+        pLimite.textContent = 'Affichage des 50 derniers sur ' + totalMsg + ' messages.';
+        pLimite.style.marginTop = '8px';
+        msgEl.appendChild(pLimite);
+      }
     }
 
     // Profil
@@ -296,13 +311,13 @@ async function chargerDonnees() {
     profilEl.replaceChildren();
     var profilChamps = [
       ['Nom', profil.nom || '-'],
+      ['Age', profil.age || '-'],
+      ['Genre', profil.genre || '-'],
       ['Plat prefere', profil.plat || '-'],
       ['Hobby', profil.hobby || '-'],
-      ['Mots favoris', (profil.motsFavoris || []).join(', ') || '-'],
-      ['Genre', profil.genre || '-'],
       ['Aime', profil.aime || '-'],
       ['Aime pas', profil.aimePas || '-'],
-      ['Age', profil.age || '-']
+      ['Mots favoris', (profil.motsFavoris || []).join(', ') || '-']
     ];
     profilChamps.forEach(function(c) {
       var d = document.createElement('div');
@@ -318,17 +333,19 @@ async function chargerDonnees() {
       profilEl.appendChild(d);
     });
 
-    // Savoir
+    // Savoir (limite a 100)
     var savoir = j.savoir || [];
     var savoirEl = document.getElementById('savoirContenu');
     savoirEl.replaceChildren();
+    document.getElementById('savoirCount').textContent = '(' + savoir.length + ')';
     if (savoir.length === 0) {
       var pVide3 = document.createElement('p');
       pVide3.className = 'vide';
       pVide3.textContent = 'Aucune connaissance memorisee.';
       savoirEl.appendChild(pVide3);
     } else {
-      savoir.forEach(function(s) {
+      var afficherSavoir = savoir.slice(0, 100);
+      afficherSavoir.forEach(function(s) {
         var d = document.createElement('div');
         d.style.cssText = 'padding:8px;border-bottom:1px solid var(--bordure);font-size:13px;';
         var topic = document.createElement('strong');
@@ -340,12 +357,20 @@ async function chargerDonnees() {
         d.appendChild(cont);
         savoirEl.appendChild(d);
       });
+      if (savoir.length > 100) {
+        var pLimite2 = document.createElement('p');
+        pLimite2.className = 'vide';
+        pLimite2.textContent = 'Affichage des 100 premiers sur ' + savoir.length + ' connaissances.';
+        pLimite2.style.marginTop = '8px';
+        savoirEl.appendChild(pLimite2);
+      }
     }
 
-    // Vocabulaire
+    // Vocabulaire (limite a 100)
     var vocab = j.vocabulaire || [];
     var vocabEl = document.getElementById('vocabContenu');
     vocabEl.replaceChildren();
+    document.getElementById('vocabCount').textContent = '(' + vocab.length + ')';
     if (vocab.length === 0) {
       var pVide4 = document.createElement('p');
       pVide4.className = 'vide';
@@ -354,24 +379,33 @@ async function chargerDonnees() {
     } else {
       var tags = document.createElement('div');
       tags.className = 'vocab-tags';
-      vocab.forEach(function (v) {
+      var afficherVocab = vocab.slice(0, 100);
+      afficherVocab.forEach(function(v) {
         var tag = document.createElement('span');
         tag.className = 'vocab-tag';
         tag.textContent = v;
         tags.appendChild(tag);
       });
       vocabEl.appendChild(tags);
+      if (vocab.length > 100) {
+        var pLimite3 = document.createElement('p');
+        pLimite3.className = 'vide';
+        pLimite3.textContent = 'Affichage des 100 premiers sur ' + vocab.length + ' mots.';
+        pLimite3.style.marginTop = '8px';
+        vocabEl.appendChild(pLimite3);
+      }
     }
 
     // Config API
     var configEl = document.getElementById('configContenu');
     configEl.replaceChildren();
     var cfg = j.config || {};
+    var modeStr = j.mode === '1' ? 'EGO (Gemini)' : 'BLAMUNE (Gemini)';
     var rows = [
       ['Provider', cfg.api_provider || '?', cfg.api_configured ? 'ok' : 'err'],
-      ['Mode actif', j.mode === '1' ? 'EGO (Gemini)' : 'BLAMUNE', '']
+      ['Mode actif', modeStr, '']
     ];
-    rows.forEach(function (r) {
+    rows.forEach(function(r) {
       var d = document.createElement('div');
       d.className = 'config-row';
       var k = document.createElement('span');
@@ -385,19 +419,9 @@ async function chargerDonnees() {
       configEl.appendChild(d);
     });
 
-  } catch (e) {
-    document.getElementById('uptime').textContent = 'Serveur eteint';
-    setSectionErreur('connexionsContenu', 'Serveur eteint');
-    setSectionErreur('inscritsContenu', 'Serveur eteint');
-    setSectionErreur('tousMessagesContenu', 'Serveur eteint');
-    setSectionErreur('profilContenu', 'Serveur eteint');
-    setSectionErreur('savoirContenu', 'Serveur eteint');
-    setSectionErreur('vocabContenu', 'Serveur eteint');
-    setSectionErreur('configContenu', 'Serveur eteint');
+  } catch(e) {
+    afficherErreur('Serveur eteint');
   } finally {
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
   }
 }
-
-// ---- INIT ----
-// Already handled by the IIFE above and initDashboard()

@@ -462,21 +462,27 @@ app.get('/admin/data', (req, res) => {
       }
     }
   }
-  const savoir = [];
+  messages.sort((a, b) => {
+    const ta = a.heure || '';
+    const tb = b.heure || '';
+    return tb.localeCompare(ta);
+  });
+  const messagesLimite = messages.slice(0, 100);
+  const savoirTotal = [];
   try {
     const f = path.join(RACINE, 'savoir.txt');
     if (fs.existsSync(f)) {
       fs.readFileSync(f, 'utf8').split('\n').filter(l => l.trim()).forEach(l => {
         const pos = l.indexOf('|');
-        if (pos >= 0) savoir.push({ topic: l.substring(0, pos).trim(), contenu: l.substring(pos + 1).trim() });
+        if (pos >= 0) savoirTotal.push({ topic: l.substring(0, pos).trim(), contenu: l.substring(pos + 1).trim() });
       });
     }
   } catch (e) {}
-  const vocab = [];
+  const vocabTotal = [];
   try {
     const f = path.join(RACINE, 'vocabulaire.txt');
     if (fs.existsSync(f)) {
-      fs.readFileSync(f, 'utf8').split('\n').filter(l => l.trim()).forEach(l => vocab.push(l.trim()));
+      fs.readFileSync(f, 'utf8').split('\n').filter(l => l.trim()).forEach(l => vocabTotal.push(l.trim()));
     }
   } catch (e) {}
   let profil = {};
@@ -506,15 +512,21 @@ app.get('/admin/data', (req, res) => {
       }
     }
   } catch (e) {}
+  const modeGlobal = Object.keys(modeParUser).length > 0
+    ? modeParUser[Object.keys(modeParUser)[0]]
+    : '2';
   res.json({
     ok: true,
     stats,
     connexions,
-    messages,
-    savoir,
-    vocabulaire: vocab,
+    messages: messagesLimite,
+    messagesTotal: messages.length,
+    savoir: savoirTotal.slice(0, 100),
+    savoirTotal: savoirTotal.length,
+    vocabulaire: vocabTotal.slice(0, 100),
+    vocabulaireTotal: vocabTotal.length,
     profil,
-    mode: '2',
+    mode: modeGlobal,
     config: {
       api_provider: config.api_provider,
       api_configured: !!config.api_key && config.api_key !== 'ego'
