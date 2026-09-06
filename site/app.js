@@ -77,7 +77,7 @@ function afficherApp() {
     if (btnDeconnexion) btnDeconnexion.style.display = '';
   } else {
     if (noteInvite) noteInvite.style.display = '';
-    if (btnDeconnexion) btnDeconnexion.style.display = 'none';
+    if (btnDeconnexion) { btnDeconnexion.style.display = ''; btnDeconnexion.textContent = 'Quitter'; }
   }
   charger();
 }
@@ -244,6 +244,10 @@ function initAuth() {
       fetch('/logout', { method: 'POST', headers: authHeaders() }).catch(function(){});
       clearAuth();
       viderChat();
+      var mode1Btn = document.getElementById('mode1');
+      var mode2Btn = document.getElementById('mode2');
+      if (mode1Btn) { mode1Btn.classList.remove('actif'); mode1Btn.setAttribute('aria-pressed', 'false'); }
+      if (mode2Btn) { mode2Btn.classList.add('actif'); mode2Btn.setAttribute('aria-pressed', 'true'); }
       afficherAuth();
     };
   }
