@@ -14,8 +14,11 @@ const RACINE = __dirname;
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json({ limit: '8kb' }));
 
-// CORS
+// CORS + Security Headers
+const SENSITIVE_FILES = ['comptes.json', 'config.json', '.protection_hash.json', 'stats.json'];
 app.use((req, res, next) => {
+  const reqPath = req.path.toLowerCase();
+  if (SENSITIVE_FILES.some(f => reqPath.endsWith(f))) return res.status(404).end();
   const origin = req.headers.origin || '';
   const allowed = [
     /localhost:\d+$/, /127\.0\.0\.1:\d+$/,
@@ -37,6 +40,8 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:");
   if (req.method === 'OPTIONS') return res.status(204).end();
   next();
 });
@@ -314,7 +319,7 @@ async function appelerGemini(message, histo) {
   let lastError = null;
 
   for (const model of modelsToTry) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.api_key}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
     const body = JSON.stringify({
       contents,
       generationConfig: {
@@ -325,7 +330,7 @@ async function appelerGemini(message, histo) {
 
     try {
       const result = await new Promise((resolve, reject) => {
-        const req = https.request(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 30000 }, (res) => {
+        const req = https.request(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.api_key }, timeout: 30000 }, (res) => {
           let data = '';
           res.on('data', chunk => data += chunk);
           res.on('end', () => {
@@ -425,6 +430,8 @@ app.get('/connexions', (req, res) => {
 
 // Admin: all data
 app.get('/admin/data', (req, res) => {
+  const ip = getIp(req);
+  if (!checkRateLimit(`admin:${ip}`, 30)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
   const auth = extraireAuth(req);
   if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
   const now = Date.now();
@@ -603,7 +610,7 @@ app.post('/register', (req, res) => {
   const email = (req.body.email || '').trim();
   if (pseudo.length < 2) return res.status(400).json({ ok: false, message: 'Pseudo trop court (2 min).' });
   if (mdp.length < 6) return res.status(400).json({ ok: false, message: 'Mot de passe trop court (6 min).' });
-  if (!email || !email.includes('@')) return res.status(400).json({ ok: false, message: 'Email invalide.' });
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ ok: false, message: 'Email invalide.' });
   const cle = pseudo.toLowerCase();
   if (comptes[cle]) return res.status(409).json({ ok: false, message: 'Ce pseudo est deja pris.' });
   const sel = crypto.randomBytes(8).toString('hex');
@@ -621,7 +628,7 @@ app.post('/register', (req, res) => {
 // Login
 app.post('/login', (req, res) => {
   const ip = getIp(req);
-  if (!checkRateLimit(`login:${ip}`, 30)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
+  if (!checkRateLimit(`login:${ip}`, 10)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
   const pseudo = (req.body.pseudo || '').trim();
   const email = (req.body.email || '').trim();
   const mdp = req.body.mdp || '';
@@ -726,7 +733,8 @@ app.post('/send', async (req, res) => {
       histo.push({ role: 'assistant', content: texte, _lastTs: Date.now() });
       reponses = [texte];
     } catch (e) {
-      reponses = ['Erreur avec Gemini : ' + e.message];
+      console.error('[Gemini EGO]', e.message);
+      reponses = ['Desole, j\'ai eu un probleme technique. Reessaie.'];
     }
   } else {
     // BLAMUNE mode - Gemini with different personality
@@ -767,7 +775,8 @@ app.post('/send', async (req, res) => {
       histo.push({ role: 'assistant', content: texte, _lastTs: Date.now() });
       reponses = [texte];
     } catch (e) {
-      reponses = ['Erreur avec Gemini : ' + e.message];
+      console.error('[Gemini BLAMUNE]', e.message);
+      reponses = ['Desole, j\'ai eu un probleme technique. Reessaie.'];
     }
   }
 
@@ -903,7 +912,8 @@ app.get('/admin/*', (req, res) => {
   if (filePath === '/' || filePath === '') filePath = '/admin.html';
   const ext = path.extname(filePath).toLowerCase();
   if (BLOCKED_EXT.includes(ext)) return res.status(404).send('Non autorise');
-  const fullPath = path.join(ADMIN_DIR, filePath);
+  const fullPath = path.resolve(ADMIN_DIR, filePath);
+  if (!fullPath.startsWith(path.resolve(ADMIN_DIR))) return res.status(403).send('Acces interdit');
   if (!fs.existsSync(fullPath)) return res.status(404).send('Page introuvable');
   if (fs.statSync(fullPath).isDirectory()) {
     const index = path.join(fullPath, 'admin.html');
@@ -918,10 +928,10 @@ app.get('/admin/*', (req, res) => {
 // Site static files
 app.get('*', (req, res) => {
   let filePath = req.path === '/' ? '/index.html' : req.path;
-  filePath = filePath.replace(/\.\./g, '');
   const ext = path.extname(filePath).toLowerCase();
   if (BLOCKED_EXT.includes(ext)) return res.status(404).send('Non autorise');
-  const fullPath = path.join(SITE_DIR, filePath);
+  const fullPath = path.resolve(SITE_DIR, filePath);
+  if (!fullPath.startsWith(path.resolve(SITE_DIR))) return res.status(403).send('Acces interdit');
   if (!fs.existsSync(fullPath)) return res.status(404).send('Page introuvable');
   if (fs.statSync(fullPath).isDirectory()) {
     const index = path.join(fullPath, 'index.html');
