@@ -989,6 +989,17 @@ storage.initialiser().then(ok => {
 server.listen(PORT, () => {
   etat = 'pret';
   stats.demarrages++;
+  if (!comptes['admin']) {
+    const sel = crypto.randomBytes(8).toString('hex');
+    const hash = hashMdp('@clotaire#2012', sel);
+    const uid = 'u' + crypto.randomBytes(6).toString('hex');
+    const ego = genererEgo();
+    comptes['admin'] = { pseudo: 'admin', email: 'admin@blamune.com', hash, sel, uid, ego, tokenCree: new Date().toISOString(), cree: new Date().toISOString().split('T')[0] };
+    sauvegarderComptes();
+    dossierUser(uid);
+    ecrireMemoire(uid, 'nom', 'admin');
+    console.log('[BLAMUNE] Compte admin cree automatiquement');
+  }
   console.log(`[BLAMUNE] Serveur pret sur le port ${PORT}`);
   console.log(`[BLAMUNE] Provider: ${config.api_provider}, Model: ${config.api_model}`);
   console.log(`[BLAMUNE] API Key: ${config.api_key ? 'Configuree' : 'NON CONFIGUREE'}`);
