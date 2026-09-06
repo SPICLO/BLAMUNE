@@ -479,6 +479,33 @@ app.get('/admin/data', (req, res) => {
       fs.readFileSync(f, 'utf8').split('\n').filter(l => l.trim()).forEach(l => vocab.push(l.trim()));
     }
   } catch (e) {}
+  let profil = {};
+  try {
+    const usersDir2 = path.join(RACINE, 'users');
+    if (fs.existsSync(usersDir2)) {
+      const dirs2 = fs.readdirSync(usersDir2, { withFileTypes: true }).filter(d => d.isDirectory());
+      for (const d of dirs2) {
+        const mf = path.join(usersDir2, d.name, 'memoire.txt');
+        if (fs.existsSync(mf)) {
+          const lines = fs.readFileSync(mf, 'utf8').split('\n').filter(l => l.trim());
+          const champMap = { nom: 'nom', age: 'age', plat: 'plat', hobby: 'hobby', genre: 'genre', aime: 'aime', aimePas: 'aimePas', 'mots favoris': 'motsFavoris' };
+          for (const l of lines) {
+            const sep = l.indexOf(':');
+            if (sep < 0) continue;
+            const cle = l.substring(0, sep).trim().toLowerCase();
+            const val = l.substring(sep + 1).trim();
+            const key = champMap[cle];
+            if (key === 'motsFavoris') {
+              profil[key] = (profil[key] || []).concat(val.split(',').map(v => v.trim()).filter(Boolean));
+            } else if (key && !profil[key]) {
+              profil[key] = val;
+            }
+          }
+          if (Object.keys(profil).length > 0) break;
+        }
+      }
+    }
+  } catch (e) {}
   res.json({
     ok: true,
     stats,
@@ -486,7 +513,7 @@ app.get('/admin/data', (req, res) => {
     messages,
     savoir,
     vocabulaire: vocab,
-    profil: {},
+    profil,
     mode: '2',
     config: {
       api_provider: config.api_provider,
