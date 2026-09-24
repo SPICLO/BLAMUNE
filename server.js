@@ -286,7 +286,7 @@ function autoApprentissage(uid, msg) {
   if (m && m[1]) { mem.humeur = m[1]; changed = true; }
   m = lower.match(/mode\s+(joyeux|calme|fatigue|triste|energique|blagueur)/);
   if (m && m[1]) { mem.humeur = m[1]; changed = true; }
-  if (/(?:enleve|supprime|enlever|retire)\s+(?:la )?humeur/i.test(lower)) { mem.humeur = ''; changed = true; }
+  if (/(?:enleve|supprime|enlever|retire|enl[eè]ve)\s+(?:la\s+|l['\u2019\u0027]?\s*|les\s+)?humeur/i.test(lower)) { mem.humeur = ''; changed = true; }
 
   if (changed) {
     sauvegarderMemoireComplete(uid, mem);
@@ -530,23 +530,10 @@ app.get('/admin/data', (req, res) => {
     if (fs.existsSync(usersDir2)) {
       const dirs2 = fs.readdirSync(usersDir2, { withFileTypes: true }).filter(d => d.isDirectory());
       for (const d of dirs2) {
-        const mf = path.join(usersDir2, d.name, 'memoire.txt');
-        if (fs.existsSync(mf)) {
-          const lines = fs.readFileSync(mf, 'utf8').split('\n').filter(l => l.trim());
-          const champMap = { nom: 'nom', age: 'age', plat: 'plat', hobby: 'hobby', genre: 'genre', aime: 'aime', aimePas: 'aimePas', 'mots favoris': 'motsFavoris', humeur: 'humeur' };
-          for (const l of lines) {
-            const sep = l.indexOf(':');
-            if (sep < 0) continue;
-            const cle = l.substring(0, sep).trim().toLowerCase();
-            const val = l.substring(sep + 1).trim();
-            const key = champMap[cle];
-            if (key === 'motsFavoris') {
-              profil[key] = (profil[key] || []).concat(val.split(',').map(v => v.trim()).filter(Boolean));
-            } else if (key && !profil[key]) {
-              profil[key] = val;
-            }
-          }
-          if (Object.keys(profil).length > 0) break;
+        const mem = lireMemoire(d.name);
+        if (mem.nom || mem.age || mem.hobby || mem.plat || mem.aime || mem.aimePas || mem.genre || mem.humeur) {
+          profil = mem;
+          break;
         }
       }
     }
