@@ -351,7 +351,8 @@ async function chargerDonnees() {
       ['Hobby', profil.hobby || '-'],
       ['Aime', profil.aime || '-'],
       ['Aime pas', profil.aimePas || '-'],
-      ['Mots favoris', (profil.motsFavoris || []).join(', ') || '-']
+      ['Mots favoris', (profil.motsFavoris || []).join(', ') || '-'],
+      ['Humeur', profil.humeur || 'neutre']
     ];
     profilChamps.forEach(function(c) {
       var d = document.createElement('div');

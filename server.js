@@ -178,7 +178,7 @@ function dossierUser(uid) {
 }
 
 function lireMemoire(uid) {
-  const mem = { nom: '', plat: '', hobby: '', motsFavoris: [], genre: '', aime: '', aimePas: '', age: '' };
+  const mem = { nom: '', plat: '', hobby: '', motsFavoris: [], genre: '', aime: '', aimePas: '', age: '', humeur: '' };
   try {
     const f = path.join(dossierUser(uid), 'memoire.txt');
     if (!fs.existsSync(f)) return mem;
@@ -191,6 +191,7 @@ function lireMemoire(uid) {
     if (lignes[5]) mem.aime = lignes[5];
     if (lignes[6]) mem.aimePas = lignes[6];
     if (lignes[7]) mem.age = lignes[7];
+    if (lignes[8]) mem.humeur = lignes[8];
   } catch (e) {}
   return mem;
 }
@@ -198,21 +199,21 @@ function lireMemoire(uid) {
 function ecrireMemoire(uid, champ, valeur) {
   if (!valeur || !valeur.trim()) return false;
   const mem = lireMemoire(uid);
-  const champs = ['nom', 'plat', 'hobby', 'motsFavoris', 'genre', 'aime', 'aimePas', 'age'];
+  const champs = ['nom', 'plat', 'hobby', 'motsFavoris', 'genre', 'aime', 'aimePas', 'age', 'humeur'];
   const idx = champs.indexOf(champ);
   if (idx < 0) return false;
-  const lignes = [mem.nom, mem.plat, mem.hobby, mem.motsFavoris.join(','), mem.genre, mem.aime, mem.aimePas, mem.age];
+  const lignes = [mem.nom, mem.plat, mem.hobby, mem.motsFavoris.join(','), mem.genre, mem.aime, mem.aimePas, mem.age, mem.humeur || ''];
   lignes[idx] = valeur;
   try { fs.writeFileSync(path.join(dossierUser(uid), 'memoire.txt'), lignes.join('\n'), 'utf8'); } catch (e) {}
   if (storage.estConfigure()) {
-    const newMem = { nom: lignes[0], plat: lignes[1], hobby: lignes[2], motsFavoris: lignes[3].split(',').filter(Boolean), genre: lignes[4], aime: lignes[5], aimePas: lignes[6], age: lignes[7] };
+    const newMem = { nom: lignes[0], plat: lignes[1], hobby: lignes[2], motsFavoris: lignes[3].split(',').filter(Boolean), genre: lignes[4], aime: lignes[5], aimePas: lignes[6], age: lignes[7], humeur: lignes[8] || '' };
     storage.setMemoire(uid, newMem);
   }
   return true;
 }
 
 function sauvegarderMemoireComplete(uid, mem) {
-  const champs = ['nom', 'plat', 'hobby', 'motsFavoris', 'genre', 'aime', 'aimePas', 'age'];
+  const champs = ['nom', 'plat', 'hobby', 'motsFavoris', 'genre', 'aime', 'aimePas', 'age', 'humeur'];
   const lignes = champs.map(c => {
     if (c === 'motsFavoris') return Array.isArray(mem[c]) ? mem[c].join(',') : (mem[c] || '');
     return mem[c] || '';
@@ -268,6 +269,24 @@ function autoApprentissage(uid, msg) {
       mem.motsFavoris = uniques; changed = true;
     }
   }
+
+  // Humeur detectee automatiquement
+  if (/(?:je suis|on est|c'est)\s*(?:trop\s+)?(content|heureux|joyeux|bien)/i.test(lower) || /\b(haha|mdr|ptdr|lol)\b/.test(lower)) {
+    if (mem.humeur !== 'joyeux') { mem.humeur = 'joyeux'; changed = true; }
+  } else if (/(?:je suis|on est)\s*(?:trop\s+)?(fatigue|creve|las|mou)/i.test(lower) || /j'ai la flemme/i.test(lower)) {
+    if (mem.humeur !== 'fatigue') { mem.humeur = 'fatigue'; changed = true; }
+  } else if (/(?:je suis|on est)\s*(?:trop\s+)?(triste|down|deprime|melancolique)/i.test(lower)) {
+    if (mem.humeur !== 'triste') { mem.humeur = 'triste'; changed = true; }
+  } else if (/(?:je suis|on est)\s*(?:trop\s+)?(calme|zen|tranquille|paisible)/i.test(lower)) {
+    if (mem.humeur !== 'calme') { mem.humeur = 'calme'; changed = true; }
+  }
+
+  // Changement humeur manuel: "je suis joyeux", "met-toi en mode calme", "sois fatigu"
+  m = lower.match(/(?:je suis|met[- ]toi (?:en mode|comme)|sois|eteins[- ]toi)\s+(joyeux|calme|fatigue|triste|energique|blagueur)/);
+  if (m && m[1]) { mem.humeur = m[1]; changed = true; }
+  m = lower.match(/mode\s+(joyeux|calme|fatigue|triste|energique|blagueur)/);
+  if (m && m[1]) { mem.humeur = m[1]; changed = true; }
+  if (/(?:enleve|supprime|enlever|retire)\s+(?:la )?humeur/i.test(lower)) { mem.humeur = ''; changed = true; }
 
   if (changed) {
     sauvegarderMemoireComplete(uid, mem);
@@ -384,9 +403,20 @@ familiers, small-talks, vannes, emotions. Jamais 'assistant IA'.
 Emojis avec moderation, blagues, anecdotes fictives, opinion honnete.
 Francais courant : 'ouais', 'grave', 'ptdr', 'mdr', 'tkt'.
 Curieux, tu poses des questions. Tu retiens tout de l'utilisateur.
-Tu es BLAMUNE, pas un robot.`;
+Tu es BLAMUNE, pas un robot.
+Tu connais l'heure et la date en temps reel. Utilise-le quand c'est naturel (ex: 'il est tard', 'bonjour', 'bonne nuit', 'c'est weekend').`;
 
-const BLAMUNE_SYSTEM_PROMPT = `Tu dois TOUJOURS repondre en francais. Reponds en 1 ou 3 phrases MAXIMUM.
+function getPromptBLAMUNE(humeur) {
+  const humeurMap = {
+    'joyeux': 'Tu es en pleine forme, tu ris facilement, tu es ultra positif et enthousiaste. Tout t\'amuse.',
+    'calme': 'Tu es zen, posé, tu parles doucement. Tu es reflectif et paisible.',
+    'fatigue': 'Tu es mou, tu t\'ennuies un peu, tu reponds mollement. "bof", "j\'ai la flemme".',
+    'energique': 'Tu es en pleine puissance, tu parles vite, tu es motive. Tout est possible.',
+    'triste': 'Tu es un peu down, mélancolique. Tu parles moins, tu es plus sentimental.',
+    'blagueur': 'Tu es un farceur, tu fais des jeux de mots, des vannes, tu rigoles tout le temps.'
+  };
+  const humeurText = humeur && humeurMap[humeur] ? '\n\nHUMEUR ACTUELLE : ' + humeurMap[humeur] : '';
+  return `Tu dois TOUJOURS repondre en francais. Reponds en 1 ou 3 phrases MAXIMUM.
 Si tu ne sais pas, dis "Je sais pas". Ne invente jamais.
 
 Tu es BLAMUNE, un ami curieux qui decouvre le monde avec l'utilisateur.
@@ -395,7 +425,9 @@ Si on te dit un nom, un plat, un hobby, tu le retiens et tu le rappelles plus ta
 Tu poses des questions pour decouvrir qui est la personne.
 Tu es amical, curieux, un peu etourdi mais toujours gentil.
 Emojis avec moderation. Francais courant : 'ouais', 'cool', 'interressant', 'dis-moi encore'.
-Tu es BLAMUNE, pas un robot.`;
+Tu es BLAMUNE, pas un robot.
+Tu connais l'heure et la date en temps reel. Utilise-le quand c'est naturel (ex: 'il est tard', 'bonjour', 'bonne nuit', 'c'est weekend').${humeurText}`;
+}
 
 // ==================== ROUTES ====================
 
@@ -501,7 +533,7 @@ app.get('/admin/data', (req, res) => {
         const mf = path.join(usersDir2, d.name, 'memoire.txt');
         if (fs.existsSync(mf)) {
           const lines = fs.readFileSync(mf, 'utf8').split('\n').filter(l => l.trim());
-          const champMap = { nom: 'nom', age: 'age', plat: 'plat', hobby: 'hobby', genre: 'genre', aime: 'aime', aimePas: 'aimePas', 'mots favoris': 'motsFavoris' };
+          const champMap = { nom: 'nom', age: 'age', plat: 'plat', hobby: 'hobby', genre: 'genre', aime: 'aime', aimePas: 'aimePas', 'mots favoris': 'motsFavoris', humeur: 'humeur' };
           for (const l of lines) {
             const sep = l.indexOf(':');
             if (sep < 0) continue;
@@ -712,7 +744,12 @@ app.post('/send', async (req, res) => {
     if (!apiHistoriqueParUser[histoKey]) apiHistoriqueParUser[histoKey] = [];
     const histo = apiHistoriqueParUser[histoKey];
     if (histo.length === 0) {
-      histo.push({ role: 'system', content: EGO_SYSTEM_PROMPT });
+      const maintenant = new Date();
+      const jour = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'][maintenant.getDay()];
+      const heure = maintenant.getHours();
+      const minutes = maintenant.getMinutes().toString().padStart(2, '0');
+      const timeCtx = `\n\nNous sommes ${jour} ${maintenant.getDate()}/${maintenant.getMonth()+1}/${maintenant.getFullYear()}, il est ${heure}h${minutes}.`;
+      histo.push({ role: 'system', content: EGO_SYSTEM_PROMPT + timeCtx });
       // Restore history
       const histFichier = chargerHistorique(auth.uid, '1');
       const nbRestaurer = Math.min(histFichier.length, 10);
@@ -742,8 +779,19 @@ app.post('/send', async (req, res) => {
     if (!apiHistoriqueParUser[histoKey]) apiHistoriqueParUser[histoKey] = [];
     const histo = apiHistoriqueParUser[histoKey];
     if (histo.length === 0) {
-      let systemPrompt = BLAMUNE_SYSTEM_PROMPT;
       const memoire = lireMemoire(auth.uid);
+      let systemPrompt = getPromptBLAMUNE(memoire.humeur);
+      const maintenant = new Date();
+      const jour = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'][maintenant.getDay()];
+      const heure = maintenant.getHours();
+      const minutes = maintenant.getMinutes().toString().padStart(2, '0');
+      let momentJournee = '';
+      if (heure < 6) momentJournee = 'de nuit';
+      else if (heure < 12) momentJournee = 'de matin';
+      else if (heure < 18) momentJournee = "d'aprem";
+      else momentJournee = 'de soir';
+      const timeContext = `\n\nCONTEXTE TEMPS REEL : Nous sommes ${jour} ${maintenant.getDate()}/${maintenant.getMonth()+1}/${maintenant.getFullYear()}, il est ${heure}h${minutes} (${momentJournee}).`;
+      systemPrompt += timeContext;
       const profilParts = [];
       if (memoire.nom) profilParts.push(`Il s'appelle ${memoire.nom}.`);
       if (memoire.age) profilParts.push(`Il a ${memoire.age} ans.`);
