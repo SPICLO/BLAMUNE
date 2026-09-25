@@ -16,6 +16,74 @@ var _chargerInterval = null;
 var dernierModeCharge = null;
 
 var _chargerPending = false;
+var _animEntree = false;
+
+// ---------------- ANIMATIONS (connexion, serpent, mode, toasts) ----------------
+
+function delai(ms) {
+  return new Promise(function (resolve) { setTimeout(resolve, ms); });
+}
+
+// Serpent lumineux autour de la carte de connexion ('actif' | 'ok' | 'off')
+function serpentEtat(etat) {
+  var e = document.getElementById('ecranAuth');
+  if (!e) return;
+  e.classList.remove('serpent-actif', 'serpent-ok');
+  if (etat === 'actif') e.classList.add('serpent-actif');
+  else if (etat === 'ok') e.classList.add('serpent-ok');
+}
+
+// Toast anime en haut de l'ecran
+function toast(texte, type) {
+  var existant = document.getElementById('toastBlamune');
+  if (existant) { existant.remove(); }
+  var t = document.createElement('div');
+  t.id = 'toastBlamune';
+  t.className = 'toast' + (type === 'ok' ? ' toast-ok' : '');
+  var s = document.createElement('span');
+  s.textContent = texte;
+  t.appendChild(s);
+  document.body.appendChild(t);
+  requestAnimationFrame(function () { t.classList.add('visible'); });
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function () {
+    t.classList.remove('visible');
+    setTimeout(function () { t.remove(); }, 450);
+  }, 2000);
+}
+
+// Deplace la pilule glissante EGO / BLAMUNE
+function deplacerPilule(mode, instant) {
+  var btn = document.getElementById(mode === '1' ? 'mode1' : (mode === '2' ? 'mode2' : null));
+  var pill = document.getElementById('piluleMode');
+  if (!btn || !pill) return;
+  var x = btn.offsetLeft;
+  var w = btn.offsetWidth;
+  if (!w) return; // panneau masque : on attendra le prochain passage
+  if (instant) { pill.style.transition = 'none'; }
+  pill.style.left = x + 'px';
+  pill.style.width = w + 'px';
+  if (instant) { void pill.offsetWidth; pill.style.transition = ''; }
+}
+
+// Remet les boutons de mode sur BLAMUNE (2) apres une deconnexion
+function reinitaliserModeUI() {
+  var mode1Btn = document.getElementById('mode1');
+  var mode2Btn = document.getElementById('mode2');
+  if (mode1Btn) { mode1Btn.classList.remove('actif'); mode1Btn.setAttribute('aria-pressed', 'false'); }
+  if (mode2Btn) { mode2Btn.classList.add('actif'); mode2Btn.setAttribute('aria-pressed', 'true'); }
+  sauverProfilLocal('mode', '2');
+  deplacerPilule('2', true);
+}
+
+// Cascade des messages a l'entree du chat
+function animerEntreeChat() {
+  var msgs = document.querySelectorAll('#chat .msg:not(.attente), #chat .accueil');
+  for (var i = 0; i < msgs.length; i++) {
+    msgs[i].style.animation = 'cascadeIn 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both';
+    msgs[i].style.animationDelay = (80 + i * 70) + 'ms';
+  }
+}
 
 function genererUserId() {
   return 'u' + Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
@@ -64,11 +132,21 @@ function authBody() {
   return p;
 }
 
-function afficherApp() {
+function afficherApp(anime) {
   var ecranAuth = document.getElementById('ecranAuth');
   var appContenu = document.getElementById('appContenu');
-  if (ecranAuth) ecranAuth.style.display = 'none';
-  if (appContenu) { appContenu.style.display = 'flex'; appContenu.style.flexDirection = 'column'; }
+  if (ecranAuth) {
+    if (anime) ecranAuth.classList.add('sortant');
+  }
+  if (appContenu) {
+    appContenu.style.display = 'flex';
+    appContenu.style.flexDirection = 'column';
+    if (anime) {
+      appContenu.classList.remove('entrant');
+      void appContenu.offsetWidth;
+      appContenu.classList.add('entrant');
+    }
+  }
   var pseudo = getAuthPseudo();
   var noteInvite = document.getElementById('noteInvite');
   var btnDeconnexion = document.getElementById('btnDeconnexion');
@@ -79,13 +157,30 @@ function afficherApp() {
     if (noteInvite) noteInvite.style.display = '';
     if (btnDeconnexion) { btnDeconnexion.style.display = ''; btnDeconnexion.textContent = 'Quitter'; }
   }
+  if (anime) _animEntree = true;
+  if (ecranAuth) {
+    if (anime) {
+      setTimeout(function () {
+        ecranAuth.style.display = 'none';
+        ecranAuth.classList.remove('sortant');
+        serpentEtat('off');
+      }, 520);
+    } else {
+      ecranAuth.style.display = 'none';
+    }
+  }
   charger();
 }
 
 function afficherAuth() {
   var ecranAuth = document.getElementById('ecranAuth');
   var appContenu = document.getElementById('appContenu');
-  if (ecranAuth) ecranAuth.style.display = '';
+  if (ecranAuth) {
+    ecranAuth.style.display = '';
+    ecranAuth.classList.remove('entrant');
+    void ecranAuth.offsetWidth;
+    ecranAuth.classList.add('entrant');
+  }
   if (appContenu) appContenu.style.display = 'none';
 }
 
@@ -104,23 +199,34 @@ async function authRegister() {
   if (!email || email.indexOf('@') < 0) { errEl.textContent = 'Email invalide.'; return; }
   if (mdp.length < 6) { errEl.textContent = 'Mot de passe trop court (6 min).'; return; }
   btnRegister.disabled = true;
-  btnRegister.textContent = 'Creation...';
+  btnRegister.classList.add('btn-charge');
+  serpentEtat('actif');
   try {
     var body = 'pseudo=' + encodeURIComponent(pseudo) + '&email=' + encodeURIComponent(email) + '&mdp=' + encodeURIComponent(mdp);
-    var r = await fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    var j = await r.json();
+    var req = fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    var j = (await Promise.all([req, delai(1600)]))[0];
     if (j.ok) {
       setAuthInfo(j.ego, j.pseudo, j.uid);
-      afficherApp();
+      btnRegister.classList.remove('btn-charge');
+      btnRegister.classList.add('btn-ok');
+      serpentEtat('ok');
+      await delai(750);
+      btnRegister.classList.remove('btn-ok');
+      btnRegister.disabled = false;
+      afficherApp(true);
     } else {
+      btnRegister.classList.remove('btn-charge');
+      btnRegister.disabled = false;
+      serpentEtat('off');
       errEl.textContent = j.message || 'Erreur.';
     }
   } catch (e) {
+    btnRegister.classList.remove('btn-charge');
+    btnRegister.disabled = false;
+    serpentEtat('off');
     errEl.textContent = 'Serveur injoignable.';
   }
-  btnRegister.disabled = false;
-  btnRegister.textContent = 'Creer mon compte';
 }
 
 async function authLogin() {
@@ -134,37 +240,61 @@ async function authLogin() {
   errEl.textContent = '';
   if (!email || !mdp) { errEl.textContent = 'Remplis tous les champs.'; return; }
   btnLogin.disabled = true;
-  btnLogin.textContent = 'Connexion...';
+  btnLogin.classList.add('btn-charge');
+  serpentEtat('actif');
   try {
     var body = 'email=' + encodeURIComponent(email) + '&mdp=' + encodeURIComponent(mdp);
-    var r = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    var j = await r.json();
+    var req = fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    var j = (await Promise.all([req, delai(1700)]))[0];
     if (j.ok) {
       setAuthInfo(j.ego, j.pseudo, j.uid);
-      afficherApp();
+      btnLogin.classList.remove('btn-charge');
+      btnLogin.classList.add('btn-ok');
+      serpentEtat('ok');
+      await delai(750);
+      btnLogin.classList.remove('btn-ok');
+      btnLogin.disabled = false;
+      afficherApp(true);
     } else {
+      btnLogin.classList.remove('btn-charge');
+      btnLogin.disabled = false;
+      serpentEtat('off');
       errEl.textContent = j.message || 'Erreur.';
     }
   } catch (e) {
+    btnLogin.classList.remove('btn-charge');
+    btnLogin.disabled = false;
+    serpentEtat('off');
     errEl.textContent = 'Serveur injoignable.';
   }
-  btnLogin.disabled = false;
-  btnLogin.textContent = 'Se connecter';
 }
 
 async function authInvite() {
   var btnInvite = document.getElementById('btnInvite');
-  if (btnInvite) btnInvite.disabled = true;
+  if (!btnInvite) return;
+  btnInvite.disabled = true;
+  btnInvite.classList.add('btn-charge');
+  serpentEtat('actif');
   try {
-    var r = await fetch('/invite', { method: 'POST' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    var j = await r.json();
+    var req = fetch('/invite', { method: 'POST' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    var j = (await Promise.all([req, delai(1200)]))[0];
     if (j.ok) {
       localStorage.removeItem(AUTH_CLES.ego);
       localStorage.removeItem(AUTH_CLES.pseudo);
       localStorage.setItem(AUTH_CLES.userId, j.uid);
-      afficherApp();
+      btnInvite.classList.remove('btn-charge');
+      btnInvite.classList.add('btn-ok');
+      serpentEtat('ok');
+      await delai(750);
+      btnInvite.classList.remove('btn-ok');
+      btnInvite.disabled = false;
+      afficherApp(true);
+    } else {
+      btnInvite.classList.remove('btn-charge');
+      btnInvite.disabled = false;
+      serpentEtat('off');
     }
   } catch (e) {
     // Fallback local si le serveur est injoignable
@@ -173,9 +303,14 @@ async function authInvite() {
     if (!localStorage.getItem(AUTH_CLES.userId)) {
       localStorage.setItem(AUTH_CLES.userId, genererUserId());
     }
-    afficherApp();
+    btnInvite.classList.remove('btn-charge');
+    btnInvite.classList.add('btn-ok');
+    serpentEtat('ok');
+    await delai(750);
+    btnInvite.classList.remove('btn-ok');
+    btnInvite.disabled = false;
+    afficherApp(true);
   }
-  if (btnInvite) btnInvite.disabled = false;
 }
 
 function initAuth() {
@@ -241,14 +376,52 @@ function initAuth() {
   var btnDeconnexion = document.getElementById('btnDeconnexion');
   if (btnDeconnexion) {
     btnDeconnexion.onclick = function() {
-      fetch('/logout', { method: 'POST', headers: authHeaders() }).catch(function(){});
-      clearAuth();
-      viderChat();
-      var mode1Btn = document.getElementById('mode1');
-      var mode2Btn = document.getElementById('mode2');
-      if (mode1Btn) { mode1Btn.classList.remove('actif'); mode1Btn.setAttribute('aria-pressed', 'false'); }
-      if (mode2Btn) { mode2Btn.classList.add('actif'); mode2Btn.setAttribute('aria-pressed', 'true'); }
-      afficherAuth();
+      var appContenu = document.getElementById('appContenu');
+      if (!appContenu || appContenu.style.display === 'none') {
+        fetch('/logout', { method: 'POST', headers: authHeaders() }).catch(function(){});
+        clearAuth();
+        viderChat();
+        reinitaliserModeUI();
+        afficherAuth();
+        return;
+      }
+      // Sortie animee : les messages fondent en cascade + aura de l'avatar
+      appContenu.classList.add('quittant');
+      var msgs = appContenu.querySelectorAll('.msg, .accueil');
+      for (var i = 0; i < msgs.length; i++) {
+        var el = msgs[i];
+        el.style.animation = 'none';
+        el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+        el.style.transitionDelay = (i * 40) + 'ms';
+        el.classList.add('fonte');
+        msgs[i].style.opacity = '0';
+        msgs[i].style.transform = 'translateY(26px)';
+      }
+      var tete = document.getElementById('tete');
+      var barre = document.getElementById('barre');
+      if (tete) { tete.style.transition = 'opacity 0.35s ease'; tete.style.opacity = '0'; }
+      if (barre) { barre.style.transition = 'opacity 0.35s ease'; barre.style.opacity = '0'; }
+      setTimeout(function () {
+        fetch('/logout', { method: 'POST', headers: authHeaders() }).catch(function(){});
+        clearAuth();
+        viderChat();
+        reinitaliserModeUI();
+        var ecranAuth = document.getElementById('ecranAuth');
+        if (ecranAuth) {
+          ecranAuth.style.display = '';
+          ecranAuth.classList.remove('entrant');
+          void ecranAuth.offsetWidth;
+          ecranAuth.classList.add('entrant');
+        }
+        appContenu.classList.remove('quittant');
+        appContenu.style.display = 'none';
+        if (tete) { tete.style.opacity = ''; tete.style.transition = ''; }
+        if (barre) { barre.style.opacity = ''; barre.style.transition = ''; }
+        for (var j = 0; j < msgs.length; j++) {
+          var m = msgs[j];
+          if (m && m.parentNode) m.style.cssText = '';
+        }
+      }, 780);
     };
   }
 
@@ -261,6 +434,11 @@ function initAuth() {
       if (e.key === 'Enter') { e.preventDefault(); envoyer(); }
     });
   }
+
+  // Position initiale de la pilule EGO / BLAMUNE
+  setTimeout(function () {
+    deplacerPilule(chargerProfilLocal().mode === '1' ? '1' : '2', true);
+  }, 50);
 
   // Quand l'onglet redevient visible, on verifie l'etat du serveur.
   document.addEventListener('visibilitychange', function () {
@@ -511,7 +689,7 @@ function signalerArret() {
   dernierQui = null;
 }
 
-function majMode(mode) {
+function majMode(mode, animer) {
   // FIX #6: validate mode values (only '1', '2', or '3')
   if (mode !== '1' && mode !== '2' && mode !== '3') mode = '2';
   var m1 = document.getElementById('mode1');
@@ -524,6 +702,7 @@ function majMode(mode) {
     m2.classList.toggle('actif', mode === '2');
     m2.setAttribute('aria-pressed', mode === '2');
   }
+  deplacerPilule(mode === '1' ? '1' : '2', !animer);
   sauverProfilLocal('mode', mode);
 }
 
@@ -624,6 +803,10 @@ async function charger() {
     } else if (nbHistorique === 0 && !c.querySelector('.accueil') && (j.etat === 'pret' || j.etat === 'demarrage')) {
       afficherAccueil();
     }
+    if (_animEntree) {
+      _animEntree = false;
+      animerEntreeChat();
+    }
     if (j.etat === 'arrete' || j.etat === 'erreur') signalerArret();
     else if (j.etat === 'demarrage') {
       nbPollsDemarrage++;
@@ -707,21 +890,33 @@ async function changerMode(m) {
   arretSignale = false;
   majStatut('demarrage', 'Changement de mode...');
   attente(true);
+
+  // Animation de bascule (delai visuel garanti)
+  var appContenu = document.getElementById('appContenu');
+  if (appContenu) {
+    appContenu.classList.remove('mode-bascule');
+    void appContenu.offsetWidth;
+    appContenu.classList.add('mode-bascule');
+  }
   try {
     var abortCtrl = new AbortController();
     var abortTimer = setTimeout(function () { abortCtrl.abort(); }, 120000);
-    var r = await fetch('/mode', { method: 'POST', headers: Object.assign({}, authHeaders(), { 'Content-Type': 'application/x-www-form-urlencoded' }), body: 'm=' + m, signal: abortCtrl.signal });
+    var req = fetch('/mode', { method: 'POST', headers: Object.assign({}, authHeaders(), { 'Content-Type': 'application/x-www-form-urlencoded' }), body: 'm=' + m, signal: abortCtrl.signal })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    var j = (await Promise.all([req, delai(1100)]))[0];
     clearTimeout(abortTimer);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    var j = await r.json();
-    majMode(j.mode || '2');
+    majMode(String(j.mode || '2'), true);
     majStatut(j.etat);
+    toast('Mode ' + (String(j.mode) === '1' ? 'EGO' : 'BLAMUNE') + ' active', 'ok');
   } catch (e) {
     majStatut('horsligne', 'Serveur injoignable');
   }
   attente(false);
   actionEnCours = false;
   if (_chargerInterval) { clearTimeout(_chargerInterval); _chargerInterval = null; }
+  if (appContenu) {
+    setTimeout(function () { appContenu.classList.remove('mode-bascule'); }, 700);
+  }
   modeEnCours = false;
   try { await charger(); } catch (_) {}
   desactiver(false);
