@@ -499,7 +499,8 @@ button:focus-visible, input:focus-visible {
   border: 1px solid var(--bordure);
   background: var(--surface);
   color: var(--texte);
-  font-size: 15px;
+  /* 16px minimum : en dessous, iOS zoome automatiquement sur le champ. */
+  font-size: 16px;
   font-family: inherit;
   outline: none;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -589,10 +590,13 @@ button:disabled {
   overflow-y: auto;
 }
 
-/* Voile rouge : apparait quand la connexion / l'inscription echoue */
+/* Voile rouge : apparait quand la connexion / l'inscription echoue.
+   position: fixed et non absolute : la carte peut defiler (petit ecran,
+   clavier ouvert) et le voile doit couvrir tout l'ecran, pas seulement
+   le haut du contenu scrollable. */
 #ecranAuth::after {
   content: '';
-  position: absolute;
+  position: fixed;
   inset: 0;
   background:
     radial-gradient(700px 460px at 50% 38%, rgba(248, 113, 113, 0.34), transparent 65%),
@@ -635,8 +639,7 @@ button:disabled {
   padding: 34px 26px;
 }
 
-/* Texte plus grand quand la carte est large : evite le zoom auto du clavier iOS */
-.auth-box.large input,
+/* Quand la carte est large, le bouton suit la taille des champs */
 .auth-box.large .auth-btn {
   font-size: 16px;
 }
@@ -735,7 +738,9 @@ button:disabled {
   border-radius: 12px;
   padding: 13px 16px;
   color: var(--texte);
-  font-size: 15px;
+  /* 16px minimum : en dessous, iOS zoome automatiquement sur le champ
+     (valable sur le formulaire de connexion ET d'inscription). */
+  font-size: 16px;
   outline: none;
   transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease, transform 0.3s ease;
 }
@@ -1216,8 +1221,12 @@ html.console #rampe .rampe-file {
   50% { transform: scaleX(1.45); }
 }
 
-/* --- Tout pret : il arrete de ramper pour te regarder (sans saut) --- */
-#rampe.fixe {
+/* --- Tout pret : il arrete de ramper pour te regarder (sans saut).
+       On fige TOUT (traversee + ondulation du corps + ecailles) : sinon
+       le serpent "immobile" bouge encore et l'effet est absurde. --- */
+#rampe.fixe,
+#rampe.fixe .rampe-mvt,
+#rampe.fixe .rampe-file {
   animation-play-state: paused;
 }
 

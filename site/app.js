@@ -316,6 +316,9 @@ function afficherAuth() {
   serpentEtat('off');
   majEchec(false);
   document.documentElement.classList.remove('saisie');
+  // Un swap en cours laisserait ses timers allumes : ils re-afficheraient
+  // le mauvais formulaire juste apres. On coupe tout avant de remettre a zero.
+  annulerSwap();
   // Retour propre sur le formulaire de connexion (carte a sa taille normale)
   var boite = document.querySelector('.auth-box');
   var login = document.getElementById('authFormLogin');
@@ -501,18 +504,31 @@ function majEchec(on) {
 
 // Clavier ouvert = le serpent de fond se masque pour ne pas se retrouver
 // au-dessus du clavier (connexion, inscription ET chat).
-// On detecte le vrai clavier via visualViewport (la hauteur du viewport
-// visible baisse quand le clavier s'ouvre) : sur PC, un champ focalise ne
-// cache donc pas le serpent. En secours, sur tactile, un champ actif suffit.
+// On mesure la hauteur du viewport visible : elle chute quand le clavier
+// s'ouvre. On la compare a une reference prise SANS clavier, et on ne parle
+// de clavier que si un champ est active (sinon une rotation ou la barre
+// d'adresse fausserait la mesure). La reference se re-aligne des que le
+// clavier est ferme : le serpent revient meme si le champ reste focalise
+// (touche "Termine", retour arriere Android, ...).
+var hauteurSansClavier = null;
+
+function champActif() {
+  var a = document.activeElement;
+  return !!(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'));
+}
+
 function clavierOuvert() {
-  if (window.visualViewport) {
-    var ecart = window.innerHeight - window.visualViewport.height;
-    if (ecart > 100) return true;
+  var vv = window.visualViewport;
+  if (vv) {
+    if (hauteurSansClavier === null) hauteurSansClavier = vv.height;
+    var ecart = hauteurSansClavier - vv.height;
+    if (ecart > 100 && champActif()) return true;
+    hauteurSansClavier = vv.height;   // pas de clavier : on recalcule
+    return false;
   }
-  var tactile = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-  if (!tactile) return false;
-  var actif = document.activeElement;
-  return !!(actif && (actif.tagName === 'INPUT' || actif.tagName === 'TEXTAREA'));
+  // Navigateur sans visualViewport : secours tactile.
+  if (!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)) return false;
+  return champActif();
 }
 
 function majSaisie() {
@@ -528,9 +544,24 @@ function fermerClavier() {
 // faisant un demi-tour 3D, puis l'autre entre dans l'autre sens. La carte
 // s'elargit pour que l'inscription profite de tout l'espace.
 var swapEnCours = false;
+var swapT1 = null;
+var swapT2 = null;
+
+// coupe un swap en cours et remet les deux formes dans leur etat normal
+function annulerSwap() {
+  if (swapT1) { clearTimeout(swapT1); swapT1 = null; }
+  if (swapT2) { clearTimeout(swapT2); swapT2 = null; }
+  swapEnCours = false;
+  var login = document.getElementById('authFormLogin');
+  var reg = document.getElementById('authFormRegister');
+  if (login) login.classList.remove('sortie-swap', 'entree-swap');
+  if (reg) reg.classList.remove('sortie-swap', 'entree-swap');
+}
 
 function basculerForm(vers) {
-  if (swapEnCours) return;
+  // Pas de swap pendant une requete : l'erreur irait dans un formulaire
+  // masquee. Pas de swap pendant un swap non plus.
+  if (swapEnCours || authEnCours) return;
   var login = document.getElementById('authFormLogin');
   var reg = document.getElementById('authFormRegister');
   var boite = document.querySelector('.auth-box');
@@ -549,13 +580,15 @@ function basculerForm(vers) {
   if (boite) boite.classList.toggle('large', vers === 'register');
 
   depuis.classList.add('sortie-swap');
-  setTimeout(function () {
+  swapT1 = setTimeout(function () {
+    swapT1 = null;
     depuis.classList.remove('sortie-swap');
     depuis.style.display = 'none';
     cible.style.display = '';
     forcerReflow(cible);
     cible.classList.add('entree-swap');
-    setTimeout(function () {
+    swapT2 = setTimeout(function () {
+      swapT2 = null;
       cible.classList.remove('entree-swap');
       swapEnCours = false;
     }, 380);
@@ -617,6 +650,11 @@ function initAuth() {
     window.visualViewport.addEventListener('scroll', majSaisie);
   }
   window.addEventListener('resize', majSaisie);
+  // Apres une rotation, la reference de hauteur sans clavier n'est plus valable.
+  window.addEventListener('orientationchange', function () {
+    hauteurSansClavier = null;
+    setTimeout(majSaisie, 500);
+  });
   majSaisie();
   if (authMdp) {
     authMdp.addEventListener('keydown', function(e) {
@@ -1122,8 +1160,10 @@ async function envoyer() {
 
   // Bulle du bot : creee des le premier fragment recu.
   var bulleBot = null;
+  var termine = false;   // une fois la reponse finalisee, plus aucun fragment
+
   function direct(texte) {
-    if (!texte) return;
+    if (termine || !texte) return;
     if (!bulleBot) {
       attente(false);
       bulleBot = ajouterMessage('bot', texte);
@@ -1138,6 +1178,8 @@ async function envoyer() {
   }
 
   function finaliser(j) {
+    if (termine) return;
+    termine = true;
     attente(false);
     z.value = '';
     majStatut(j.etat);
@@ -1158,6 +1200,12 @@ async function envoyer() {
     }
   }
 
+  // Le chrono couvre TOUTE la requete, corps de flux compris : avant, il
+  // s'arretait des les en-tetes et un flux qui s'arrete gelait l'application
+  // (bouton d'envoi bloque, plus aucun rafraichissement).
+  var abortCtrl = new AbortController();
+  var abortTimer = setTimeout(function () { abortCtrl.abort(); }, 120000);
+
   try {
     var profil = chargerProfilLocal();
     var modeServ = dernierModeCharge || profil.mode || '2';
@@ -1165,10 +1213,7 @@ async function envoyer() {
     var headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
     var ah = authHeaders();
     for (var k in ah) headers[k] = ah[k];
-    var abortCtrl = new AbortController();
-    var abortTimer = setTimeout(function () { abortCtrl.abort(); }, 120000);
     var r = await fetch('/send', { method: 'POST', headers: headers, body: body, signal: abortCtrl.signal });
-    clearTimeout(abortTimer);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     z.value = '';
     var ct = r.headers.get('content-type') || '';
@@ -1176,6 +1221,9 @@ async function envoyer() {
       var recuFin = false;
       await lireFlux(r, direct, function (d) { recuFin = true; finaliser(d); });
       if (!recuFin) throw new Error('Flux interrompu');
+    } else if (ct.indexOf('text/event-stream') >= 0) {
+      // Flux annonce mais non lisible : on ne peut pas faire mieux que d'echouer.
+      throw new Error('Flux non supporte par ce navigateur');
     } else {
       // Serveur ancien (pas de flux) : on garde l'ancien chemin JSON.
       finaliser(await r.json());
@@ -1192,12 +1240,14 @@ async function envoyer() {
       majStatut('horsligne', 'Serveur injoignable');
       ajouterInfo('Envoi echoue : le serveur ne repond pas (timeout 120s). Reessaie.');
     }
+  } finally {
+    clearTimeout(abortTimer);
+    actionEnCours = false;
+    if (_chargerInterval) { clearTimeout(_chargerInterval); _chargerInterval = null; }
+    desactiver(false);
+    z.focus();
+    setTimeout(function () { charger(); }, 500);
   }
-  actionEnCours = false;
-  if (_chargerInterval) { clearTimeout(_chargerInterval); _chargerInterval = null; }
-  desactiver(false);
-  z.focus();
-  setTimeout(function () { charger(); }, 500);
 }
 
 async function changerMode(m) {
@@ -1274,6 +1324,14 @@ window.addEventListener('load', function () {
     rampeRelacher();
   });
   window.addEventListener('pointerup', function () {
+    rampeRelacher();
+  });
+  // Si la souris quitte la fenetre (ou qu'on change d'onglet), plus aucune
+  // mousemove n'arrive : sans ca le serpent restait fige en mode "interagit".
+  document.documentElement.addEventListener('mouseleave', function () {
+    rampeRelacher();
+  });
+  window.addEventListener('blur', function () {
     rampeRelacher();
   });
 });
