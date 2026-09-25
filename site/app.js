@@ -17,6 +17,7 @@ var dernierModeCharge = null;
 
 var _chargerPending = false;
 var _animEntree = false;
+var authEnCours = false;
 
 // ---------------- OUTILS D'ANIMATION ----------------
 
@@ -36,18 +37,21 @@ function serpentEtat(etat) {
 // Serpent vif : suit le curseur pendant la requete, puis revient se refermer
 // sur la carte (il "mange sa queue") avant de tourner sur lui-meme via la ring.
 var serpentElem = null;
+var dernierCurseur = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 
 function serpentSuivre(on) {
-  if (!serpentElem) {
-    serpentElem = document.createElement('div');
-    serpentElem.id = 'serpent';
-    serpentElem.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(serpentElem);
-  }
   if (on) {
+    if (!serpentElem) {
+      serpentElem = document.createElement('div');
+      serpentElem.id = 'serpent';
+      serpentElem.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(serpentElem);
+    }
     serpentElem.classList.remove('mange');
+    serpentElem.style.left = dernierCurseur.x + 'px';
+    serpentElem.style.top = dernierCurseur.y + 'px';
     serpentElem.classList.add('suivre');
-  } else {
+  } else if (serpentElem) {
     serpentElem.classList.remove('suivre');
   }
 }
@@ -151,6 +155,8 @@ function authBody() {
 function afficherApp() {
   var ecranAuth = document.getElementById('ecranAuth');
   var appContenu = document.getElementById('appContenu');
+  serpentSuivre(false);
+  serpentEtat('off');
   if (ecranAuth) ecranAuth.style.display = 'none';
   if (appContenu) { appContenu.style.display = 'flex'; appContenu.style.flexDirection = 'column'; }
   finaliserAffichageApp();
@@ -225,6 +231,7 @@ function jouerTransitionConnexion(message) {
 
     setTimeout(function () {
       if (ecranAuth) { ecranAuth.style.display = 'none'; ecranAuth.classList.remove('sortie-auth'); }
+      serpentEtat('off');
       if (success) success.classList.remove('actif');
       if (principal) principal.style.display = '';
     }, 560);
@@ -256,6 +263,7 @@ function jouerTransitionDeconnexion() {
     if (appContenu) {
       appContenu.style.display = 'none';
       appContenu.classList.remove('sortie-app');
+      appContenu.classList.remove('entree-app');
     }
   }, 460);
 }
@@ -270,6 +278,7 @@ function afficherAuth() {
 }
 
 async function authRegister() {
+  if (authEnCours) return;
   var pseudoEl = document.getElementById('authPseudoReg');
   var emailEl = document.getElementById('authEmailReg');
   var mdpEl = document.getElementById('authMdpReg');
@@ -283,6 +292,7 @@ async function authRegister() {
   if (pseudo.length < 2) { errEl.textContent = 'Pseudo trop court (2 min).'; return; }
   if (!email || email.indexOf('@') < 0) { errEl.textContent = 'Email invalide.'; return; }
   if (mdp.length < 6) { errEl.textContent = 'Mot de passe trop court (6 min).'; return; }
+  authEnCours = true;
   btnRegister.disabled = true;
   btnRegister.textContent = 'Creation...';
   serpentSuivre(true);
@@ -306,9 +316,11 @@ async function authRegister() {
   }
   btnRegister.disabled = false;
   btnRegister.textContent = 'Creer mon compte';
+  authEnCours = false;
 }
 
 async function authLogin() {
+  if (authEnCours) return;
   var emailEl = document.getElementById('authEmail');
   var mdpEl = document.getElementById('authMdp');
   var errEl = document.getElementById('authErrLogin');
@@ -318,6 +330,7 @@ async function authLogin() {
   var mdp = mdpEl.value;
   errEl.textContent = '';
   if (!email || !mdp) { errEl.textContent = 'Remplis tous les champs.'; return; }
+  authEnCours = true;
   btnLogin.disabled = true;
   btnLogin.textContent = 'Connexion...';
   serpentSuivre(true);
@@ -341,11 +354,15 @@ async function authLogin() {
   }
   btnLogin.disabled = false;
   btnLogin.textContent = 'Se connecter';
+  authEnCours = false;
 }
 
 async function authInvite() {
+  if (authEnCours) return;
   var btnInvite = document.getElementById('btnInvite');
-  if (btnInvite) btnInvite.disabled = true;
+  if (!btnInvite) return;
+  authEnCours = true;
+  btnInvite.disabled = true;
   serpentSuivre(true);
   try {
     var req = fetch('/invite', { method: 'POST' })
@@ -358,6 +375,7 @@ async function authInvite() {
       jouerTransitionConnexion('Mode invite active !');
     } else {
       serpentSuivre(false);
+      serpentEtat('off');
     }
   } catch (e) {
     // Fallback local si le serveur est injoignable
@@ -369,7 +387,8 @@ async function authInvite() {
     }
     jouerTransitionConnexion('Mode invite active !');
   }
-  if (btnInvite) btnInvite.disabled = false;
+  btnInvite.disabled = false;
+  authEnCours = false;
 }
 
 function initAuth() {
@@ -952,6 +971,8 @@ window.addEventListener('load', function () {
     navigator.serviceWorker.register('/sw.js').catch(function() {});
   }
   document.addEventListener('mousemove', function (e) {
+    dernierCurseur.x = e.clientX;
+    dernierCurseur.y = e.clientY;
     var s = document.getElementById('serpent');
     if (s && s.classList.contains('suivre')) {
       s.style.left = e.clientX + 'px';
