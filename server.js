@@ -52,7 +52,9 @@ let config = {
   api_key: process.env.API_KEY || '',
   api_model: 'gemini-3.5-flash',
   api_url: process.env.API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',
-  api_max_tokens: 8192,
+  // Reponses courtes (1 a 5 phrases nettoyees) : inutile de laisser
+  // le modele generer des milliers de tokens, ca rallonge la reponse.
+  api_max_tokens: 1024,
   api_temperature: 0.7
 };
 
@@ -321,8 +323,24 @@ function sauvegarderHistorique(uid, mode, historique) {
   if (storage.estConfigure()) storage.setHistorique(uid, mode, historique);
 }
 
-// ==================== GEMINI API ====================
-async function appelerGemini(message, histo) {
+// ==================== APPEL GEMINI ====================
+// Deux points qui font gagner du temps :
+//  1) on n'envoie que les N derniers messages (moins d'entree = premiere
+//     lettre affichee bien plus tot),
+//  2) on demande une reponse EN FLUX (SSE) : le client voit le texte
+//     s'ecrire au lieu d'attendre la fin de la generation.
+
+const HISTO_API_MAX = 16; // derniers echanges envoyes a l'API
+
+function limiterHisto(histo, nb) {
+  if (!Array.isArray(histo) || histo.length <= nb + 1) return histo;
+  const systeme = histo.filter(h => h.role === 'system');
+  let convo = histo.filter(h => h.role !== 'system').slice(-nb);
+  while (convo.length && convo[0].role !== 'user') convo.shift();
+  return systeme.concat(convo);
+}
+
+function construireContenus(histo) {
   const contents = [];
   let systemText = '';
   for (const h of histo) {
@@ -338,47 +356,138 @@ async function appelerGemini(message, histo) {
   if (systemText && contents.length === 0) {
     contents.push({ role: 'user', parts: [{ text: systemText }] });
   }
+  return contents;
+}
 
-  // Try primary model, then fallbacks
-  const modelsToTry = [config.api_model, ...FALLBACK_MODELS.filter(m => m !== config.api_model)];
-  let lastError = null;
+function optionsGemini() {
+  return {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.api_key },
+    timeout: 30000
+  };
+}
 
-  for (const model of modelsToTry) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-    const body = JSON.stringify({
-      contents,
-      generationConfig: {
-        maxOutputTokens: config.api_max_tokens,
-        temperature: config.api_temperature
-      }
-    });
+function corpsGemini(contents) {
+  return JSON.stringify({
+    contents,
+    generationConfig: {
+      maxOutputTokens: config.api_max_tokens,
+      temperature: config.api_temperature
+    }
+  });
+}
 
-    try {
-      const result = await new Promise((resolve, reject) => {
-        const req = https.request(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.api_key }, timeout: 30000 }, (res) => {
-          let data = '';
-          res.on('data', chunk => data += chunk);
-          res.on('end', () => {
-            try {
-              const json = JSON.parse(data);
-              if (json.error) return reject(new Error(json.error.message));
-              const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-              resolve(text);
-            } catch (e) { reject(e); }
-          });
-        });
-        req.on('error', reject);
-        req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
-        req.write(body);
-        req.end();
+function texteDepuisReponse(data) {
+  const json = JSON.parse(data);
+  if (json.error) throw new Error(json.error.message);
+  return ((json.candidates && json.candidates[0] &&
+           json.candidates[0].content && json.candidates[0].content.parts) || [])
+    .filter(p => p && p.text && !p.thought)
+    .map(p => p.text).join('');
+}
+
+// --- Reponse classique : tout d'un coup (repli si le flux echoue) ---
+function modeleClassique(modele, contents) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modele}:generateContent`;
+  const body = corpsGemini(contents);
+  return new Promise((resolve, reject) => {
+    const req = https.request(url, optionsGemini(), (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve(texteDepuisReponse(data)); }
+        catch (e) { reject(e); }
       });
-      if (result) return result;
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+    req.write(body);
+    req.end();
+  });
+}
+
+// --- Reponse en flux (SSE) : on appelle onDelta(texteEntiere) au fil de l'eau ---
+function modeleEnFlux(modele, contents, onDelta) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modele}:streamGenerateContent?alt=sse`;
+  const body = corpsGemini(contents);
+  return new Promise((resolve, reject) => {
+    let fini = false;
+    const echouer = (err) => { if (!fini) { fini = true; reject(err); } };
+    const req = https.request(url, optionsGemini(), (res) => {
+      if (res.statusCode !== 200) {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => echouer(new Error('HTTP ' + res.statusCode + ' ' + data.substring(0, 200))));
+        res.resume();
+        return;
+      }
+      let tampon = '';
+      let texte = '';
+      res.setEncoding('utf8');
+      res.on('data', morceau => {
+        if (fini) return;
+        tampon += morceau;
+        const lignes = tampon.split('\n');
+        tampon = lignes.pop();
+        for (const ligne of lignes) {
+          if (ligne.substring(0, 5) !== 'data:') continue;
+          const brut = ligne.substring(5).trim();
+          if (!brut || brut === '[DONE]') continue;
+          let json;
+          try { json = JSON.parse(brut); } catch (e) { continue; }
+          if (json.error) return echouer(new Error(json.error.message));
+          const parties = json.candidates && json.candidates[0] &&
+                          json.candidates[0].content && json.candidates[0].content.parts;
+          if (!Array.isArray(parties)) continue;
+          const bout = parties.filter(p => p && p.text && !p.thought).map(p => p.text).join('');
+          if (bout) {
+            texte += bout;
+            try { onDelta(texte); } catch (e) {}
+          }
+        }
+      });
+      res.on('end', () => { if (!fini) { fini = true; resolve(texte); } });
+      res.on('error', echouer);
+    });
+    req.on('error', echouer);
+    req.on('timeout', () => { req.destroy(); echouer(new Error('Timeout')); });
+    req.write(body);
+    req.end();
+  });
+}
+
+// onDelta est optionnel : sans lui on garde l'ancien comportement.
+async function appelerGemini(message, histo, onDelta) {
+  const contents = construireContenus(limiterHisto(histo, HISTO_API_MAX));
+  const modeles = [config.api_model, ...FALLBACK_MODELS.filter(m => m !== config.api_model)];
+  let derniereErreur = null;
+  let fluxActif = typeof onDelta === 'function';
+
+  for (const modele of modeles) {
+    if (fluxActif) {
+      try {
+        const texte = await modeleEnFlux(modele, contents, onDelta);
+        if (texte) return texte;
+        derniereErreur = new Error('Reponse vide');
+      } catch (e) {
+        // Le flux a echoue : on retente la meme modele en classique, et on
+        // n'insiste plus sur le flux pour le reste de la requete.
+        derniereErreur = e;
+        fluxActif = false;
+      }
+    }
+    try {
+      const texte = await modeleClassique(modele, contents);
+      if (texte) {
+        if (typeof onDelta === 'function') { try { onDelta(texte); } catch (e) {} }
+        return texte;
+      }
+      derniereErreur = new Error('Reponse vide');
     } catch (e) {
-      lastError = e;
-      continue;
+      derniereErreur = e;
     }
   }
-  throw new Error(lastError ? lastError.message : 'Tous les modeles Gemini ont echoue');
+  throw new Error(derniereErreur ? derniereErreur.message : 'Tous les modeles Gemini ont echoue');
 }
 
 function nettoyerReponse(texte) {
@@ -822,6 +931,28 @@ app.post('/send', async (req, res) => {
   const debut = Date.now();
   let reponses = [];
 
+  // Flux SSE : le client demande a voir la reponse s'ecrire au fur et a mesure.
+  const enFlux = extraireChamp(req, 'stream') === '1';
+  let coupe = false;
+  const surDelta = enFlux ? (t) => {
+    if (coupe || res.writableEnded || res.destroyed) return;
+    try { res.write('data: ' + JSON.stringify({ t: t }) + '\n\n'); } catch (e) {}
+  } : null;
+
+  if (enFlux) {
+    res.status(200);
+    res.set({
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    });
+    res.flushHeaders();
+    try { res.write(':BLAMUNE\n\n'); } catch (e) {}
+    res.on('error', function () {});
+    res.on('close', function () { if (!res.writableEnded) coupe = true; });
+  }
+
   if (mode === '1') {
     // EGO mode - Gemini API
     const histoKey = auth.uid + '_1';
@@ -849,7 +980,7 @@ app.post('/send', async (req, res) => {
     while (histo.length > 50) histo.splice(1, 1);
 
     try {
-      const reponse = await appelerGemini(msg, histo);
+      const reponse = await appelerGemini(msg, histo, surDelta);
       const texte = nettoyerReponse(reponse);
       histo.push({ role: 'assistant', content: texte, _lastTs: Date.now() });
       reponses = [texte];
@@ -928,7 +1059,7 @@ app.post('/send', async (req, res) => {
     } catch (e) {}
 
     try {
-      const reponse = await appelerGemini(msg, histo);
+      const reponse = await appelerGemini(msg, histo, surDelta);
       const texte = nettoyerReponse(reponse);
       histo.push({ role: 'assistant', content: texte, _lastTs: Date.now() });
       reponses = [texte];
@@ -949,7 +1080,16 @@ app.post('/send', async (req, res) => {
   reponses.forEach(r => hist.push({ qui: 'bot', texte: r, t: Math.floor(Date.now() / 1000) }));
   sauvegarderHistorique(auth.uid, mode, hist);
 
-  res.json({ etat, reponses, confiance: 'haute' });
+  if (enFlux) {
+    if (!coupe && !res.writableEnded && !res.destroyed) {
+      try {
+        res.write('data: ' + JSON.stringify({ fin: true, etat, reponses, confiance: 'haute' }) + '\n\n');
+      } catch (e) {}
+    }
+    try { res.end(); } catch (e) {}
+  } else {
+    res.json({ etat, reponses, confiance: 'haute' });
+  }
 });
 
 // History

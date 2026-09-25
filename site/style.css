@@ -589,6 +589,27 @@ button:disabled {
   overflow-y: auto;
 }
 
+/* Voile rouge : apparait quand la connexion / l'inscription echoue */
+#ecranAuth::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(700px 460px at 50% 38%, rgba(248, 113, 113, 0.34), transparent 65%),
+    radial-gradient(900px 620px at 50% 108%, rgba(239, 68, 68, 0.4), transparent 72%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+  z-index: 0;
+}
+
+#ecranAuth.echec::after { opacity: 1; }
+
+#ecranAuth.echec .auth-box {
+  border-color: rgba(248, 113, 113, 0.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(248, 113, 113, 0.3), 0 0 34px rgba(239, 68, 68, 0.28);
+}
+
 .auth-box {
   background: rgba(17, 26, 51, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -601,6 +622,23 @@ button:disabled {
   -webkit-backdrop-filter: blur(20px) saturate(1.3);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   animation: authSlide 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  z-index: 1;
+  transition: max-width 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.35s ease,
+              box-shadow 0.35s ease;
+}
+
+/* Inscription : la carte prend tout l'espace disponible */
+.auth-box.large {
+  max-width: min(94vw, 540px);
+  padding: 34px 26px;
+}
+
+/* Texte plus grand quand la carte est large : evite le zoom auto du clavier iOS */
+.auth-box.large input,
+.auth-box.large .auth-btn {
+  font-size: 16px;
 }
 
 @keyframes authSlide {
@@ -608,12 +646,13 @@ button:disabled {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* Nouveau logo : bien centre, plus gros, il occupe la tete de la carte */
 .auth-avatar {
-  width: 68px; height: 68px; border-radius: 50%;
+  width: 96px; height: 96px; border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  padding: 3px;
-  margin: 0 auto 14px;
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2), 0 8px 24px rgba(34, 211, 238, 0.35);
+  padding: 4px;
+  margin: 0 auto 16px;
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.18), 0 10px 30px rgba(34, 211, 238, 0.35);
   animation: avatarFloat 3s ease-in-out infinite;
 }
 
@@ -622,7 +661,9 @@ button:disabled {
   height: 100%;
   border-radius: 50%;
   object-fit: cover;
+  object-position: center;
   display: block;
+  margin: 0 auto;
 }
 
 .auth-box h2 {
@@ -638,64 +679,38 @@ button:disabled {
   color: var(--texte-doux); font-size: 13px; margin: 0 0 22px;
 }
 
+/* --- Formulaire : le passage connexion <-> inscription se fait en "swap"
+       (la carte fait un demi-tour 3D pendant l'echange des deux formes). --- */
+#authPrincipal {
+  perspective: 1000px;
+}
+
 .auth-form {
   display: flex; flex-direction: column; gap: 12px;
-  animation: formFade 0.4s ease-out;
+  transform-origin: center;
 }
 
-.auth-form.glisser {
-  animation: formGlisser 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+.auth-form.sortie-swap {
+  animation: swapSortie 0.2s ease-in forwards;
 }
 
-@keyframes formGlisser {
-  from { opacity: 0; transform: translateX(70px); }
-  to { opacity: 1; transform: translateX(0); }
+.auth-form.entree-swap {
+  animation: swapEntree 0.36s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes formFade {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes swapSortie {
+  to { transform: rotateY(-78deg) translateZ(-40px); opacity: 0; }
 }
 
-/* Wrapper champ : contient input + tick check */
+@keyframes swapEntree {
+  from { transform: rotateY(78deg) translateZ(-40px); opacity: 0; }
+  to { transform: rotateY(0deg) scale(1); opacity: 1; }
+}
+
+/* Wrapper champ : contient l'input. Pas de tick vert : la validation passe
+   uniquement par le tremblement rouge + le fond de l'ecran en echec. */
 .champ {
   position: relative;
-}
-
-/* Tick ✓ vert melange au bleu de l'app, dessine en SVG stroke */
-.champ .check {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  width: 24px;
-  height: 24px;
-  transform: translateY(-50%);
-  opacity: 0;
-  pointer-events: none;
-  filter: drop-shadow(0 0 6px rgba(52, 211, 153, 0.6));
-  transition: opacity 0.25s ease;
-}
-
-.champ .check-trait {
-  stroke: #34d399;
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 30;
-  stroke-dashoffset: 30;
-  fill: none;
-}
-
-.champ.vrai .check {
-  opacity: 1;
-}
-
-.champ.vrai .check-trait {
-  animation: checkDessin 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-@keyframes checkDessin {
-  to { stroke-dashoffset: 0; }
 }
 
 /* Tremblement rouge, melange avec le bleu de l'app.
@@ -725,10 +740,6 @@ button:disabled {
   transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease, transform 0.3s ease;
 }
 
-/* Reserve de place pour le tick ✓ a droite, y compris en focus */
-.auth-form .champ input {
-  padding-right: 42px;
-}
 .auth-form input:focus,
 .auth-form .champ input:focus {
   border-color: rgba(56, 189, 248, 0.6);
@@ -882,6 +893,11 @@ button:disabled {
   animation: formFade 0.4s ease-out 0.5s forwards;
 }
 
+@keyframes formFade {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* --- Sortie de l'ecran d'authentification (vers l'app) --- */
 #ecranAuth.sortie-auth {
   animation: sortieAuth 0.55s cubic-bezier(0.55, 0, 0.85, 0.35) forwards;
@@ -993,49 +1009,8 @@ html.console .auth-box::before {
   opacity: 1;
 }
 
-/* --- Serpent vif : suit le curseur, puis mange sa queue --- */
-#serpent {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  padding: 6px;
-  z-index: 9999;
-  pointer-events: none;
-  display: none;
-  background: conic-gradient(from 0deg,
-    rgba(34, 211, 238, 0) 0deg,
-    rgba(34, 211, 238, 0.95) 40deg,
-    rgba(56, 189, 248, 0.4) 120deg,
-    rgba(34, 211, 238, 0) 240deg);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  transform: translate(-50%, -50%);
-  filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.8));
-  will-change: left, top;
-}
-
-#serpent.suivre {
-  display: block;
-  animation: serpentRoule 0.7s linear infinite;
-}
-@keyframes serpentRoule {
-  to { transform: translate(-50%, -50%) rotate(360deg); }
-}
-
-#serpent.mange {
-  display: block;
-  animation: serpentMange 0.95s ease-in forwards;
-}
-@keyframes serpentMange {
-  0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
-  50% { transform: translate(-50%, -50%) scale(0.6) rotate(320deg); opacity: 0.95; }
-  100% { transform: translate(-50%, -50%) scale(0.35) rotate(700deg); opacity: 0; }
-}
+/* --- Serpent vif retire : plus rien ne vient se placer au-dessus du
+       clavier pendant la saisie. --- */
 
 /* --- Pilule glissante EGO / BLAMUNE --- */
 .segmente { position: relative; }
@@ -1112,24 +1087,31 @@ html.console .auth-box::before {
   }
 }
 
+
 /* ==================== SERPENT DE FOND (RAMPANT) ==================== */
-/* Rampe en arriere-plan, on peut interagir avec lui (curseur, souris, doigt),
-   il tourne sur lui-meme pendant la connexion/inscription. Couleurs discretes
-   pour ne pas troubler l'appli. */
+/* Rampe en arriere-plan, tres stylisee et interactive : la tete se tourne
+   vers le pointeur, les pupilles grossissent, la langue sort, le corps
+   s'incline, et il s'arrete de ramper quand on s'approche trop.
+   Couleurs discretes : elle ne doit pas troubler celles de l'appli.
+   IMPORTANT : elle se masque des qu'un champ est actif (clavier ouvert)
+   pour ne jamais se retrouver au-dessus du clavier. */
 
 #rampe {
   position: fixed;
-  left: -320px;
+  left: -300px;
   bottom: 18vh;
-  width: 260px;
-  height: 100px;
+  width: 264px;
+  height: 96px;
   z-index: 0;
   pointer-events: none;
   opacity: 0.35;
   will-change: transform;
   animation: rampeTraversee 46s linear infinite;
-  transition: left 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), bottom 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+  transition: left 0.8s cubic-bezier(0.34, 1.56, 0.64, 1),
+              bottom 0.8s cubic-bezier(0.34, 1.56, 0.64, 1),
+              opacity 0.35s ease;
 }
+
 html.console #rampe {
   animation: none;
   opacity: 0.12;
@@ -1137,6 +1119,14 @@ html.console #rampe {
 html.console #rampe .rampe-mvt,
 html.console #rampe .rampe-file {
   animation: none;
+}
+
+/* Inclinaison douce du corps vers le pointeur */
+.rampe-lean {
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 60%;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .rampe-mvt {
@@ -1156,20 +1146,29 @@ html.console #rampe .rampe-file {
   transition: filter 0.4s ease, opacity 0.4s ease;
 }
 
+/* La tete pivote autour de la nuque (coordonnees du viewBox) */
 .rampe-tete {
   transform-box: view-box;
-  transform-origin: 170px 32px;
+  transform-origin: 233px 37px;
   transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* La langue sort de la bouche (elle pousse depuis sa gauche) */
 .rampe-langue {
   opacity: 0;
-  transform-box: view-box;
-  transform-origin: 196px 26px;
+  transform-box: fill-box;
+  transform-origin: 0% 50%;
   transition: opacity 0.2s ease;
 }
 
-/* --- Traverse l'ecran en rampent --- */
+/* Les pupilles grossissent quand il te remarque */
+.rampe-pupille {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* --- Traverse l'ecran en rampant --- */
 @keyframes rampeTraversee {
   0%   { transform: translateX(0) translateY(0)   rotate(0deg); }
   10%  { transform: translateX(18vw) translateY(-14px) rotate(-6deg); }
@@ -1187,39 +1186,47 @@ html.console #rampe .rampe-file {
   50% { transform: rotate(-4deg) scaleY(0.94); }
 }
 
-/* --- Fluide du corps (dessous) pendant la reptation --- */
+/* --- Les ecailles glissent le long du corps --- */
 #rampe .rampe-file {
   animation: rampeFile 1.1s linear infinite;
 }
 @keyframes rampeFile {
-  to { stroke-dashoffset: -68; }
+  to { stroke-dashoffset: -80; }
 }
 
 /* --- Interaction curseur / souris / doigt : la tete se tourne vers lui,
-       la langue sort, le serpent se reveille. On change UNIQUEMENT l'intensite
-       visuelle (pas la duree d'animation : ca ferait sauter le serpent). --- */
+       la langue sort, les pupilles grossissent, le corps s'incline.
+       On change UNIQUEMENT l'intensite visuelle (jamais la duree
+       d'animation : ca ferait sauter le serpent). --- */
 #rampe.interagit {
   opacity: 0.8;
 }
 #rampe.interagit svg {
-  filter: drop-shadow(0 0 30px rgba(56, 189, 248, 0.95));
+  filter: drop-shadow(0 0 30px rgba(56, 189, 248, 0.95)) drop-shadow(0 0 10px rgba(34, 211, 238, 0.5));
 }
 #rampe.interagit .rampe-langue {
   opacity: 1;
   animation: rampeLangue 0.7s ease-in-out infinite;
 }
+#rampe.interagit .rampe-pupille {
+  transform: scale(1.55);
+}
 @keyframes rampeLangue {
   0%, 100% { transform: scaleX(1); }
-  50% { transform: scaleX(1.4); }
+  50% { transform: scaleX(1.45); }
 }
 
-/* --- Pendant connexion / inscription : le serpent tourne sur lui-meme.
-       On remplace l'animation de traversal par une rotation sur place,
-       centree sur la carte (transition douce). Pas de duree changee en vol. --- */
+/* --- Tout pret : il arrete de ramper pour te regarder (sans saut) --- */
+#rampe.fixe {
+  animation-play-state: paused;
+}
+
+/* --- Pendant connexion / inscription : il glisse au centre de l'ecran
+       et tourne sur lui-meme (on remplace l'animation de traverssee). --- */
 #rampe.tourne {
   animation: rampeRonde 1.1s linear infinite;
-  left: calc(50% - 130px);
-  bottom: calc(50vh - 70px);
+  left: calc(50% - 132px);
+  bottom: calc(50vh - 60px);
   opacity: 0.9;
 }
 #rampe.tourne .rampe-mvt {
@@ -1227,4 +1234,10 @@ html.console #rampe .rampe-file {
 }
 @keyframes rampeRonde {
   to { transform: rotate(360deg); }
+}
+
+/* --- Un champ actif = clavier ouvert : le serpent disparait.
+       Derniere regle du bloc pour primer sur toutes les autres. --- */
+html.saisie #rampe {
+  opacity: 0;
 }

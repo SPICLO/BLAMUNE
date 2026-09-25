@@ -40,28 +40,12 @@ function serpentEtat(etat) {
   else if (etat === 'ok') e.classList.add('serpent-ok');
 }
 
-// Serpent vif : suit le curseur pendant la requete, puis revient se refermer
-// sur la carte (il "mange sa queue") avant de tourner sur lui-meme via la ring.
-var serpentElem = null;
-var dernierCurseur = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+// Plus de serpent "voleur" qui vient se placer au-dessus du clavier :
+// le seul serpent est celui de fond (#rampe), et il se masque des qu'un
+// champ est actif. Pendant la connexion/inscription il tourne sur place.
 
 function serpentSuivre(on) {
   if (!estConsole) rampeTourne(!!on);
-  if (estConsole) return;
-  if (on) {
-    if (!serpentElem) {
-      serpentElem = document.createElement('div');
-      serpentElem.id = 'serpent';
-      serpentElem.setAttribute('aria-hidden', 'true');
-      document.body.appendChild(serpentElem);
-    }
-    serpentElem.classList.remove('mange');
-    serpentElem.style.left = dernierCurseur.x + 'px';
-    serpentElem.style.top = dernierCurseur.y + 'px';
-    serpentElem.classList.add('suivre');
-  } else if (serpentElem) {
-    serpentElem.classList.remove('suivre');
-  }
 }
 
 // Serpent de fond : pendant la connexion/inscription il tourne sur lui-meme,
@@ -70,30 +54,20 @@ function serpentSuivre(on) {
 function rampeTourne(on) {
   var rampe = document.getElementById('rampe');
   if (!rampe) return;
+  if (on) rampe.classList.remove('fixe');
   rampe.classList.toggle('tourne', !!on);
 }
 
 function serpentMangerQueue() {
   rampeTourne(false);
-  if (!serpentElem) return;
-  serpentElem.classList.remove('suivre');
-  var centre = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-  var carte = document.querySelector('.auth-box');
-  if (carte) {
-    var r = carte.getBoundingClientRect();
-    centre.x = r.left + r.width / 2;
-    centre.y = r.top + r.height / 2;
-  }
-  serpentElem.style.left = centre.x + 'px';
-  serpentElem.style.top = centre.y + 'px';
-  serpentElem.classList.add('mange');
-  setTimeout(function () { serpentElem.classList.remove('mange'); }, 1000);
 }
 
 // ------------- Serpent de fond : reaction au curseur / souris / doigt -------------
-// Quand le pointeur (ou le doigt) passe pres de lui, sa tete se tourne vers lui,
-// il sort la langue et s'accelere. Distance de proximite en pixels.
-var RAMPE_PORTEE = 240;
+// Quand le pointeur (ou le doigt) passe pres de lui : sa tete se tourne vers
+// lui, sa langue sort, ses pupilles grossissent, son corps s'incline, et s'il
+// est tout proche il arrete de ramper pour le regarder.
+var RAMPE_PORTEE = 240;   // zone d'interaction
+var RAMPE_ARRET = 150;    // assez proche : il se fige pour t'observer
 
 function rampeInteragir(x, y) {
   if (estConsole) return;
@@ -106,13 +80,21 @@ function rampeInteragir(x, y) {
   var dy = y - cy;
   var dist = Math.sqrt(dx * dx + dy * dy);
   var tete = rampe.querySelector('.rampe-tete');
+  var lean = rampe.querySelector('.rampe-lean');
   if (dist < RAMPE_PORTEE) {
     rampe.classList.add('interagit');
-    var angle = (Math.atan2(-dy, dx) * 180 / Math.PI) * 0.45;
-    if (tete) tete.style.transform = 'rotate(' + angle + 'deg)';
+    var degres = Math.atan2(-dy, dx) * 180 / Math.PI;
+    if (tete) tete.style.transform = 'rotate(' + (degres * 0.45).toFixed(2) + 'deg)';
+    if (lean) {
+      var inclinaison = Math.max(-8, Math.min(8, degres * 0.09));
+      lean.style.transform = 'rotate(' + inclinaison.toFixed(2) + 'deg)';
+    }
+    rampe.classList.toggle('fixe', dist < RAMPE_ARRET && !rampe.classList.contains('tourne'));
   } else {
     rampe.classList.remove('interagit');
+    rampe.classList.remove('fixe');
     if (tete) tete.style.transform = '';
+    if (lean) lean.style.transform = '';
   }
 }
 
@@ -120,8 +102,11 @@ function rampeRelacher() {
   var rampe = document.getElementById('rampe');
   if (!rampe) return;
   rampe.classList.remove('interagit');
+  rampe.classList.remove('fixe');
   var tete = rampe.querySelector('.rampe-tete');
   if (tete) tete.style.transform = '';
+  var lean = rampe.querySelector('.rampe-lean');
+  if (lean) lean.style.transform = '';
 }
 
 // Pilule glissante EGO / BLAMUNE
@@ -209,6 +194,8 @@ function afficherApp() {
   var appContenu = document.getElementById('appContenu');
   serpentSuivre(false);
   serpentEtat('off');
+  majEchec(false);
+  document.documentElement.classList.remove('saisie');
   if (ecranAuth) ecranAuth.style.display = 'none';
   if (appContenu) { appContenu.style.display = 'flex'; appContenu.style.flexDirection = 'column'; }
   finaliserAffichageApp();
@@ -253,6 +240,8 @@ function jouerTransitionConnexion(message) {
   var success = document.getElementById('authSuccess');
   var successTexte = document.getElementById('authSuccessTexte');
 
+  majEchec(false);
+  document.documentElement.classList.remove('saisie');
   serpentEtat('ok');
   serpentMangerQueue();
   if (successTexte) successTexte.textContent = message || 'Connexion reussie !';
@@ -325,6 +314,15 @@ function afficherAuth() {
   var appContenu = document.getElementById('appContenu');
   serpentSuivre(false);
   serpentEtat('off');
+  majEchec(false);
+  document.documentElement.classList.remove('saisie');
+  // Retour propre sur le formulaire de connexion (carte a sa taille normale)
+  var boite = document.querySelector('.auth-box');
+  var login = document.getElementById('authFormLogin');
+  var reg = document.getElementById('authFormRegister');
+  if (boite) boite.classList.remove('large');
+  if (reg) reg.style.display = 'none';
+  if (login) login.style.display = '';
   if (ecranAuth) ecranAuth.style.display = '';
   if (appContenu) appContenu.style.display = 'none';
 }
@@ -345,8 +343,11 @@ async function authRegister() {
       !marquerChamp(emailEl, email.indexOf('@') >= 0, true) ||
       !marquerChamp(mdpEl, mdp.length >= 6, true)) {
     errEl.textContent = 'Des champs sont invalides.';
+    majEchec(true);
     return;
   }
+  majEchec(false);
+  fermerClavier();   // le clavier se ferme : le serpent de fond revient
   authEnCours = true;
   btnRegister.disabled = true;
   btnRegister.textContent = 'Creation...';
@@ -357,6 +358,7 @@ async function authRegister() {
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
     var j = (await Promise.all([req, delai(1500)]))[0];
     if (j.ok) {
+      majEchec(false);
       setAuthInfo(j.ego, j.pseudo, j.uid);
       jouerTransitionConnexion('Bienvenue' + (j.pseudo ? ', ' + j.pseudo : '') + ' !');
     } else {
@@ -365,11 +367,13 @@ async function authRegister() {
       marquerChamp(pseudoEl, false, true);
       marquerChamp(emailEl, false, true);
       marquerChamp(mdpEl, false, true);
+      majEchec(true);
       errEl.textContent = j.message || 'Erreur.';
     }
   } catch (e) {
     serpentSuivre(false);
     serpentEtat('off');
+    majEchec(true);
     errEl.textContent = 'Serveur injoignable.';
   }
   btnRegister.disabled = false;
@@ -390,8 +394,11 @@ async function authLogin() {
   if (!marquerChamp(emailEl, email.indexOf('@') >= 0, true) ||
       !marquerChamp(mdpEl, mdp.length >= 1, true)) {
     errEl.textContent = 'Des champs sont invalides.';
+    majEchec(true);
     return;
   }
+  majEchec(false);
+  fermerClavier();   // le clavier se ferme : le serpent de fond revient
   authEnCours = true;
   btnLogin.disabled = true;
   btnLogin.textContent = 'Connexion...';
@@ -402,6 +409,7 @@ async function authLogin() {
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
     var j = (await Promise.all([req, delai(1400)]))[0];
     if (j.ok) {
+      majEchec(false);
       setAuthInfo(j.ego, j.pseudo, j.uid);
       jouerTransitionConnexion('Content de te revoir' + (j.pseudo ? ', ' + j.pseudo : '') + ' !');
     } else {
@@ -409,11 +417,13 @@ async function authLogin() {
       serpentEtat('off');
       marquerChamp(emailEl, false, true);
       marquerChamp(mdpEl, false, true);
+      majEchec(true);
       errEl.textContent = j.message || 'Erreur.';
     }
   } catch (e) {
     serpentSuivre(false);
     serpentEtat('off');
+    majEchec(true);
     errEl.textContent = 'Serveur injoignable.';
   }
   btnLogin.disabled = false;
@@ -427,7 +437,8 @@ async function authInvite() {
   if (!btnInvite) return;
   authEnCours = true;
   btnInvite.disabled = true;
-  serpentSuivre(true);
+  // Mode invite : pas de serpent qui tourne, on garde la rampe en reptation.
+  serpentSuivre(false);
   try {
     var req = fetch('/invite', { method: 'POST' })
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
@@ -460,10 +471,9 @@ function marquerChamp(el, ok, retrembler) {
   var champ = el.closest ? el.closest('.champ') : null;
   if (!champ) return ok;
   if (ok) {
+    // Plus de ✓ vert : on efface simplement l'etat d'erreur.
     champ.classList.remove('faux');
-    champ.classList.add('vrai');
   } else {
-    champ.classList.remove('vrai');
     champ.classList.add('faux');
     if (retrembler) {
       var input = el;
@@ -473,6 +483,83 @@ function marquerChamp(el, ok, retrembler) {
     }
   }
   return ok;
+}
+
+// Echec : tout le fond de l'ecran d'authentification vire au rouge.
+function majEchec(on) {
+  var e = document.getElementById('ecranAuth');
+  if (!e) return;
+  if (on) {
+    e.classList.add('echec');
+    if (majEchec._t) clearTimeout(majEchec._t);
+    majEchec._t = setTimeout(function () { majEchec(false); }, 6000);
+  } else {
+    e.classList.remove('echec');
+    if (majEchec._t) { clearTimeout(majEchec._t); majEchec._t = null; }
+  }
+}
+
+// Clavier ouvert = le serpent de fond se masque pour ne pas se retrouver
+// au-dessus du clavier (connexion, inscription ET chat).
+// On detecte le vrai clavier via visualViewport (la hauteur du viewport
+// visible baisse quand le clavier s'ouvre) : sur PC, un champ focalise ne
+// cache donc pas le serpent. En secours, sur tactile, un champ actif suffit.
+function clavierOuvert() {
+  if (window.visualViewport) {
+    var ecart = window.innerHeight - window.visualViewport.height;
+    if (ecart > 100) return true;
+  }
+  var tactile = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  if (!tactile) return false;
+  var actif = document.activeElement;
+  return !!(actif && (actif.tagName === 'INPUT' || actif.tagName === 'TEXTAREA'));
+}
+
+function majSaisie() {
+  document.documentElement.classList.toggle('saisie', clavierOuvert());
+}
+
+function fermerClavier() {
+  var actif = document.activeElement;
+  if (actif && typeof actif.blur === 'function') actif.blur();
+}
+
+// Bascule connexion <-> inscription en "swap" : la forme active sort en
+// faisant un demi-tour 3D, puis l'autre entre dans l'autre sens. La carte
+// s'elargit pour que l'inscription profite de tout l'espace.
+var swapEnCours = false;
+
+function basculerForm(vers) {
+  if (swapEnCours) return;
+  var login = document.getElementById('authFormLogin');
+  var reg = document.getElementById('authFormRegister');
+  var boite = document.querySelector('.auth-box');
+  if (!login || !reg) return;
+  var depuis = (vers === 'register') ? login : reg;
+  var cible = (vers === 'register') ? reg : login;
+  if (depuis.style.display === 'none') return;
+  swapEnCours = true;
+  majEchec(false);
+
+  var champs = depuis.querySelectorAll('.champ');
+  for (var i = 0; i < champs.length; i++) champs[i].classList.remove('faux');
+  var ancienErr = depuis.querySelector('.auth-err');
+  if (ancienErr) ancienErr.textContent = '';
+
+  if (boite) boite.classList.toggle('large', vers === 'register');
+
+  depuis.classList.add('sortie-swap');
+  setTimeout(function () {
+    depuis.classList.remove('sortie-swap');
+    depuis.style.display = 'none';
+    cible.style.display = '';
+    forcerReflow(cible);
+    cible.classList.add('entree-swap');
+    setTimeout(function () {
+      cible.classList.remove('entree-swap');
+      swapEnCours = false;
+    }, 380);
+  }, 200);
 }
 
 function initAuth() {
@@ -492,8 +579,8 @@ function initAuth() {
   if (btnRegister) btnRegister.onclick = authRegister;
   if (btnInvite) btnInvite.onclick = authInvite;
 
-  // Validation en direct : tremblement rouge si invalide, ✓ qui se dessine
-  // quand c'est bon, avec un petit delai de stabilite (confiance).
+  // Validation en direct : tremblement rouge si invalide (plus de ✓ vert).
+  // Taper = l'utilisateur corrige, donc le fond rouge disparait.
   var CHAMPS = [
     { id: 'authPseudoReg', valide: function (v) { return v.trim().length >= 2; } },
     { id: 'authEmailReg', valide: function (v) { return v.indexOf('@') >= 0; } },
@@ -506,6 +593,7 @@ function initAuth() {
     if (!el) return;
     var delaiValidation = null;
     el.addEventListener('input', function () {
+      majEchec(false);
       if (delaiValidation) clearTimeout(delaiValidation);
       delaiValidation = setTimeout(function () {
         marquerChamp(el, def.valide(el.value));
@@ -514,33 +602,22 @@ function initAuth() {
   });
 
   if (authShowRegister) {
-    authShowRegister.onclick = function(e) {
-      e.preventDefault();
-      var authFormLogin = document.getElementById('authFormLogin');
-      var authFormRegister = document.getElementById('authFormRegister');
-      if (authFormLogin) { authFormLogin.style.display = 'none'; authFormLogin.classList.remove('glisser'); }
-      if (authFormRegister) {
-        authFormRegister.classList.remove('glisser');
-        forcerReflow(authFormRegister);
-        authFormRegister.classList.add('glisser');
-        authFormRegister.style.display = '';
-      }
-    };
+    authShowRegister.onclick = function (e) { e.preventDefault(); basculerForm('register'); };
   }
   if (authShowLogin) {
-    authShowLogin.onclick = function(e) {
-      e.preventDefault();
-      var authFormLogin = document.getElementById('authFormLogin');
-      var authFormRegister = document.getElementById('authFormRegister');
-      if (authFormRegister) { authFormRegister.style.display = 'none'; authFormRegister.classList.remove('glisser'); }
-      if (authFormLogin) {
-        authFormLogin.classList.remove('glisser');
-        forcerReflow(authFormLogin);
-        authFormLogin.classList.add('glisser');
-        authFormLogin.style.display = '';
-      }
-    };
+    authShowLogin.onclick = function (e) { e.preventDefault(); basculerForm('login'); };
   }
+
+  // Clavier ouvert (champ actif / viewport retreci) = le serpent de fond se
+  // masque, pour ne jamais se retrouver au-dessus du clavier.
+  document.addEventListener('focusin', majSaisie);
+  document.addEventListener('focusout', function () { setTimeout(majSaisie, 260); });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', majSaisie);
+    window.visualViewport.addEventListener('scroll', majSaisie);
+  }
+  window.addEventListener('resize', majSaisie);
+  majSaisie();
   if (authMdp) {
     authMdp.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') authLogin();
@@ -994,6 +1071,43 @@ function desactiver(on) {
   if (mode2Btn) mode2Btn.disabled = on;
 }
 
+// Lecture d'une reponse en flux (SSE) : le texte du bot s'ecrit au fur et a
+// mesure de la generation au lieu d'attendre la fin. Chaque evenement porte
+// le texte entier (absolu), donc un repli/relance ne cree jamais de doublon.
+function lireFlux(reponse, surDelta, surFin) {
+  var lecteur = reponse.body.getReader();
+  var decodeur = new TextDecoder();
+  var tampon = '';
+
+  function traiterBloc(bloc) {
+    var lignes = bloc.split('\n');
+    for (var i = 0; i < lignes.length; i++) {
+      var ligne = lignes[i];
+      if (ligne.substring(0, 5) !== 'data:') continue;
+      var brut = ligne.substring(5).trim();
+      if (!brut) continue;
+      var d;
+      try { d = JSON.parse(brut); } catch (e) { continue; }
+      if (d.fin) { surFin(d); }
+      else if (typeof d.t === 'string') { surDelta(d.t); }
+    }
+  }
+
+  return lecteur.read().then(function suite(res) {
+    if (res.done) {
+      // Dernier bloc non suivi d'une ligne vide : on le traite quand meme.
+      tampon += decodeur.decode();
+      if (tampon.trim()) traiterBloc(tampon);
+      return;
+    }
+    tampon += decodeur.decode(res.value, { stream: true });
+    var blocs = tampon.split('\n\n');
+    tampon = blocs.pop();
+    for (var i = 0; i < blocs.length; i++) traiterBloc(blocs[i]);
+    return lecteur.read().then(suite);
+  });
+}
+
 async function envoyer() {
   if (!getAuthUserId()) return;
   var z = document.getElementById('zone');
@@ -1005,10 +1119,49 @@ async function envoyer() {
   majStatut('pense');
   var msgNode = ajouterMessage('moi', m);
   attente(true);
+
+  // Bulle du bot : creee des le premier fragment recu.
+  var bulleBot = null;
+  function direct(texte) {
+    if (!texte) return;
+    if (!bulleBot) {
+      attente(false);
+      bulleBot = ajouterMessage('bot', texte);
+      defilerSiEnBas();
+    } else {
+      var b = bulleBot.querySelector('.bulle');
+      if (b && b.textContent !== texte) {
+        b.textContent = texte;
+        defilerSiEnBas();
+      }
+    }
+  }
+
+  function finaliser(j) {
+    attente(false);
+    z.value = '';
+    majStatut(j.etat);
+    var reps = j.reponses || [];
+    if (reps.length > 0) {
+      if (bulleBot) {
+        var b = bulleBot.querySelector('.bulle');
+        if (b) b.textContent = reps[0];   // version nettoyee par le serveur
+        for (var i = 1; i < reps.length; i++) ajouterMessage('bot', reps[i], j.confiance);
+        bulleBot = null;
+      } else {
+        reps.forEach(function (rep) { ajouterMessage('bot', rep, j.confiance); });
+      }
+      if (j.etat === 'arrete' || j.etat === 'erreur') signalerArret();
+    } else if (bulleBot) {
+      bulleBot.remove();
+      bulleBot = null;
+    }
+  }
+
   try {
     var profil = chargerProfilLocal();
     var modeServ = dernierModeCharge || profil.mode || '2';
-    var body = 'msg=' + encodeURIComponent(m) + '&mode=' + encodeURIComponent(modeServ);
+    var body = 'msg=' + encodeURIComponent(m) + '&mode=' + encodeURIComponent(modeServ) + '&stream=1';
     var headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
     var ah = authHeaders();
     for (var k in ah) headers[k] = ah[k];
@@ -1017,20 +1170,28 @@ async function envoyer() {
     var r = await fetch('/send', { method: 'POST', headers: headers, body: body, signal: abortCtrl.signal });
     clearTimeout(abortTimer);
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    var j = await r.json();
-    attente(false);
     z.value = '';
-    majStatut(j.etat);
-    if (j.reponses && j.reponses.length > 0) {
-      j.reponses.forEach(function (rep) { ajouterMessage('bot', rep, j.confiance); });
-      if (j.etat === 'arrete' || j.etat === 'erreur') signalerArret();
+    var ct = r.headers.get('content-type') || '';
+    if (ct.indexOf('text/event-stream') >= 0 && r.body && r.body.getReader) {
+      var recuFin = false;
+      await lireFlux(r, direct, function (d) { recuFin = true; finaliser(d); });
+      if (!recuFin) throw new Error('Flux interrompu');
+    } else {
+      // Serveur ancien (pas de flux) : on garde l'ancien chemin JSON.
+      finaliser(await r.json());
     }
   } catch (e) {
     attente(false);
-    if (msgNode) msgNode.remove();
-    z.value = m;
-    majStatut('horsligne', 'Serveur injoignable');
-    ajouterInfo('Envoi echoue : le serveur ne repond pas (timeout 120s). Reessaie.');
+    if (bulleBot) {
+      // Une partie de la reponse est deja arrivee : on la garde.
+      z.value = '';
+      majStatut('horsligne', 'Connexion interrompue');
+    } else {
+      if (msgNode) msgNode.remove();
+      z.value = m;
+      majStatut('horsligne', 'Serveur injoignable');
+      ajouterInfo('Envoi echoue : le serveur ne repond pas (timeout 120s). Reessaie.');
+    }
   }
   actionEnCours = false;
   if (_chargerInterval) { clearTimeout(_chargerInterval); _chargerInterval = null; }
@@ -1092,37 +1253,19 @@ window.addEventListener('load', function () {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(function() {});
   }
+  // Interactions avec le serpent de fond : curseur, souris ou doigt.
   document.addEventListener('mousemove', function (e) {
-    dernierCurseur.x = e.clientX;
-    dernierCurseur.y = e.clientY;
     rampeInteragir(e.clientX, e.clientY);
-    var s = document.getElementById('serpent');
-    if (s && s.classList.contains('suivre')) {
-      s.style.left = e.clientX + 'px';
-      s.style.top = e.clientY + 'px';
-    }
   });
   document.addEventListener('touchmove', function (e) {
     var t = e.touches && e.touches[0];
     if (!t) return;
-    dernierCurseur.x = t.clientX;
-    dernierCurseur.y = t.clientY;
     rampeInteragir(t.clientX, t.clientY);
-    var s = document.getElementById('serpent');
-    if (s && s.classList.contains('suivre')) {
-      s.style.left = t.clientX + 'px';
-      s.style.top = t.clientY + 'px';
-    }
   });
   document.addEventListener('touchstart', function (e) {
     var t = e.touches && e.touches[0];
     if (!t) return;
     rampeInteragir(t.clientX, t.clientY);
-    var s = document.getElementById('serpent');
-    if (s && s.classList.contains('suivre')) {
-      s.style.left = t.clientX + 'px';
-      s.style.top = t.clientY + 'px';
-    }
   });
   document.addEventListener('touchend', function () {
     rampeRelacher();
