@@ -347,12 +347,19 @@ async function chargerDonnees() {
       ['Nom', profil.nom || '-'],
       ['Age', profil.age || '-'],
       ['Genre', profil.genre || '-'],
+      ['Ville', profil.ville || '-'],
+      ['Travail / etudes', profil.travail || '-'],
       ['Plat prefere', profil.plat || '-'],
       ['Hobby', profil.hobby || '-'],
+      ['Sport', profil.sport || '-'],
+      ['Musique', profil.musique || '-'],
+      ['Serie / film / jeu', profil.serie || '-'],
+      ['Reve / objectif', profil.reve || '-'],
       ['Aime', profil.aime || '-'],
       ['Aime pas', profil.aimePas || '-'],
       ['Mots favoris', (profil.motsFavoris || []).join(', ') || '-'],
-      ['Humeur', profil.humeur || 'neutre']
+      ['Humeur de BLAMUNE', profil.humeur || 'neutre'],
+      ['Humeur de l\'utilisateur', profil.humeurUser || 'inconnue']
     ];
     profilChamps.forEach(function(c) {
       var d = document.createElement('div');
