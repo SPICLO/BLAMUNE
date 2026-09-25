@@ -367,14 +367,28 @@ function optionsGemini() {
   };
 }
 
-function corpsGemini(contents) {
-  return JSON.stringify({
-    contents,
-    generationConfig: {
-      maxOutputTokens: config.api_max_tokens,
-      temperature: config.api_temperature
-    }
-  });
+// La "reflexion" du modele (thinking) ajoute plusieurs secondes avant la
+// premiere lettre : on la desactive pour repondre vite. Si le modele refuse
+// ce champ (HTTP 400), on retente une seule fois sans, puis on n'insiste plus.
+let reflexionRefusee = false;
+
+function corpsGemini(contents, sansReflexion) {
+  const generationConfig = {
+    maxOutputTokens: config.api_max_tokens,
+    temperature: config.api_temperature
+  };
+  if (sansReflexion) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  return JSON.stringify({ contents, generationConfig });
+}
+
+// 400 recu alors qu'on venait d'envoyer thinkingConfig = le modele ne veut pas
+// qu'on coupe la reflexion. On marque l'echec et on signale le retraitement.
+function refusReflexion(statusCode, sansReflexion) {
+  if (statusCode !== 400 || !sansReflexion) return null;
+  reflexionRefusee = true;
+  const e = new Error('thinkingConfig refuse par le modele');
+  e.reflexion = true;
+  return e;
 }
 
 function texteDepuisReponse(data) {
@@ -388,13 +402,23 @@ function texteDepuisReponse(data) {
 
 // --- Reponse classique : tout d'un coup (repli si le flux echoue) ---
 function modeleClassique(modele, contents) {
+  const sansReflexion = !reflexionRefusee;
+  return modeleClassiqueBrut(modele, contents, sansReflexion).catch(function (e) {
+    if (e && e.reflexion) return modeleClassiqueBrut(modele, contents, false);
+    throw e;
+  });
+}
+
+function modeleClassiqueBrut(modele, contents, sansReflexion) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modele}:generateContent`;
-  const body = corpsGemini(contents);
+  const body = corpsGemini(contents, sansReflexion);
   return new Promise((resolve, reject) => {
     const req = https.request(url, optionsGemini(), (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
+        const refuse = refusReflexion(res.statusCode, sansReflexion);
+        if (refuse) return reject(refuse);
         try { resolve(texteDepuisReponse(data)); }
         catch (e) { reject(e); }
       });
@@ -408,8 +432,16 @@ function modeleClassique(modele, contents) {
 
 // --- Reponse en flux (SSE) : on appelle onDelta(texteEntiere) au fil de l'eau ---
 function modeleEnFlux(modele, contents, onDelta) {
+  const sansReflexion = !reflexionRefusee;
+  return modeleEnFluxBrut(modele, contents, onDelta, sansReflexion).catch(function (e) {
+    if (e && e.reflexion) return modeleEnFluxBrut(modele, contents, onDelta, false);
+    throw e;
+  });
+}
+
+function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modele}:streamGenerateContent?alt=sse`;
-  const body = corpsGemini(contents);
+  const body = corpsGemini(contents, sansReflexion);
   return new Promise((resolve, reject) => {
     let fini = false;
     const echouer = (err) => { if (!fini) { fini = true; reject(err); } };
@@ -417,7 +449,10 @@ function modeleEnFlux(modele, contents, onDelta) {
       if (res.statusCode !== 200) {
         let data = '';
         res.on('data', c => data += c);
-        res.on('end', () => echouer(new Error('HTTP ' + res.statusCode + ' ' + data.substring(0, 200))));
+        res.on('end', () => {
+          const refuse = refusReflexion(res.statusCode, sansReflexion);
+          echouer(refuse || new Error('HTTP ' + res.statusCode + ' ' + data.substring(0, 200)));
+        });
         res.resume();
         return;
       }
@@ -456,18 +491,22 @@ function modeleEnFlux(modele, contents, onDelta) {
   });
 }
 
+// Dernier modele qui a repondu (diagnostic affiche en commentaire SSE).
+let dernierModeleOk = '';
+
 // onDelta est optionnel : sans lui on garde l'ancien comportement.
 async function appelerGemini(message, histo, onDelta) {
   const contents = construireContenus(limiterHisto(histo, HISTO_API_MAX));
   const modeles = [config.api_model, ...FALLBACK_MODELS.filter(m => m !== config.api_model)];
   let derniereErreur = null;
   let fluxActif = typeof onDelta === 'function';
+  dernierModeleOk = '';
 
   for (const modele of modeles) {
     if (fluxActif) {
       try {
         const texte = await modeleEnFlux(modele, contents, onDelta);
-        if (texte) return texte;
+        if (texte) { dernierModeleOk = modele; return texte; }
         derniereErreur = new Error('Reponse vide');
       } catch (e) {
         // Le flux a echoue : on retente la meme modele en classique, et on
@@ -479,6 +518,7 @@ async function appelerGemini(message, histo, onDelta) {
     try {
       const texte = await modeleClassique(modele, contents);
       if (texte) {
+        dernierModeleOk = modele;
         if (typeof onDelta === 'function') { try { onDelta(texte); } catch (e) {} }
         return texte;
       }
@@ -1082,7 +1122,11 @@ app.post('/send', async (req, res) => {
 
   if (enFlux) {
     if (!coupe && !res.writableEnded && !res.destroyed) {
+      // Commentaire SSE ignore par le client : sert de diagnostic
+      // (modele utilise + duree totale de la requete).
       try {
+        res.write(':diag modele=' + (dernierModeleOk || '?') +
+                  ' duree=' + duree + 'ms reflexion=' + (reflexionRefusee ? 'off-forcee' : 'off') + '\n\n');
         res.write('data: ' + JSON.stringify({ fin: true, etat, reponses, confiance: 'haute' }) + '\n\n');
       } catch (e) {}
     }
