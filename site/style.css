@@ -119,6 +119,13 @@ button:focus-visible, input:focus-visible {
   animation: avatarPulse 3s ease-in-out infinite;
 }
 
+.avatar-bot img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 @keyframes avatarPulse {
   0%, 100% { box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25), 0 4px 14px rgba(34, 211, 238, 0.35); }
   50% { box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.15), 0 4px 20px rgba(34, 211, 238, 0.5); }
@@ -413,15 +420,18 @@ button:focus-visible, input:focus-visible {
   height: 72px;
   border-radius: 50%;
   margin: 0 auto 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  font-weight: 800;
-  color: #fff;
+  padding: 3px;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25), 0 10px 30px rgba(34, 211, 238, 0.4);
   animation: avatarFloat 3s ease-in-out infinite;
+}
+
+.accueil .gros-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 
 @keyframes avatarFloat {
@@ -601,11 +611,18 @@ button:disabled {
 .auth-avatar {
   width: 68px; height: 68px; border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #fff; font-size: 30px; font-weight: 800;
-  display: flex; align-items: center; justify-content: center;
+  padding: 3px;
   margin: 0 auto 14px;
   box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2), 0 8px 24px rgba(34, 211, 238, 0.35);
   animation: avatarFloat 3s ease-in-out infinite;
+}
+
+.auth-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 
 .auth-box h2 {
@@ -867,7 +884,7 @@ button:disabled {
 
 /* ==================== COMPLEMENTS : serpent, pilule, cascade, mode ==================== */
 
-/* --- Serpent lumineux autour de la carte de connexion --- */
+/* --- Anneau site statique autour de la carte de connexion --- */
 .auth-box { position: relative; }
 
 .auth-box::before {
@@ -886,34 +903,11 @@ button:disabled {
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
   opacity: 0.18;
-  animation: serpentSpin 7s linear infinite;
   pointer-events: none;
   z-index: 0;
 }
-@keyframes serpentSpin { to { transform: rotate(360deg); } }
-
-#ecranAuth.serpent-actif .auth-box::before {
-  opacity: 0.95;
-  animation-duration: 1.6s;
-  filter: drop-shadow(0 0 10px rgba(34, 211, 238, 0.65));
-}
-
-#ecranAuth.serpent-ok .auth-box::before {
-  background: conic-gradient(from 0deg,
-    rgba(52, 211, 153, 0) 0deg,
-    rgba(52, 211, 153, 0.95) 35deg,
-    rgba(16, 185, 129, 0.3) 120deg,
-    rgba(52, 211, 153, 0) 230deg);
-  opacity: 1;
-  animation-duration: 1.1s;
-  filter: drop-shadow(0 0 12px rgba(52, 211, 153, 0.7));
-}
 
 /* --- Console (Xbox/PS/Switch) : alléger pour éviter les saccades GPU --- */
-/* Le serpent voleur (suivi au curseur) n'a pas de sens au pad : on le cache. */
-/* L'anneau devient une simple bordure en pointillés qui tourne (léger). */
-html.console #serpent { display: none !important; }
-
 html.console .auth-box::before {
   background: none;
   -webkit-mask: none;
@@ -922,12 +916,6 @@ html.console .auth-box::before {
   border: 3px dashed rgba(34, 211, 238, 0.85);
   filter: none;
   opacity: 1;
-}
-
-html.console #ecranAuth.serpent-ok .auth-box::before {
-  background: none;
-  border-color: rgba(52, 211, 153, 0.9);
-  animation-duration: 1.1s;
 }
 
 /* --- Serpent vif : suit le curseur, puis mange sa queue --- */
@@ -972,10 +960,6 @@ html.console #ecranAuth.serpent-ok .auth-box::before {
   0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
   50% { transform: translate(-50%, -50%) scale(0.6) rotate(320deg); opacity: 0.95; }
   100% { transform: translate(-50%, -50%) scale(0.35) rotate(700deg); opacity: 0; }
-}
-
-@media (hover: none) {
-  #serpent { display: none !important; }
 }
 
 /* --- Pilule glissante EGO / BLAMUNE --- */

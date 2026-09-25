@@ -572,7 +572,7 @@ function ajouterMessage(qui, texte, confiance, epoch) {
 
   var avatar = document.createElement('div');
   avatar.className = 'avatar ' + (qui === 'bot' ? 'avatar-bot' : 'avatar-moi');
-  if (qui === 'bot') avatar.textContent = 'B';
+  if (qui === 'bot') { var logo = document.createElement('img'); logo.src = 'logo.png'; logo.alt = ''; avatar.appendChild(logo); }
   else { var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('fill', 'currentColor'); svg.setAttribute('aria-hidden', 'true'); var path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'); svg.appendChild(path); avatar.appendChild(svg); }
 
   var corps = document.createElement('div');
@@ -642,7 +642,10 @@ function attente(on) {
     d.className = 'msg bot attente';
     var av = document.createElement('div');
     av.className = 'avatar avatar-bot';
-    av.textContent = 'B';
+    var logo = document.createElement('img');
+    logo.src = 'logo.png';
+    logo.alt = '';
+    av.appendChild(logo);
     var corps = document.createElement('div');
     corps.className = 'corps';
     var bulle = document.createElement('div');
@@ -771,7 +774,10 @@ function afficherAccueil() {
   a.className = 'accueil';
   var gros = document.createElement('div');
   gros.className = 'gros-avatar';
-  gros.textContent = 'B';
+  var grosLogo = document.createElement('img');
+  grosLogo.src = 'logo.png';
+  grosLogo.alt = 'BLAMUNE';
+  gros.appendChild(grosLogo);
   var titre = document.createElement('h2');
   titre.textContent = 'Bienvenue !';
   var sous = document.createElement('p');
@@ -984,6 +990,26 @@ window.addEventListener('load', function () {
     if (s && s.classList.contains('suivre')) {
       s.style.left = e.clientX + 'px';
       s.style.top = e.clientY + 'px';
+    }
+  });
+  document.addEventListener('touchmove', function (e) {
+    var t = e.touches && e.touches[0];
+    if (!t) return;
+    dernierCurseur.x = t.clientX;
+    dernierCurseur.y = t.clientY;
+    var s = document.getElementById('serpent');
+    if (s && s.classList.contains('suivre')) {
+      s.style.left = t.clientX + 'px';
+      s.style.top = t.clientY + 'px';
+    }
+  });
+  document.addEventListener('touchstart', function (e) {
+    var t = e.touches && e.touches[0];
+    if (!t) return;
+    var s = document.getElementById('serpent');
+    if (s && s.classList.contains('suivre')) {
+      s.style.left = t.clientX + 'px';
+      s.style.top = t.clientY + 'px';
     }
   });
 });
