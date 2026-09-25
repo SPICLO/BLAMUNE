@@ -909,6 +909,54 @@ button:disabled {
   filter: drop-shadow(0 0 12px rgba(52, 211, 153, 0.7));
 }
 
+/* --- Serpent vif : suit le curseur, puis mange sa queue --- */
+#serpent {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  padding: 6px;
+  z-index: 9999;
+  pointer-events: none;
+  display: none;
+  background: conic-gradient(from 0deg,
+    rgba(34, 211, 238, 0) 0deg,
+    rgba(34, 211, 238, 0.95) 40deg,
+    rgba(56, 189, 248, 0.4) 120deg,
+    rgba(34, 211, 238, 0) 240deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.8));
+  will-change: left, top;
+}
+
+#serpent.suivre {
+  display: block;
+  animation: serpentRoule 0.7s linear infinite;
+}
+@keyframes serpentRoule {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+#serpent.mange {
+  display: block;
+  animation: serpentMange 0.95s ease-in forwards;
+}
+@keyframes serpentMange {
+  0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(0.6) rotate(320deg); opacity: 0.95; }
+  100% { transform: translate(-50%, -50%) scale(0.35) rotate(700deg); opacity: 0; }
+}
+
+@media (hover: none) {
+  #serpent { display: none !important; }
+}
+
 /* --- Pilule glissante EGO / BLAMUNE --- */
 .segmente { position: relative; }
 

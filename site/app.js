@@ -33,6 +33,41 @@ function serpentEtat(etat) {
   else if (etat === 'ok') e.classList.add('serpent-ok');
 }
 
+// Serpent vif : suit le curseur pendant la requete, puis revient se refermer
+// sur la carte (il "mange sa queue") avant de tourner sur lui-meme via la ring.
+var serpentElem = null;
+
+function serpentSuivre(on) {
+  if (!serpentElem) {
+    serpentElem = document.createElement('div');
+    serpentElem.id = 'serpent';
+    serpentElem.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(serpentElem);
+  }
+  if (on) {
+    serpentElem.classList.remove('mange');
+    serpentElem.classList.add('suivre');
+  } else {
+    serpentElem.classList.remove('suivre');
+  }
+}
+
+function serpentMangerQueue() {
+  if (!serpentElem) return;
+  serpentElem.classList.remove('suivre');
+  var centre = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  var carte = document.querySelector('.auth-box');
+  if (carte) {
+    var r = carte.getBoundingClientRect();
+    centre.x = r.left + r.width / 2;
+    centre.y = r.top + r.height / 2;
+  }
+  serpentElem.style.left = centre.x + 'px';
+  serpentElem.style.top = centre.y + 'px';
+  serpentElem.classList.add('mange');
+  setTimeout(function () { serpentElem.classList.remove('mange'); }, 1000);
+}
+
 // Pilule glissante EGO / BLAMUNE
 function deplacerPilule(mode, instant) {
   var btn = document.getElementById(mode === '1' ? 'mode1' : (mode === '2' ? 'mode2' : null));
@@ -161,6 +196,7 @@ function jouerTransitionConnexion(message) {
   var successTexte = document.getElementById('authSuccessTexte');
 
   serpentEtat('ok');
+  serpentMangerQueue();
   if (successTexte) successTexte.textContent = message || 'Connexion reussie !';
   if (principal) principal.style.display = 'none';
   if (success) {
@@ -200,6 +236,7 @@ function jouerTransitionDeconnexion() {
   var ecranAuth = document.getElementById('ecranAuth');
   var appContenu = document.getElementById('appContenu');
 
+  serpentSuivre(false);
   serpentEtat('off');
   afficherToastDeco('A bientot !');
 
@@ -226,6 +263,7 @@ function jouerTransitionDeconnexion() {
 function afficherAuth() {
   var ecranAuth = document.getElementById('ecranAuth');
   var appContenu = document.getElementById('appContenu');
+  serpentSuivre(false);
   serpentEtat('off');
   if (ecranAuth) ecranAuth.style.display = '';
   if (appContenu) appContenu.style.display = 'none';
@@ -247,20 +285,22 @@ async function authRegister() {
   if (mdp.length < 6) { errEl.textContent = 'Mot de passe trop court (6 min).'; return; }
   btnRegister.disabled = true;
   btnRegister.textContent = 'Creation...';
-  serpentEtat('actif');
+  serpentSuivre(true);
   try {
     var body = 'pseudo=' + encodeURIComponent(pseudo) + '&email=' + encodeURIComponent(email) + '&mdp=' + encodeURIComponent(mdp);
-    var r = await fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    var j = await r.json();
+    var req = fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    var j = (await Promise.all([req, delai(1500)]))[0];
     if (j.ok) {
       setAuthInfo(j.ego, j.pseudo, j.uid);
       jouerTransitionConnexion('Bienvenue' + (j.pseudo ? ', ' + j.pseudo : '') + ' !');
     } else {
+      serpentSuivre(false);
       serpentEtat('off');
       errEl.textContent = j.message || 'Erreur.';
     }
   } catch (e) {
+    serpentSuivre(false);
     serpentEtat('off');
     errEl.textContent = 'Serveur injoignable.';
   }
@@ -280,20 +320,22 @@ async function authLogin() {
   if (!email || !mdp) { errEl.textContent = 'Remplis tous les champs.'; return; }
   btnLogin.disabled = true;
   btnLogin.textContent = 'Connexion...';
-  serpentEtat('actif');
+  serpentSuivre(true);
   try {
     var body = 'email=' + encodeURIComponent(email) + '&mdp=' + encodeURIComponent(mdp);
-    var r = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    var j = await r.json();
+    var req = fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    var j = (await Promise.all([req, delai(1400)]))[0];
     if (j.ok) {
       setAuthInfo(j.ego, j.pseudo, j.uid);
       jouerTransitionConnexion('Content de te revoir' + (j.pseudo ? ', ' + j.pseudo : '') + ' !');
     } else {
+      serpentSuivre(false);
       serpentEtat('off');
       errEl.textContent = j.message || 'Erreur.';
     }
   } catch (e) {
+    serpentSuivre(false);
     serpentEtat('off');
     errEl.textContent = 'Serveur injoignable.';
   }
@@ -304,19 +346,22 @@ async function authLogin() {
 async function authInvite() {
   var btnInvite = document.getElementById('btnInvite');
   if (btnInvite) btnInvite.disabled = true;
-  serpentEtat('actif');
+  serpentSuivre(true);
   try {
-    var r = await fetch('/invite', { method: 'POST' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    var j = await r.json();
+    var req = fetch('/invite', { method: 'POST' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    var j = (await Promise.all([req, delai(1200)]))[0];
     if (j.ok) {
       localStorage.removeItem(AUTH_CLES.ego);
       localStorage.removeItem(AUTH_CLES.pseudo);
       localStorage.setItem(AUTH_CLES.userId, j.uid);
       jouerTransitionConnexion('Mode invite active !');
+    } else {
+      serpentSuivre(false);
     }
   } catch (e) {
     // Fallback local si le serveur est injoignable
+    serpentSuivre(false);
     localStorage.removeItem(AUTH_CLES.ego);
     localStorage.removeItem(AUTH_CLES.pseudo);
     if (!localStorage.getItem(AUTH_CLES.userId)) {
@@ -906,4 +951,11 @@ window.addEventListener('load', function () {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(function() {});
   }
+  document.addEventListener('mousemove', function (e) {
+    var s = document.getElementById('serpent');
+    if (s && s.classList.contains('suivre')) {
+      s.style.left = e.clientX + 'px';
+      s.style.top = e.clientY + 'px';
+    }
+  });
 });
