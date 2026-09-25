@@ -20,8 +20,8 @@ var _animEntree = false;
 var authEnCours = false;
 
 // Consoles (Xbox/PlayStation/Switch) : interface pilotee au pad, pas a la
-// souris. On desactive le serpent voleur et on allege les animations pour
-// eviter les saccades GPU qui font vibrer/defiler la page.
+// souris. On allege les animations pour eviter les saccades GPU qui font
+// vibrer/defiler la page.
 var estConsole = /xbox|playstation|nintendo/i.test((navigator.userAgent || ''));
 if (estConsole) document.documentElement.classList.add('console');
 
@@ -29,84 +29,6 @@ if (estConsole) document.documentElement.classList.add('console');
 
 function delai(ms) {
   return new Promise(function (resolve) { setTimeout(resolve, ms); });
-}
-
-// Serpent lumineux autour de la carte de connexion ('actif' | 'ok' | 'off')
-function serpentEtat(etat) {
-  var e = document.getElementById('ecranAuth');
-  if (!e) return;
-  e.classList.remove('serpent-actif', 'serpent-ok');
-  if (etat === 'actif') e.classList.add('serpent-actif');
-  else if (etat === 'ok') e.classList.add('serpent-ok');
-}
-
-// Plus de serpent "voleur" qui vient se placer au-dessus du clavier :
-// le seul serpent est celui de fond (#rampe), et il se masque des qu'un
-// champ est actif. Pendant la connexion/inscription il tourne sur place.
-
-function serpentSuivre(on) {
-  if (!estConsole) rampeTourne(!!on);
-}
-
-// Serpent de fond : pendant la connexion/inscription il tourne sur lui-meme,
-// glisse au centre (transition) et tourne sur place. Le changement d'animation
-// coupe proprement la traversal (pas de conflit de duree).
-function rampeTourne(on) {
-  var rampe = document.getElementById('rampe');
-  if (!rampe) return;
-  if (on) rampe.classList.remove('fixe');
-  rampe.classList.toggle('tourne', !!on);
-}
-
-function serpentMangerQueue() {
-  rampeTourne(false);
-}
-
-// ------------- Serpent de fond : reaction au curseur / souris / doigt -------------
-// Quand le pointeur (ou le doigt) passe pres de lui : sa tete se tourne vers
-// lui, sa langue sort, ses pupilles grossissent, son corps s'incline, et s'il
-// est tout proche il arrete de ramper pour le regarder.
-var RAMPE_PORTEE = 240;   // zone d'interaction
-var RAMPE_ARRET = 150;    // assez proche : il se fige pour t'observer
-
-function rampeInteragir(x, y) {
-  if (estConsole) return;
-  var rampe = document.getElementById('rampe');
-  if (!rampe) return;
-  var r = rampe.getBoundingClientRect();
-  var cx = r.left + r.width / 2;
-  var cy = r.top + r.height / 2;
-  var dx = x - cx;
-  var dy = y - cy;
-  var dist = Math.sqrt(dx * dx + dy * dy);
-  var tete = rampe.querySelector('.rampe-tete');
-  var lean = rampe.querySelector('.rampe-lean');
-  if (dist < RAMPE_PORTEE) {
-    rampe.classList.add('interagit');
-    var degres = Math.atan2(-dy, dx) * 180 / Math.PI;
-    if (tete) tete.style.transform = 'rotate(' + (degres * 0.45).toFixed(2) + 'deg)';
-    if (lean) {
-      var inclinaison = Math.max(-8, Math.min(8, degres * 0.09));
-      lean.style.transform = 'rotate(' + inclinaison.toFixed(2) + 'deg)';
-    }
-    rampe.classList.toggle('fixe', dist < RAMPE_ARRET && !rampe.classList.contains('tourne'));
-  } else {
-    rampe.classList.remove('interagit');
-    rampe.classList.remove('fixe');
-    if (tete) tete.style.transform = '';
-    if (lean) lean.style.transform = '';
-  }
-}
-
-function rampeRelacher() {
-  var rampe = document.getElementById('rampe');
-  if (!rampe) return;
-  rampe.classList.remove('interagit');
-  rampe.classList.remove('fixe');
-  var tete = rampe.querySelector('.rampe-tete');
-  if (tete) tete.style.transform = '';
-  var lean = rampe.querySelector('.rampe-lean');
-  if (lean) lean.style.transform = '';
 }
 
 // Pilule glissante EGO / BLAMUNE
@@ -192,10 +114,7 @@ function authBody() {
 function afficherApp() {
   var ecranAuth = document.getElementById('ecranAuth');
   var appContenu = document.getElementById('appContenu');
-  serpentSuivre(false);
-  serpentEtat('off');
   majEchec(false);
-  document.documentElement.classList.remove('saisie');
   if (ecranAuth) ecranAuth.style.display = 'none';
   if (appContenu) { appContenu.style.display = 'flex'; appContenu.style.flexDirection = 'column'; }
   finaliserAffichageApp();
@@ -241,9 +160,6 @@ function jouerTransitionConnexion(message) {
   var successTexte = document.getElementById('authSuccessTexte');
 
   majEchec(false);
-  document.documentElement.classList.remove('saisie');
-  serpentEtat('ok');
-  serpentMangerQueue();
   if (successTexte) successTexte.textContent = message || 'Connexion reussie !';
   if (principal) principal.style.display = 'none';
   if (success) {
@@ -272,7 +188,6 @@ function jouerTransitionConnexion(message) {
 
     setTimeout(function () {
       if (ecranAuth) { ecranAuth.style.display = 'none'; ecranAuth.classList.remove('sortie-auth'); }
-      serpentEtat('off');
       if (success) success.classList.remove('actif');
       if (principal) principal.style.display = '';
     }, 560);
@@ -284,8 +199,6 @@ function jouerTransitionDeconnexion() {
   var ecranAuth = document.getElementById('ecranAuth');
   var appContenu = document.getElementById('appContenu');
 
-  serpentSuivre(false);
-  serpentEtat('off');
   afficherToastDeco('A bientot !');
 
   if (appContenu) {
@@ -312,10 +225,7 @@ function jouerTransitionDeconnexion() {
 function afficherAuth() {
   var ecranAuth = document.getElementById('ecranAuth');
   var appContenu = document.getElementById('appContenu');
-  serpentSuivre(false);
-  serpentEtat('off');
   majEchec(false);
-  document.documentElement.classList.remove('saisie');
   // Un swap en cours laisserait ses timers allumes : ils re-afficheraient
   // le mauvais formulaire juste apres. On coupe tout avant de remettre a zero.
   annulerSwap();
@@ -350,11 +260,10 @@ async function authRegister() {
     return;
   }
   majEchec(false);
-  fermerClavier();   // le clavier se ferme : le serpent de fond revient
+  fermerClavier();   // le clavier se ferme avant la transition
   authEnCours = true;
   btnRegister.disabled = true;
   btnRegister.textContent = 'Creation...';
-  serpentSuivre(true);
   try {
     var body = 'pseudo=' + encodeURIComponent(pseudo) + '&email=' + encodeURIComponent(email) + '&mdp=' + encodeURIComponent(mdp);
     var req = fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
@@ -365,8 +274,6 @@ async function authRegister() {
       setAuthInfo(j.ego, j.pseudo, j.uid);
       jouerTransitionConnexion('Bienvenue' + (j.pseudo ? ', ' + j.pseudo : '') + ' !');
     } else {
-      serpentSuivre(false);
-      serpentEtat('off');
       marquerChamp(pseudoEl, false, true);
       marquerChamp(emailEl, false, true);
       marquerChamp(mdpEl, false, true);
@@ -374,8 +281,6 @@ async function authRegister() {
       errEl.textContent = j.message || 'Erreur.';
     }
   } catch (e) {
-    serpentSuivre(false);
-    serpentEtat('off');
     majEchec(true);
     errEl.textContent = 'Serveur injoignable.';
   }
@@ -401,11 +306,10 @@ async function authLogin() {
     return;
   }
   majEchec(false);
-  fermerClavier();   // le clavier se ferme : le serpent de fond revient
+  fermerClavier();   // le clavier se ferme avant la transition
   authEnCours = true;
   btnLogin.disabled = true;
   btnLogin.textContent = 'Connexion...';
-  serpentSuivre(true);
   try {
     var body = 'email=' + encodeURIComponent(email) + '&mdp=' + encodeURIComponent(mdp);
     var req = fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
@@ -416,16 +320,12 @@ async function authLogin() {
       setAuthInfo(j.ego, j.pseudo, j.uid);
       jouerTransitionConnexion('Content de te revoir' + (j.pseudo ? ', ' + j.pseudo : '') + ' !');
     } else {
-      serpentSuivre(false);
-      serpentEtat('off');
       marquerChamp(emailEl, false, true);
       marquerChamp(mdpEl, false, true);
       majEchec(true);
       errEl.textContent = j.message || 'Erreur.';
     }
   } catch (e) {
-    serpentSuivre(false);
-    serpentEtat('off');
     majEchec(true);
     errEl.textContent = 'Serveur injoignable.';
   }
@@ -440,8 +340,6 @@ async function authInvite() {
   if (!btnInvite) return;
   authEnCours = true;
   btnInvite.disabled = true;
-  // Mode invite : pas de serpent qui tourne, on garde la rampe en reptation.
-  serpentSuivre(false);
   try {
     var req = fetch('/invite', { method: 'POST' })
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
@@ -451,13 +349,9 @@ async function authInvite() {
       localStorage.removeItem(AUTH_CLES.pseudo);
       localStorage.setItem(AUTH_CLES.userId, j.uid);
       jouerTransitionConnexion('Mode invite active !');
-    } else {
-      serpentSuivre(false);
-      serpentEtat('off');
     }
   } catch (e) {
     // Fallback local si le serveur est injoignable
-    serpentSuivre(false);
     localStorage.removeItem(AUTH_CLES.ego);
     localStorage.removeItem(AUTH_CLES.pseudo);
     if (!localStorage.getItem(AUTH_CLES.userId)) {
@@ -500,39 +394,6 @@ function majEchec(on) {
     e.classList.remove('echec');
     if (majEchec._t) { clearTimeout(majEchec._t); majEchec._t = null; }
   }
-}
-
-// Clavier ouvert = le serpent de fond se masque pour ne pas se retrouver
-// au-dessus du clavier (connexion, inscription ET chat).
-// On mesure la hauteur du viewport visible : elle chute quand le clavier
-// s'ouvre. On la compare a une reference prise SANS clavier, et on ne parle
-// de clavier que si un champ est active (sinon une rotation ou la barre
-// d'adresse fausserait la mesure). La reference se re-aligne des que le
-// clavier est ferme : le serpent revient meme si le champ reste focalise
-// (touche "Termine", retour arriere Android, ...).
-var hauteurSansClavier = null;
-
-function champActif() {
-  var a = document.activeElement;
-  return !!(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'));
-}
-
-function clavierOuvert() {
-  var vv = window.visualViewport;
-  if (vv) {
-    if (hauteurSansClavier === null) hauteurSansClavier = vv.height;
-    var ecart = hauteurSansClavier - vv.height;
-    if (ecart > 100 && champActif()) return true;
-    hauteurSansClavier = vv.height;   // pas de clavier : on recalcule
-    return false;
-  }
-  // Navigateur sans visualViewport : secours tactile.
-  if (!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)) return false;
-  return champActif();
-}
-
-function majSaisie() {
-  document.documentElement.classList.toggle('saisie', clavierOuvert());
 }
 
 function fermerClavier() {
@@ -641,21 +502,6 @@ function initAuth() {
     authShowLogin.onclick = function (e) { e.preventDefault(); basculerForm('login'); };
   }
 
-  // Clavier ouvert (champ actif / viewport retreci) = le serpent de fond se
-  // masque, pour ne jamais se retrouver au-dessus du clavier.
-  document.addEventListener('focusin', majSaisie);
-  document.addEventListener('focusout', function () { setTimeout(majSaisie, 260); });
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', majSaisie);
-    window.visualViewport.addEventListener('scroll', majSaisie);
-  }
-  window.addEventListener('resize', majSaisie);
-  // Apres une rotation, la reference de hauteur sans clavier n'est plus valable.
-  window.addEventListener('orientationchange', function () {
-    hauteurSansClavier = null;
-    setTimeout(majSaisie, 500);
-  });
-  majSaisie();
   if (authMdp) {
     authMdp.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') authLogin();
@@ -1303,35 +1149,4 @@ window.addEventListener('load', function () {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(function() {});
   }
-  // Interactions avec le serpent de fond : curseur, souris ou doigt.
-  document.addEventListener('mousemove', function (e) {
-    rampeInteragir(e.clientX, e.clientY);
-  });
-  document.addEventListener('touchmove', function (e) {
-    var t = e.touches && e.touches[0];
-    if (!t) return;
-    rampeInteragir(t.clientX, t.clientY);
-  });
-  document.addEventListener('touchstart', function (e) {
-    var t = e.touches && e.touches[0];
-    if (!t) return;
-    rampeInteragir(t.clientX, t.clientY);
-  });
-  document.addEventListener('touchend', function () {
-    rampeRelacher();
-  });
-  document.addEventListener('touchcancel', function () {
-    rampeRelacher();
-  });
-  window.addEventListener('pointerup', function () {
-    rampeRelacher();
-  });
-  // Si la souris quitte la fenetre (ou qu'on change d'onglet), plus aucune
-  // mousemove n'arrive : sans ca le serpent restait fige en mode "interagit".
-  document.documentElement.addEventListener('mouseleave', function () {
-    rampeRelacher();
-  });
-  window.addEventListener('blur', function () {
-    rampeRelacher();
-  });
 });

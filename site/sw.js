@@ -1,5 +1,5 @@
 // BLAMUNE Service Worker - offline cache
-const CACHE = 'blamune-v4';
+const CACHE = 'blamune-v5';
 const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/manifest.json', '/logo.png'];
 
 self.addEventListener('install', (e) => {

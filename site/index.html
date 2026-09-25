@@ -27,53 +27,6 @@
 </head>
 <body>
 
-<!-- Serpent de fond : rampe stylisee et interactive (curseur / souris / doigt).
-     Il se masque des qu'un champ est actif pour ne jamais se retrouver
-     au-dessus du clavier (connexion, inscription, chat). -->
-<div id="rampe" aria-hidden="true">
-  <div class="rampe-lean">
-    <div class="rampe-mvt">
-      <svg viewBox="0 0 264 96" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="rampeDeg" x1="0" y1="1" x2="1" y2="0">
-            <stop offset="0" stop-color="#059669"/>
-            <stop offset="0.45" stop-color="#10b981"/>
-            <stop offset="0.78" stop-color="#22d3ee"/>
-            <stop offset="1" stop-color="#38bdf8"/>
-          </linearGradient>
-          <linearGradient id="rampeReflet" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
-            <stop offset="1" stop-color="#ffffff" stop-opacity="0.06"/>
-          </linearGradient>
-        </defs>
-
-        <!-- queue qui s'affine -->
-        <path class="rampe-queue" d="M4 76 C 9 72, 13 68, 19 63" fill="none" stroke="url(#rampeDeg)" stroke-width="4.5" stroke-linecap="round"/>
-
-        <!-- corps ondule -->
-        <path class="rampe-corps" d="M19 63 C 45 25, 81 21, 107 47 C 133 73, 159 77, 183 53 C 203 33, 217 29, 233 37" fill="none" stroke="url(#rampeDeg)" stroke-width="20" stroke-linecap="round"/>
-
-        <!-- ecailles qui glissent le long du corps -->
-        <path class="rampe-file" d="M19 63 C 45 25, 81 21, 107 47 C 133 73, 159 77, 183 53 C 203 33, 217 29, 233 37" fill="none" stroke="url(#rampeReflet)" stroke-width="7" stroke-dasharray="12 28" stroke-linecap="round" opacity="0.85"/>
-
-        <!-- tete : elle pivote vers le pointeur -->
-        <g class="rampe-tete">
-          <ellipse cx="245" cy="37" rx="16" ry="13.5" fill="url(#rampeDeg)"/>
-          <ellipse cx="235" cy="31" rx="3.6" ry="4" fill="#f8fafc" opacity="0.9"/>
-          <circle class="rampe-pupille" cx="236" cy="31" r="1.8" fill="#0b1020"/>
-          <ellipse cx="249" cy="31.5" rx="4.6" ry="5.2" fill="#f8fafc"/>
-          <circle class="rampe-pupille" cx="250.5" cy="31.5" r="2.5" fill="#0b1020"/>
-          <circle cx="252" cy="29.6" r="1.1" fill="#ffffff"/>
-          <path d="M234 45 C 240 49.5, 249 50.5, 258 48" fill="none" stroke="rgba(11,16,32,0.5)" stroke-width="1.8" stroke-linecap="round"/>
-          <g class="rampe-langue">
-            <path d="M258 47 L 274 45 M258 47 L 273 52 M274 45 L 281 43 M274 45 L 279 49" fill="none" stroke="#f472b6" stroke-width="2" stroke-linecap="round"/>
-          </g>
-        </g>
-      </svg>
-    </div>
-  </div>
-</div>
-
 <!-- ECRAN D'AUTHENTIFICATION -->
 <div id="ecranAuth">
   <div class="auth-box">
