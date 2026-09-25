@@ -34,26 +34,40 @@
     <h2>Bienvenue sur BLAMUNE</h2>
     <p class="auth-sous">Connecte-toi pour garder ton historique et personnaliser ton experience.</p>
 
-    <div id="authFormLogin" class="auth-form">
-      <input id="authEmail" type="email" placeholder="Ton email" autocomplete="email" maxlength="100" aria-label="Ton email">
-      <input id="authMdp" type="password" placeholder="Mot de passe" autocomplete="current-password" maxlength="100" aria-label="Mot de passe">
-      <button id="btnLogin" class="auth-btn" type="button">Se connecter</button>
-      <p class="auth-err" id="authErrLogin"></p>
-      <p class="auth-switch">Pas encore de compte ? <a href="#" id="authShowRegister">Creer un compte</a></p>
+    <div id="authPrincipal">
+
+      <div id="authFormLogin" class="auth-form">
+        <input id="authEmail" type="email" placeholder="Ton email" autocomplete="email" maxlength="100" aria-label="Ton email">
+        <input id="authMdp" type="password" placeholder="Mot de passe" autocomplete="current-password" maxlength="100" aria-label="Mot de passe">
+        <button id="btnLogin" class="auth-btn" type="button">Se connecter</button>
+        <p class="auth-err" id="authErrLogin"></p>
+        <p class="auth-switch">Pas encore de compte ? <a href="#" id="authShowRegister">Creer un compte</a></p>
+      </div>
+
+      <div id="authFormRegister" class="auth-form" style="display:none">
+        <input id="authPseudoReg" type="text" placeholder="Choisis un pseudo" autocomplete="username" maxlength="30" aria-label="Choisis un pseudo">
+        <input id="authEmailReg" type="email" placeholder="Ton email" autocomplete="email" maxlength="100" aria-label="Ton email">
+        <input id="authMdpReg" type="password" placeholder="Choisis un mot de passe" autocomplete="new-password" maxlength="100" aria-label="Choisis un mot de passe">
+        <button id="btnRegister" class="auth-btn" type="button">Creer mon compte</button>
+        <p class="auth-err" id="authErrRegister"></p>
+        <p class="auth-switch">Deja un compte ? <a href="#" id="authShowLogin">Se connecter</a></p>
+      </div>
+
+      <div class="auth-sep"><span>ou</span></div>
+      <button id="btnInvite" class="auth-btn auth-invite" type="button">Continuer en tant qu'invite</button>
+      <p class="auth-note">L'invite ne sauvegarde pas tes messages.</p>
+
     </div>
 
-    <div id="authFormRegister" class="auth-form" style="display:none">
-      <input id="authPseudoReg" type="text" placeholder="Choisis un pseudo" autocomplete="username" maxlength="30" aria-label="Choisis un pseudo">
-      <input id="authEmailReg" type="email" placeholder="Ton email" autocomplete="email" maxlength="100" aria-label="Ton email">
-      <input id="authMdpReg" type="password" placeholder="Choisis un mot de passe" autocomplete="new-password" maxlength="100" aria-label="Choisis un mot de passe">
-      <button id="btnRegister" class="auth-btn" type="button">Creer mon compte</button>
-      <p class="auth-err" id="authErrRegister"></p>
-      <p class="auth-switch">Deja un compte ? <a href="#" id="authShowLogin">Se connecter</a></p>
+    <div id="authSuccess" class="auth-success" aria-live="polite">
+      <div class="success-ring">
+        <svg class="success-check" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+          <circle class="success-check-circle" cx="32" cy="32" r="23"></circle>
+          <path class="success-check-mark" d="M20 32 28.5 40 44 24"></path>
+        </svg>
+      </div>
+      <p class="success-texte" id="authSuccessTexte"></p>
     </div>
-
-    <div class="auth-sep"><span>ou</span></div>
-    <button id="btnInvite" class="auth-btn auth-invite" type="button">Continuer en tant qu'invite</button>
-    <p class="auth-note">L'invite ne sauvegarde pas tes messages.</p>
   </div>
 </div>
 

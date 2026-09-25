@@ -18,7 +18,7 @@ var dernierModeCharge = null;
 var _chargerPending = false;
 var _animEntree = false;
 
-// ---------------- ANIMATIONS (connexion, serpent, mode, toasts) ----------------
+// ---------------- OUTILS D'ANIMATION ----------------
 
 function delai(ms) {
   return new Promise(function (resolve) { setTimeout(resolve, ms); });
@@ -33,26 +33,7 @@ function serpentEtat(etat) {
   else if (etat === 'ok') e.classList.add('serpent-ok');
 }
 
-// Toast anime en haut de l'ecran
-function toast(texte, type) {
-  var existant = document.getElementById('toastBlamune');
-  if (existant) { existant.remove(); }
-  var t = document.createElement('div');
-  t.id = 'toastBlamune';
-  t.className = 'toast' + (type === 'ok' ? ' toast-ok' : '');
-  var s = document.createElement('span');
-  s.textContent = texte;
-  t.appendChild(s);
-  document.body.appendChild(t);
-  requestAnimationFrame(function () { t.classList.add('visible'); });
-  clearTimeout(t._timer);
-  t._timer = setTimeout(function () {
-    t.classList.remove('visible');
-    setTimeout(function () { t.remove(); }, 450);
-  }, 2000);
-}
-
-// Deplace la pilule glissante EGO / BLAMUNE
+// Pilule glissante EGO / BLAMUNE
 function deplacerPilule(mode, instant) {
   var btn = document.getElementById(mode === '1' ? 'mode1' : (mode === '2' ? 'mode2' : null));
   var pill = document.getElementById('piluleMode');
@@ -132,21 +113,15 @@ function authBody() {
   return p;
 }
 
-function afficherApp(anime) {
+function afficherApp() {
   var ecranAuth = document.getElementById('ecranAuth');
   var appContenu = document.getElementById('appContenu');
-  if (ecranAuth) {
-    if (anime) ecranAuth.classList.add('sortant');
-  }
-  if (appContenu) {
-    appContenu.style.display = 'flex';
-    appContenu.style.flexDirection = 'column';
-    if (anime) {
-      appContenu.classList.remove('entrant');
-      void appContenu.offsetWidth;
-      appContenu.classList.add('entrant');
-    }
-  }
+  if (ecranAuth) ecranAuth.style.display = 'none';
+  if (appContenu) { appContenu.style.display = 'flex'; appContenu.style.flexDirection = 'column'; }
+  finaliserAffichageApp();
+}
+
+function finaliserAffichageApp() {
   var pseudo = getAuthPseudo();
   var noteInvite = document.getElementById('noteInvite');
   var btnDeconnexion = document.getElementById('btnDeconnexion');
@@ -157,30 +132,102 @@ function afficherApp(anime) {
     if (noteInvite) noteInvite.style.display = '';
     if (btnDeconnexion) { btnDeconnexion.style.display = ''; btnDeconnexion.textContent = 'Quitter'; }
   }
-  if (anime) _animEntree = true;
-  if (ecranAuth) {
-    if (anime) {
-      setTimeout(function () {
-        ecranAuth.style.display = 'none';
-        ecranAuth.classList.remove('sortant');
-        serpentEtat('off');
-      }, 520);
-    } else {
-      ecranAuth.style.display = 'none';
-    }
-  }
   charger();
+}
+
+// ---------------- ANIMATIONS CONNEXION / DECONNEXION ----------------
+
+function forcerReflow(el) {
+  if (el) { void el.offsetWidth; }
+}
+
+function afficherToastDeco(texte, type) {
+  var ancien = document.querySelector('.deco-toast');
+  if (ancien) ancien.remove();
+  var d = document.createElement('div');
+  d.className = 'deco-toast' + (type === 'ok' ? ' deco-toast-ok' : '');
+  d.textContent = texte;
+  document.body.appendChild(d);
+  setTimeout(function () { if (d && d.parentNode) d.parentNode.removeChild(d); }, 2300);
+}
+
+// Joue le check anime + le fondu vers l'app. Utilisee apres connexion,
+// inscription et mode invite : meme animation, message personnalise.
+function jouerTransitionConnexion(message) {
+  var ecranAuth = document.getElementById('ecranAuth');
+  var appContenu = document.getElementById('appContenu');
+  var principal = document.getElementById('authPrincipal');
+  var success = document.getElementById('authSuccess');
+  var successTexte = document.getElementById('authSuccessTexte');
+
+  serpentEtat('ok');
+  if (successTexte) successTexte.textContent = message || 'Connexion reussie !';
+  if (principal) principal.style.display = 'none';
+  if (success) {
+    success.classList.remove('actif');
+    forcerReflow(success);
+    success.classList.add('actif');
+  }
+
+  // Laisse admirer le check un instant, puis bascule vers l'app :
+  // l'ecran auth se floute/zoome en sortie pendant que l'app apparait en fondu.
+  setTimeout(function () {
+    _animEntree = true;
+    if (ecranAuth) {
+      ecranAuth.classList.remove('sortie-auth');
+      forcerReflow(ecranAuth);
+      ecranAuth.classList.add('sortie-auth');
+    }
+    if (appContenu) {
+      appContenu.style.display = 'flex';
+      appContenu.style.flexDirection = 'column';
+      appContenu.classList.remove('entree-app');
+      forcerReflow(appContenu);
+      appContenu.classList.add('entree-app');
+    }
+    finaliserAffichageApp();
+
+    setTimeout(function () {
+      if (ecranAuth) { ecranAuth.style.display = 'none'; ecranAuth.classList.remove('sortie-auth'); }
+      if (success) success.classList.remove('actif');
+      if (principal) principal.style.display = '';
+    }, 560);
+  }, 950);
+}
+
+// Fondu de l'app vers l'ecran d'authentification, avec un petit toast.
+function jouerTransitionDeconnexion() {
+  var ecranAuth = document.getElementById('ecranAuth');
+  var appContenu = document.getElementById('appContenu');
+
+  serpentEtat('off');
+  afficherToastDeco('A bientot !');
+
+  if (appContenu) {
+    appContenu.classList.remove('sortie-app');
+    forcerReflow(appContenu);
+    appContenu.classList.add('sortie-app');
+  }
+  if (ecranAuth) {
+    ecranAuth.style.display = '';
+    ecranAuth.classList.remove('entree-auth');
+    forcerReflow(ecranAuth);
+    ecranAuth.classList.add('entree-auth');
+  }
+
+  setTimeout(function () {
+    if (appContenu) {
+      appContenu.style.display = 'none';
+      appContenu.classList.remove('sortie-app');
+    }
+  }, 460);
 }
 
 function afficherAuth() {
   var ecranAuth = document.getElementById('ecranAuth');
   var appContenu = document.getElementById('appContenu');
-  if (ecranAuth) {
-    ecranAuth.style.display = '';
-    ecranAuth.classList.remove('entrant');
-    void ecranAuth.offsetWidth;
-    ecranAuth.classList.add('entrant');
-  }
+  serpentEtat('off');
+  if (ecranAuth) ecranAuth.style.display = '';
   if (appContenu) appContenu.style.display = 'none';
 }
 
@@ -199,34 +246,26 @@ async function authRegister() {
   if (!email || email.indexOf('@') < 0) { errEl.textContent = 'Email invalide.'; return; }
   if (mdp.length < 6) { errEl.textContent = 'Mot de passe trop court (6 min).'; return; }
   btnRegister.disabled = true;
-  btnRegister.classList.add('btn-charge');
+  btnRegister.textContent = 'Creation...';
   serpentEtat('actif');
   try {
     var body = 'pseudo=' + encodeURIComponent(pseudo) + '&email=' + encodeURIComponent(email) + '&mdp=' + encodeURIComponent(mdp);
-    var req = fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
-    var j = (await Promise.all([req, delai(1600)]))[0];
+    var r = await fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var j = await r.json();
     if (j.ok) {
       setAuthInfo(j.ego, j.pseudo, j.uid);
-      btnRegister.classList.remove('btn-charge');
-      btnRegister.classList.add('btn-ok');
-      serpentEtat('ok');
-      await delai(750);
-      btnRegister.classList.remove('btn-ok');
-      btnRegister.disabled = false;
-      afficherApp(true);
+      jouerTransitionConnexion('Bienvenue' + (j.pseudo ? ', ' + j.pseudo : '') + ' !');
     } else {
-      btnRegister.classList.remove('btn-charge');
-      btnRegister.disabled = false;
       serpentEtat('off');
       errEl.textContent = j.message || 'Erreur.';
     }
   } catch (e) {
-    btnRegister.classList.remove('btn-charge');
-    btnRegister.disabled = false;
     serpentEtat('off');
     errEl.textContent = 'Serveur injoignable.';
   }
+  btnRegister.disabled = false;
+  btnRegister.textContent = 'Creer mon compte';
 }
 
 async function authLogin() {
@@ -240,61 +279,41 @@ async function authLogin() {
   errEl.textContent = '';
   if (!email || !mdp) { errEl.textContent = 'Remplis tous les champs.'; return; }
   btnLogin.disabled = true;
-  btnLogin.classList.add('btn-charge');
+  btnLogin.textContent = 'Connexion...';
   serpentEtat('actif');
   try {
     var body = 'email=' + encodeURIComponent(email) + '&mdp=' + encodeURIComponent(mdp);
-    var req = fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
-    var j = (await Promise.all([req, delai(1700)]))[0];
+    var r = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var j = await r.json();
     if (j.ok) {
       setAuthInfo(j.ego, j.pseudo, j.uid);
-      btnLogin.classList.remove('btn-charge');
-      btnLogin.classList.add('btn-ok');
-      serpentEtat('ok');
-      await delai(750);
-      btnLogin.classList.remove('btn-ok');
-      btnLogin.disabled = false;
-      afficherApp(true);
+      jouerTransitionConnexion('Content de te revoir' + (j.pseudo ? ', ' + j.pseudo : '') + ' !');
     } else {
-      btnLogin.classList.remove('btn-charge');
-      btnLogin.disabled = false;
       serpentEtat('off');
       errEl.textContent = j.message || 'Erreur.';
     }
   } catch (e) {
-    btnLogin.classList.remove('btn-charge');
-    btnLogin.disabled = false;
     serpentEtat('off');
     errEl.textContent = 'Serveur injoignable.';
   }
+  btnLogin.disabled = false;
+  btnLogin.textContent = 'Se connecter';
 }
 
 async function authInvite() {
   var btnInvite = document.getElementById('btnInvite');
-  if (!btnInvite) return;
-  btnInvite.disabled = true;
-  btnInvite.classList.add('btn-charge');
+  if (btnInvite) btnInvite.disabled = true;
   serpentEtat('actif');
   try {
-    var req = fetch('/invite', { method: 'POST' })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
-    var j = (await Promise.all([req, delai(1200)]))[0];
+    var r = await fetch('/invite', { method: 'POST' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var j = await r.json();
     if (j.ok) {
       localStorage.removeItem(AUTH_CLES.ego);
       localStorage.removeItem(AUTH_CLES.pseudo);
       localStorage.setItem(AUTH_CLES.userId, j.uid);
-      btnInvite.classList.remove('btn-charge');
-      btnInvite.classList.add('btn-ok');
-      serpentEtat('ok');
-      await delai(750);
-      btnInvite.classList.remove('btn-ok');
-      btnInvite.disabled = false;
-      afficherApp(true);
-    } else {
-      btnInvite.classList.remove('btn-charge');
-      btnInvite.disabled = false;
-      serpentEtat('off');
+      jouerTransitionConnexion('Mode invite active !');
     }
   } catch (e) {
     // Fallback local si le serveur est injoignable
@@ -303,14 +322,9 @@ async function authInvite() {
     if (!localStorage.getItem(AUTH_CLES.userId)) {
       localStorage.setItem(AUTH_CLES.userId, genererUserId());
     }
-    btnInvite.classList.remove('btn-charge');
-    btnInvite.classList.add('btn-ok');
-    serpentEtat('ok');
-    await delai(750);
-    btnInvite.classList.remove('btn-ok');
-    btnInvite.disabled = false;
-    afficherApp(true);
+    jouerTransitionConnexion('Mode invite active !');
   }
+  if (btnInvite) btnInvite.disabled = false;
 }
 
 function initAuth() {
@@ -376,52 +390,11 @@ function initAuth() {
   var btnDeconnexion = document.getElementById('btnDeconnexion');
   if (btnDeconnexion) {
     btnDeconnexion.onclick = function() {
-      var appContenu = document.getElementById('appContenu');
-      if (!appContenu || appContenu.style.display === 'none') {
-        fetch('/logout', { method: 'POST', headers: authHeaders() }).catch(function(){});
-        clearAuth();
-        viderChat();
-        reinitaliserModeUI();
-        afficherAuth();
-        return;
-      }
-      // Sortie animee : les messages fondent en cascade + aura de l'avatar
-      appContenu.classList.add('quittant');
-      var msgs = appContenu.querySelectorAll('.msg, .accueil');
-      for (var i = 0; i < msgs.length; i++) {
-        var el = msgs[i];
-        el.style.animation = 'none';
-        el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
-        el.style.transitionDelay = (i * 40) + 'ms';
-        el.classList.add('fonte');
-        msgs[i].style.opacity = '0';
-        msgs[i].style.transform = 'translateY(26px)';
-      }
-      var tete = document.getElementById('tete');
-      var barre = document.getElementById('barre');
-      if (tete) { tete.style.transition = 'opacity 0.35s ease'; tete.style.opacity = '0'; }
-      if (barre) { barre.style.transition = 'opacity 0.35s ease'; barre.style.opacity = '0'; }
-      setTimeout(function () {
-        fetch('/logout', { method: 'POST', headers: authHeaders() }).catch(function(){});
-        clearAuth();
-        viderChat();
-        reinitaliserModeUI();
-        var ecranAuth = document.getElementById('ecranAuth');
-        if (ecranAuth) {
-          ecranAuth.style.display = '';
-          ecranAuth.classList.remove('entrant');
-          void ecranAuth.offsetWidth;
-          ecranAuth.classList.add('entrant');
-        }
-        appContenu.classList.remove('quittant');
-        appContenu.style.display = 'none';
-        if (tete) { tete.style.opacity = ''; tete.style.transition = ''; }
-        if (barre) { barre.style.opacity = ''; barre.style.transition = ''; }
-        for (var j = 0; j < msgs.length; j++) {
-          var m = msgs[j];
-          if (m && m.parentNode) m.style.cssText = '';
-        }
-      }, 780);
+      fetch('/logout', { method: 'POST', headers: authHeaders() }).catch(function(){});
+      clearAuth();
+      viderChat();
+      reinitaliserModeUI();
+      jouerTransitionDeconnexion();
     };
   }
 
@@ -891,11 +864,11 @@ async function changerMode(m) {
   majStatut('demarrage', 'Changement de mode...');
   attente(true);
 
-  // Animation de bascule (delai visuel garanti)
+  // Animation de bascule (delai visuel garanti + rotation de l'avatar)
   var appContenu = document.getElementById('appContenu');
   if (appContenu) {
     appContenu.classList.remove('mode-bascule');
-    void appContenu.offsetWidth;
+    forcerReflow(appContenu);
     appContenu.classList.add('mode-bascule');
   }
   try {
@@ -907,7 +880,7 @@ async function changerMode(m) {
     clearTimeout(abortTimer);
     majMode(String(j.mode || '2'), true);
     majStatut(j.etat);
-    toast('Mode ' + (String(j.mode) === '1' ? 'EGO' : 'BLAMUNE') + ' active', 'ok');
+    afficherToastDeco('Mode ' + (String(j.mode) === '1' ? 'EGO' : 'BLAMUNE') + ' actif !', 'ok');
   } catch (e) {
     majStatut('horsligne', 'Serveur injoignable');
   }
