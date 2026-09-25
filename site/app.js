@@ -46,6 +46,8 @@ var serpentElem = null;
 var dernierCurseur = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 
 function serpentSuivre(on) {
+  var rampe = document.getElementById('rampe');
+  if (!estConsole && rampe) rampe.classList.toggle('tourne', !!on);
   if (estConsole) return;
   if (on) {
     if (!serpentElem) {
@@ -64,6 +66,8 @@ function serpentSuivre(on) {
 }
 
 function serpentMangerQueue() {
+  var rampe = document.getElementById('rampe');
+  if (rampe) rampe.classList.remove('tourne');
   if (!serpentElem) return;
   serpentElem.classList.remove('suivre');
   var centre = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
@@ -77,6 +81,39 @@ function serpentMangerQueue() {
   serpentElem.style.top = centre.y + 'px';
   serpentElem.classList.add('mange');
   setTimeout(function () { serpentElem.classList.remove('mange'); }, 1000);
+}
+
+// ------------- Serpent de fond : reaction au curseur / souris / doigt -------------
+// Quand le pointeur (ou le doigt) passe pres de lui, sa tete se tourne vers lui,
+// il sort la langue et s'accelere. Distance de proximite en pixels.
+var RAMPE_PORTEE = 240;
+
+function rampeInteragir(x, y) {
+  if (estConsole) return;
+  var rampe = document.getElementById('rampe');
+  if (!rampe) return;
+  var r = rampe.getBoundingClientRect();
+  var cx = r.left + r.width / 2;
+  var cy = r.top + r.height / 2;
+  var dx = x - cx;
+  var dy = y - cy;
+  var dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < RAMPE_PORTEE) {
+    rampe.classList.add('interagit');
+    var angle = (Math.atan2(-dy, dx) * 180 / Math.PI) * 0.45;
+    var tete = rampe.querySelector('.rampe-tete');
+    if (tete) tete.style.transform = 'rotate(' + angle + 'deg)';
+  } else {
+    rampe.classList.remove('interagit');
+  }
+}
+
+function rampeRelacher() {
+  var rampe = document.getElementById('rampe');
+  if (!rampe) return;
+  rampe.classList.remove('interagit');
+  var tete = rampe.querySelector('.rampe-tete');
+  if (tete) tete.style.transform = '';
 }
 
 // Pilule glissante EGO / BLAMUNE
@@ -1050,6 +1087,7 @@ window.addEventListener('load', function () {
   document.addEventListener('mousemove', function (e) {
     dernierCurseur.x = e.clientX;
     dernierCurseur.y = e.clientY;
+    rampeInteragir(e.clientX, e.clientY);
     var s = document.getElementById('serpent');
     if (s && s.classList.contains('suivre')) {
       s.style.left = e.clientX + 'px';
@@ -1061,6 +1099,7 @@ window.addEventListener('load', function () {
     if (!t) return;
     dernierCurseur.x = t.clientX;
     dernierCurseur.y = t.clientY;
+    rampeInteragir(t.clientX, t.clientY);
     var s = document.getElementById('serpent');
     if (s && s.classList.contains('suivre')) {
       s.style.left = t.clientX + 'px';
@@ -1075,5 +1114,11 @@ window.addEventListener('load', function () {
       s.style.left = t.clientX + 'px';
       s.style.top = t.clientY + 'px';
     }
+  });
+  window.addEventListener('pointerup', function () {
+    rampeRelacher();
+  });
+  document.addEventListener('touchend', function () {
+    rampeRelacher();
   });
 });

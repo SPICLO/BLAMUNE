@@ -25,7 +25,7 @@
   --rayon-bulle: 18px;
 }
 
-#appContenu { display: none; }
+#appContenu { display: none; position: relative; z-index: 1; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -581,7 +581,7 @@ button:disabled {
   background:
     radial-gradient(600px 400px at 30% 20%, rgba(56, 189, 248, 0.08), transparent 60%),
     radial-gradient(500px 400px at 70% 80%, rgba(139, 92, 246, 0.08), transparent 60%),
-    var(--fond);
+    rgba(11, 16, 32, 0.72);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1110,4 +1110,117 @@ html.console .auth-box::before {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ==================== SERPENT DE FOND (RAMPANT) ==================== */
+/* Rampe en arriere-plan, on peut interagir avec lui (curseur, souris, doigt),
+   il tourne sur lui-meme pendant la connexion/inscription. Couleurs discretes
+   pour ne pas troubler l'appli. */
+
+#rampe {
+  position: fixed;
+  left: -320px;
+  bottom: 18vh;
+  width: 260px;
+  height: 100px;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  will-change: transform;
+  animation: rampeTraversee 46s linear infinite;
+  transition: left 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), bottom 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+}
+html.console #rampe {
+  animation: none;
+  opacity: 0.12;
+}
+
+.rampe-mvt {
+  width: 100%;
+  height: 100%;
+  animation: rampeOndule 2.6s ease-in-out infinite;
+  transform-origin: 50% 80%;
+  will-change: transform;
+}
+
+#rampe svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 0 14px rgba(56, 189, 248, 0.55));
+  transition: filter 0.4s ease, opacity 0.4s ease;
+}
+
+.rampe-tete {
+  transform-origin: 170px 32px;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.rampe-langue {
+  opacity: 0;
+  transform-origin: 196px 26px;
+  transition: opacity 0.2s ease;
+}
+
+/* --- Traverse l'ecran en rampent --- */
+@keyframes rampeTraversee {
+  0%   { transform: translateX(0) translateY(0)   rotate(0deg); }
+  10%  { transform: translateX(18vw) translateY(-14px) rotate(-6deg); }
+  25%  { transform: translateX(38vw) translateY(10px)  rotate(5deg); }
+  40%  { transform: translateX(58vw) translateY(-18px) rotate(-7deg); }
+  55%  { transform: translateX(78vw) translateY(12px)  rotate(6deg); }
+  70%  { transform: translateX(96vw) translateY(-10px) rotate(-5deg); }
+  85%  { transform: translateX(112vw) translateY(16px) rotate(7deg); }
+  100% { transform: translateX(135vw) translateY(0)  rotate(0deg); }
+}
+
+/* --- Ondulation du corps pendant la reptation --- */
+@keyframes rampeOndule {
+  0%, 100% { transform: rotate(0deg) scaleY(1); }
+  50% { transform: rotate(-4deg) scaleY(0.94); }
+}
+
+/* --- Fluide du corps (dessous) pendant la reptation --- */
+#rampe .rampe-file {
+  animation: rampeFile 1.1s linear infinite;
+}
+@keyframes rampeFile {
+  to { stroke-dashoffset: -68; }
+}
+
+/* --- Interaction curseur / souris / doigt : la tete se tourne vers lui,
+       la langue sort, le serpent se reveille --- */
+#rampe.interagit {
+  opacity: 0.85;
+  animation-duration: 24s;
+  filter: drop-shadow(0 0 18px rgba(34, 211, 238, 0.7));
+}
+#rampe.interagit svg {
+  filter: drop-shadow(0 0 26px rgba(56, 189, 248, 0.8));
+}
+#rampe.interagit .rampe-langue {
+  opacity: 1;
+  animation: rampeLangue 0.7s ease-in-out infinite;
+}
+@keyframes rampeLangue {
+  0%, 100% { transform: scaleX(1); }
+  50% { transform: scaleX(1.4); }
+}
+#rampe.interagit .rampe-mvt {
+  animation-duration: 1.4s;
+}
+
+/* --- Pendant connexion / inscription : le serpent tourne sur lui-meme --- */
+#rampe.tourne {
+  opacity: 0.9;
+  animation: none;
+  left: calc(50% - 130px);
+  bottom: calc(50vh - 70px);
+}
+#rampe.tourne .rampe-mvt {
+  animation: rampeRonde 1.1s linear infinite;
+}
+@keyframes rampeRonde {
+  to { transform: rotate(360deg); }
 }

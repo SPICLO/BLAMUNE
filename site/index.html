@@ -27,6 +27,28 @@
 </head>
 <body>
 
+<!-- Serpent de fond : rampe, reagit au pointeur/doigt, tourne sur lui-meme pendant la connexion -->
+<div id="rampe" aria-hidden="true">
+  <div class="rampe-mvt">
+  <svg viewBox="0 0 200 66" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="rampeDeg" x1="0" y1="0" x2="1" y2="0.2">
+        <stop offset="0" stop-color="#10b981" stop-opacity="0.85"/>
+        <stop offset="0.55" stop-color="#22d3ee" stop-opacity="0.9"/>
+        <stop offset="1" stop-color="#38bdf8" stop-opacity="0.95"/>
+      </linearGradient>
+    </defs>
+    <path class="rampe-corps" d="M13 48 C 31 14, 60 12, 80 35 S 114 56, 134 30 S 164 12, 186 26" fill="none" stroke="url(#rampeDeg)" stroke-width="16" stroke-linecap="round"/>
+    <path class="rampe-file" d="M13 48 C 31 14, 60 12, 80 35 S 114 56, 134 30 S 164 12, 186 26" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="16" stroke-linecap="round" stroke-dasharray="8 26"/>
+    <g class="rampe-tete">
+      <circle cx="186" cy="26" r="9" fill="url(#rampeDeg)"/>
+      <circle cx="189" cy="23" r="2.2" fill="#0b1020"/>
+      <path class="rampe-langue" d="M196 24 207 21 M196 27 206 30" stroke="#38bdf8" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    </g>
+  </svg>
+  </div>
+</div>
+
 <!-- ECRAN D'AUTHENTIFICATION -->
 <div id="ecranAuth">
   <div class="auth-box">
