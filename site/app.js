@@ -296,9 +296,12 @@ async function authRegister() {
   var email = emailEl.value.trim();
   var mdp = mdpEl.value;
   errEl.textContent = '';
-  if (pseudo.length < 2) { errEl.textContent = 'Pseudo trop court (2 min).'; return; }
-  if (!email || email.indexOf('@') < 0) { errEl.textContent = 'Email invalide.'; return; }
-  if (mdp.length < 6) { errEl.textContent = 'Mot de passe trop court (6 min).'; return; }
+  if (!marquerChamp(pseudoEl, pseudo.length >= 2) ||
+      !marquerChamp(emailEl, email.indexOf('@') >= 0) ||
+      !marquerChamp(mdpEl, mdp.length >= 6)) {
+    errEl.textContent = 'Des champs sont invalides.';
+    return;
+  }
   authEnCours = true;
   btnRegister.disabled = true;
   btnRegister.textContent = 'Creation...';
@@ -336,7 +339,11 @@ async function authLogin() {
   var email = emailEl.value.trim();
   var mdp = mdpEl.value;
   errEl.textContent = '';
-  if (!email || !mdp) { errEl.textContent = 'Remplis tous les champs.'; return; }
+  if (!marquerChamp(emailEl, email.indexOf('@') >= 0) ||
+      !marquerChamp(mdpEl, mdp.length >= 1)) {
+    errEl.textContent = 'Des champs sont invalides.';
+    return;
+  }
   authEnCours = true;
   btnLogin.disabled = true;
   btnLogin.textContent = 'Connexion...';
@@ -398,6 +405,24 @@ async function authInvite() {
   authEnCours = false;
 }
 
+function marquerChamp(el, ok) {
+  if (!el) return false;
+  var champ = el.closest ? el.closest('.champ') : null;
+  if (!champ) return ok;
+  if (ok) {
+    champ.classList.remove('faux');
+    champ.classList.add('vrai');
+  } else {
+    champ.classList.remove('vrai');
+    champ.classList.add('faux');
+    var input = el;
+    input.style.animation = 'none';
+    void input.offsetWidth;
+    input.style.animation = '';
+  }
+  return ok;
+}
+
 function initAuth() {
   var btnLogin = document.getElementById('btnLogin');
   var btnRegister = document.getElementById('btnRegister');
@@ -414,13 +439,40 @@ function initAuth() {
   if (btnLogin) btnLogin.onclick = authLogin;
   if (btnRegister) btnRegister.onclick = authRegister;
   if (btnInvite) btnInvite.onclick = authInvite;
+
+  // Validation en direct : tremblement rouge si invalide, ✓ qui se dessine
+  // quand c'est bon, avec un petit delai de stabilite (confiance).
+  var CHAMPS = [
+    { id: 'authPseudoReg', valide: function (v) { return v.trim().length >= 2; } },
+    { id: 'authEmailReg', valide: function (v) { return v.indexOf('@') >= 0; } },
+    { id: 'authMdpReg', valide: function (v) { return v.length >= 6; } },
+    { id: 'authEmail', valide: function (v) { return v.indexOf('@') >= 0; } },
+    { id: 'authMdp', valide: function (v) { return v.length >= 1; } }
+  ];
+  CHAMPS.forEach(function (def) {
+    var el = document.getElementById(def.id);
+    if (!el) return;
+    var delaiValidation = null;
+    el.addEventListener('input', function () {
+      if (delaiValidation) clearTimeout(delaiValidation);
+      delaiValidation = setTimeout(function () {
+        marquerChamp(el, def.valide(el.value));
+      }, 450);
+    });
+  });
+
   if (authShowRegister) {
     authShowRegister.onclick = function(e) {
       e.preventDefault();
       var authFormLogin = document.getElementById('authFormLogin');
       var authFormRegister = document.getElementById('authFormRegister');
-      if (authFormLogin) authFormLogin.style.display = 'none';
-      if (authFormRegister) authFormRegister.style.display = '';
+      if (authFormLogin) { authFormLogin.style.display = 'none'; authFormLogin.classList.remove('glisser'); }
+      if (authFormRegister) {
+        authFormRegister.style.display = '';
+        authFormRegister.classList.remove('glisser');
+        forcerReflow(authFormRegister);
+        authFormRegister.classList.add('glisser');
+      }
     };
   }
   if (authShowLogin) {
@@ -428,8 +480,13 @@ function initAuth() {
       e.preventDefault();
       var authFormLogin = document.getElementById('authFormLogin');
       var authFormRegister = document.getElementById('authFormRegister');
-      if (authFormLogin) authFormLogin.style.display = '';
-      if (authFormRegister) authFormRegister.style.display = 'none';
+      if (authFormRegister) { authFormRegister.style.display = 'none'; authFormRegister.classList.remove('glisser'); }
+      if (authFormLogin) {
+        authFormLogin.style.display = '';
+        authFormLogin.classList.remove('glisser');
+        forcerReflow(authFormLogin);
+        authFormLogin.classList.add('glisser');
+      }
     };
   }
   if (authMdp) {

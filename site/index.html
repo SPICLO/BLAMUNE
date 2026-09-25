@@ -37,17 +37,32 @@
     <div id="authPrincipal">
 
       <div id="authFormLogin" class="auth-form">
-        <input id="authEmail" type="email" placeholder="Ton email" autocomplete="email" maxlength="100" aria-label="Ton email">
-        <input id="authMdp" type="password" placeholder="Mot de passe" autocomplete="current-password" maxlength="100" aria-label="Mot de passe">
+        <div class="champ">
+          <input id="authEmail" type="email" placeholder="Ton email" autocomplete="email" maxlength="100" aria-label="Ton email">
+          <svg class="check" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path class="check-trait" d="M4 12.5 9.5 18 20 6.5"></path></svg>
+        </div>
+        <div class="champ">
+          <input id="authMdp" type="password" placeholder="Mot de passe" autocomplete="current-password" maxlength="100" aria-label="Mot de passe">
+          <svg class="check" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path class="check-trait" d="M4 12.5 9.5 18 20 6.5"></path></svg>
+        </div>
         <button id="btnLogin" class="auth-btn" type="button">Se connecter</button>
         <p class="auth-err" id="authErrLogin"></p>
         <p class="auth-switch">Pas encore de compte ? <a href="#" id="authShowRegister">Creer un compte</a></p>
       </div>
 
       <div id="authFormRegister" class="auth-form" style="display:none">
-        <input id="authPseudoReg" type="text" placeholder="Choisis un pseudo" autocomplete="username" maxlength="30" aria-label="Choisis un pseudo">
-        <input id="authEmailReg" type="email" placeholder="Ton email" autocomplete="email" maxlength="100" aria-label="Ton email">
-        <input id="authMdpReg" type="password" placeholder="Choisis un mot de passe" autocomplete="new-password" maxlength="100" aria-label="Choisis un mot de passe">
+        <div class="champ">
+          <input id="authPseudoReg" type="text" placeholder="Choisis un pseudo" autocomplete="username" maxlength="30" aria-label="Choisis un pseudo">
+          <svg class="check" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path class="check-trait" d="M4 12.5 9.5 18 20 6.5"></path></svg>
+        </div>
+        <div class="champ">
+          <input id="authEmailReg" type="email" placeholder="Ton email" autocomplete="email" maxlength="100" aria-label="Ton email">
+          <svg class="check" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path class="check-trait" d="M4 12.5 9.5 18 20 6.5"></path></svg>
+        </div>
+        <div class="champ">
+          <input id="authMdpReg" type="password" placeholder="Choisis un mot de passe" autocomplete="new-password" maxlength="100" aria-label="Choisis un mot de passe">
+          <svg class="check" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path class="check-trait" d="M4 12.5 9.5 18 20 6.5"></path></svg>
+        </div>
         <button id="btnRegister" class="auth-btn" type="button">Creer mon compte</button>
         <p class="auth-err" id="authErrRegister"></p>
         <p class="auth-switch">Deja un compte ? <a href="#" id="authShowLogin">Se connecter</a></p>
