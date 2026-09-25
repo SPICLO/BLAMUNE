@@ -19,6 +19,12 @@ var _chargerPending = false;
 var _animEntree = false;
 var authEnCours = false;
 
+// Consoles (Xbox/PlayStation/Switch) : interface pilotee au pad, pas a la
+// souris. On desactive le serpent voleur et on allege les animations pour
+// eviter les saccades GPU qui font vibrer/defiler la page.
+var estConsole = /xbox|playstation|nintendo/i.test((navigator.userAgent || ''));
+if (estConsole) document.documentElement.classList.add('console');
+
 // ---------------- OUTILS D'ANIMATION ----------------
 
 function delai(ms) {
@@ -40,6 +46,7 @@ var serpentElem = null;
 var dernierCurseur = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 
 function serpentSuivre(on) {
+  if (estConsole) return;
   if (on) {
     if (!serpentElem) {
       serpentElem = document.createElement('div');

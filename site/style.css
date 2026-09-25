@@ -909,6 +909,27 @@ button:disabled {
   filter: drop-shadow(0 0 12px rgba(52, 211, 153, 0.7));
 }
 
+/* --- Console (Xbox/PS/Switch) : alléger pour éviter les saccades GPU --- */
+/* Le serpent voleur (suivi au curseur) n'a pas de sens au pad : on le cache. */
+/* L'anneau devient une simple bordure en pointillés qui tourne (léger). */
+html.console #serpent { display: none !important; }
+
+html.console .auth-box::before {
+  background: none;
+  -webkit-mask: none;
+  mask: none;
+  padding: 0;
+  border: 3px dashed rgba(34, 211, 238, 0.85);
+  filter: none;
+  opacity: 1;
+}
+
+html.console #ecranAuth.serpent-ok .auth-box::before {
+  background: none;
+  border-color: rgba(52, 211, 153, 0.9);
+  animation-duration: 1.1s;
+}
+
 /* --- Serpent vif : suit le curseur, puis mange sa queue --- */
 #serpent {
   position: fixed;
