@@ -296,9 +296,9 @@ async function authRegister() {
   var email = emailEl.value.trim();
   var mdp = mdpEl.value;
   errEl.textContent = '';
-  if (!marquerChamp(pseudoEl, pseudo.length >= 2) ||
-      !marquerChamp(emailEl, email.indexOf('@') >= 0) ||
-      !marquerChamp(mdpEl, mdp.length >= 6)) {
+  if (!marquerChamp(pseudoEl, pseudo.length >= 2, true) ||
+      !marquerChamp(emailEl, email.indexOf('@') >= 0, true) ||
+      !marquerChamp(mdpEl, mdp.length >= 6, true)) {
     errEl.textContent = 'Des champs sont invalides.';
     return;
   }
@@ -317,6 +317,9 @@ async function authRegister() {
     } else {
       serpentSuivre(false);
       serpentEtat('off');
+      marquerChamp(pseudoEl, false, true);
+      marquerChamp(emailEl, false, true);
+      marquerChamp(mdpEl, false, true);
       errEl.textContent = j.message || 'Erreur.';
     }
   } catch (e) {
@@ -339,8 +342,8 @@ async function authLogin() {
   var email = emailEl.value.trim();
   var mdp = mdpEl.value;
   errEl.textContent = '';
-  if (!marquerChamp(emailEl, email.indexOf('@') >= 0) ||
-      !marquerChamp(mdpEl, mdp.length >= 1)) {
+  if (!marquerChamp(emailEl, email.indexOf('@') >= 0, true) ||
+      !marquerChamp(mdpEl, mdp.length >= 1, true)) {
     errEl.textContent = 'Des champs sont invalides.';
     return;
   }
@@ -359,6 +362,8 @@ async function authLogin() {
     } else {
       serpentSuivre(false);
       serpentEtat('off');
+      marquerChamp(emailEl, false, true);
+      marquerChamp(mdpEl, false, true);
       errEl.textContent = j.message || 'Erreur.';
     }
   } catch (e) {
@@ -405,7 +410,7 @@ async function authInvite() {
   authEnCours = false;
 }
 
-function marquerChamp(el, ok) {
+function marquerChamp(el, ok, retrembler) {
   if (!el) return false;
   var champ = el.closest ? el.closest('.champ') : null;
   if (!champ) return ok;
@@ -415,10 +420,12 @@ function marquerChamp(el, ok) {
   } else {
     champ.classList.remove('vrai');
     champ.classList.add('faux');
-    var input = el;
-    input.style.animation = 'none';
-    void input.offsetWidth;
-    input.style.animation = '';
+    if (retrembler) {
+      var input = el;
+      input.style.animation = 'none';
+      void input.offsetWidth;
+      input.style.animation = '';
+    }
   }
   return ok;
 }
@@ -468,10 +475,10 @@ function initAuth() {
       var authFormRegister = document.getElementById('authFormRegister');
       if (authFormLogin) { authFormLogin.style.display = 'none'; authFormLogin.classList.remove('glisser'); }
       if (authFormRegister) {
-        authFormRegister.style.display = '';
         authFormRegister.classList.remove('glisser');
         forcerReflow(authFormRegister);
         authFormRegister.classList.add('glisser');
+        authFormRegister.style.display = '';
       }
     };
   }
@@ -482,10 +489,10 @@ function initAuth() {
       var authFormRegister = document.getElementById('authFormRegister');
       if (authFormRegister) { authFormRegister.style.display = 'none'; authFormRegister.classList.remove('glisser'); }
       if (authFormLogin) {
-        authFormLogin.style.display = '';
         authFormLogin.classList.remove('glisser');
         forcerReflow(authFormLogin);
         authFormLogin.classList.add('glisser');
+        authFormLogin.style.display = '';
       }
     };
   }

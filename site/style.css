@@ -662,10 +662,6 @@ button:disabled {
   position: relative;
 }
 
-.champ input {
-  padding-right: 42px;
-}
-
 /* Tick ✓ vert melange au bleu de l'app, dessine en SVG stroke */
 .champ .check {
   position: absolute;
@@ -702,8 +698,9 @@ button:disabled {
   to { stroke-dashoffset: 0; }
 }
 
-/* Tremblement rouge, melange avec le bleu de l'app */
-.champ.faux input {
+/* Tremblement rouge, melange avec le bleu de l'app.
+   Specificite plus forte que focus/hover pour garder l'etat d'erreur. */
+.auth-form .champ.faux input {
   border-color: rgba(248, 113, 113, 0.9);
   background: rgba(239, 68, 68, 0.08);
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18), 0 0 18px rgba(56, 189, 248, 0.18);
@@ -727,25 +724,30 @@ button:disabled {
   outline: none;
   transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease, transform 0.3s ease;
 }
+
+/* Reserve de place pour le tick ✓ a droite, y compris en focus */
+.auth-form .champ input {
+  padding-right: 42px;
+}
 .auth-form input:focus,
-.champ input:focus {
+.auth-form .champ input:focus {
   border-color: rgba(56, 189, 248, 0.6);
   background: rgba(255, 255, 255, 0.06);
   box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12), 0 0 16px rgba(56, 189, 248, 0.08);
   transform: translateY(-1px);
 }
 .auth-form input:focus-visible,
-.champ input:focus-visible {
+.auth-form .champ input:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 .auth-form input:hover,
-.champ input:hover {
+.auth-form .champ input:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.12);
 }
 .auth-form input::placeholder,
-.champ input::placeholder {
+.auth-form .champ input::placeholder {
   color: var(--texte-faible);
 }
 
