@@ -46,8 +46,7 @@ var serpentElem = null;
 var dernierCurseur = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 
 function serpentSuivre(on) {
-  var rampe = document.getElementById('rampe');
-  if (!estConsole && rampe) rampe.classList.toggle('tourne', !!on);
+  if (!estConsole) rampeTourne(!!on);
   if (estConsole) return;
   if (on) {
     if (!serpentElem) {
@@ -65,9 +64,17 @@ function serpentSuivre(on) {
   }
 }
 
-function serpentMangerQueue() {
+// Serpent de fond : pendant la connexion/inscription il tourne sur lui-meme,
+// glisse au centre (transition) et tourne sur place. Le changement d'animation
+// coupe proprement la traversal (pas de conflit de duree).
+function rampeTourne(on) {
   var rampe = document.getElementById('rampe');
-  if (rampe) rampe.classList.remove('tourne');
+  if (!rampe) return;
+  rampe.classList.toggle('tourne', !!on);
+}
+
+function serpentMangerQueue() {
+  rampeTourne(false);
   if (!serpentElem) return;
   serpentElem.classList.remove('suivre');
   var centre = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
@@ -98,13 +105,14 @@ function rampeInteragir(x, y) {
   var dx = x - cx;
   var dy = y - cy;
   var dist = Math.sqrt(dx * dx + dy * dy);
+  var tete = rampe.querySelector('.rampe-tete');
   if (dist < RAMPE_PORTEE) {
     rampe.classList.add('interagit');
     var angle = (Math.atan2(-dy, dx) * 180 / Math.PI) * 0.45;
-    var tete = rampe.querySelector('.rampe-tete');
     if (tete) tete.style.transform = 'rotate(' + angle + 'deg)';
   } else {
     rampe.classList.remove('interagit');
+    if (tete) tete.style.transform = '';
   }
 }
 
@@ -1109,16 +1117,20 @@ window.addEventListener('load', function () {
   document.addEventListener('touchstart', function (e) {
     var t = e.touches && e.touches[0];
     if (!t) return;
+    rampeInteragir(t.clientX, t.clientY);
     var s = document.getElementById('serpent');
     if (s && s.classList.contains('suivre')) {
       s.style.left = t.clientX + 'px';
       s.style.top = t.clientY + 'px';
     }
   });
-  window.addEventListener('pointerup', function () {
+  document.addEventListener('touchend', function () {
     rampeRelacher();
   });
-  document.addEventListener('touchend', function () {
+  document.addEventListener('touchcancel', function () {
+    rampeRelacher();
+  });
+  window.addEventListener('pointerup', function () {
     rampeRelacher();
   });
 });
