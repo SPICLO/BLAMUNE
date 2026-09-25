@@ -451,7 +451,13 @@ function lireEtat(uid) {
   try {
     const f = path.join(dossierUser(uid), 'etat_blamune.json');
     if (!fs.existsSync(f)) return defaut;
-    return Object.assign(defaut, JSON.parse(fs.readFileSync(f, 'utf8')));
+    const d = JSON.parse(fs.readFileSync(f, 'utf8'));
+    return {
+      premierContact: typeof d.premierContact === 'number' ? d.premierContact : 0,
+      dernierContact: typeof d.dernierContact === 'number' ? d.dernierContact : 0,
+      sessions: typeof d.sessions === 'number' ? d.sessions : 0,
+      souvenirs: Array.isArray(d.souvenirs) ? d.souvenirs : []
+    };
   } catch (e) { return defaut; }
 }
 
@@ -466,11 +472,12 @@ function dateSouvenir(ts) {
   return jj + '/' + mm;
 }
 
-// Evenements marquants que BLAMUNE capte et garde en memoire.
+// Evenements marquants que BLAMUNE capte et garde en memoire. (Patterns sans accents :
+// on compare toujours sur le message "deaccentue".)
 const SOUVENIRS_PATTERNS = [
   { re: /\b(bac|brevet|permis|concours|resultats?|exam(ens?|in)?|epreuves?)\b/i, texte: 'ses examens ou resultats' },
   { re: /\banniversaire\b/i, texte: 'son anniversaire' },
-  { re: /\b(demenage|demenage|nouvel(?:le)?\s+appart|nouvelle\s+maison)\b/i, texte: 'son demenagement' },
+  { re: /\b(demenage|nouvel(?:le)?\s+appart|nouvelle\s+maison)\b/i, texte: 'son demenagement' },
   { re: /\b(entretien|rendez[- ]vous|rdv)\b/i, texte: 'un entretien ou rdv important' },
   { re: /\b(vacances|voyage|je\s+pars|on\s+part)\b/i, texte: 'des vacances ou un voyage' },
   { re: /\b(promu|promue|promotion|embauche|embauchee|licenc\w*|change\s+de\s+boulot|nouveau\s+travail|nouvelle\s+embauche|perdu\s+(?:mon|le)\s+travail)\b/i, texte: 'des changements au travail' },
@@ -479,9 +486,14 @@ const SOUVENIRS_PATTERNS = [
   { re: /\b(marie|mariee|fiance|fiancee|en\s+couple)\b/i, texte: 'sa vie sentimentale' }
 ];
 
+function sansAccents(str) {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 function detecterSouvenirs(etat, lower) {
+  const propre = sansAccents(lower);
   for (const p of SOUVENIRS_PATTERNS) {
-    if (p.re.test(lower)) {
+    if (p.re.test(propre)) {
       const now = Date.now();
       const dernier = etat.souvenirs[etat.souvenirs.length - 1];
       if (dernier && now - dernier.ts < 3600000 && dernier.texte === p.texte) return false;
@@ -850,6 +862,13 @@ app.post('/send', async (req, res) => {
     const histoKey = auth.uid + '_2';
     if (!apiHistoriqueParUser[histoKey]) apiHistoriqueParUser[histoKey] = [];
     const histo = apiHistoriqueParUser[histoKey];
+    // Nouvelle session si plus de 45 min sans activite (peu importe logout/restart) :
+    // BLAMUNE "vit" entre deux sessions et sent le temps qui passe.
+    const SEUIL_NOUVELLE_SESSION = 45 * 60 * 1000;
+    if (histo.length > 0) {
+      const derniereActivite = histo[histo.length - 1]._lastTs || 0;
+      if (derniereActivite && Date.now() - derniereActivite > SEUIL_NOUVELLE_SESSION) histo.length = 0;
+    }
     if (histo.length === 0) {
       const memoire = lireMemoire(auth.uid);
       let systemPrompt = getPromptBLAMUNE(memoire.humeur);
@@ -876,7 +895,10 @@ app.post('/send', async (req, res) => {
       if (profilParts.length) systemPrompt += '\n\nINFOS SUR L\'UTILISATEUR :\n' + profilParts.join('\n');
       const etatBL = lireEtat(auth.uid);
       const tsActuel = Date.now();
-      const continuite = texteContinuite(tsActuel - (etatBL.dernierContact || 0), etatBL.souvenirs);
+      // Premier contact : pas encore de "dernierContact", donc pas de continuite (sinon ca
+      // dirait "tu n'as pas parle depuis 50 ans").
+      const ecartContact = etatBL.dernierContact ? tsActuel - etatBL.dernierContact : 0;
+      const continuite = texteContinuite(ecartContact, etatBL.souvenirs);
       if (continuite) systemPrompt += continuite;
       if (!etatBL.premierContact) etatBL.premierContact = tsActuel;
       etatBL.dernierContact = tsActuel;
@@ -893,7 +915,7 @@ app.post('/send', async (req, res) => {
         }
       }
     }
-histo.push({ role: 'user', content: msg, _lastTs: Date.now() });
+    histo.push({ role: 'user', content: msg, _lastTs: Date.now() });
     autoApprentissage(auth.uid, msg);
     while (histo.length > 50) histo.splice(1, 1);
 
