@@ -161,6 +161,14 @@ function promptTexte() {
   return dernierChat && dernierChat.contents ? JSON.stringify(dernierChat.contents) : '';
 }
 
+// Reecrit l'etat interieur pour tester les dates de la relation
+// (premierContact, dernierContact, souvenirs) sans attendre le temps reel.
+function ecrireEtat(dirUid, champs) {
+  const base = { premierContact: 0, dernierContact: 0, sessions: 4, souvenirs: [], messages: 12 };
+  fs.writeFileSync(path.join(dirUid, 'etat_blamune.json'),
+    JSON.stringify(Object.assign(base, champs)), 'utf8');
+}
+
 async function main() {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'blamune-test-'));
   await new Promise(r => mock.listen(PORT_MOCK, '127.0.0.1', r));
@@ -232,6 +240,41 @@ async function main() {
     assert(promptTexte().indexOf('ANNIVERSAIRE') >= 0, 'anniversaire detecte et annonce');
     assert(promptTexte().indexOf('dans 10 jours') >= 0, 'denombrement des jours');
     ok.push('anniversaire (dans 10 jours)');
+
+    // 5bis. Rituels et jalons de la relation
+    const ilYa7 = Date.now() - 7 * 86400000;
+    ecrireEtat(dirUid, { premierContact: ilYa7, dernierContact: Date.now() - 3600000 });
+    await envoyer('un petit test de date');
+    assert(promptTexte().indexOf('JALON DE VOTRE RENCONTRE') >= 0, 'jalon annonce au prompt');
+    assert(promptTexte().indexOf('exactement une semaine') >= 0,
+      'libelle du jalon: ' + JSON.stringify(promptTexte().match(/JALON[^\"]{0,120}/)));
+    ok.push('jalon relation (une semaine)');
+
+    const ilYa1an = new Date();
+    ilYa1an.setFullYear(ilYa1an.getFullYear() - 1);
+    ecrireEtat(dirUid, { premierContact: ilYa1an.getTime(), dernierContact: Date.now() - 3600000 });
+    await envoyer('un deuxieme test de date');
+    assert(promptTexte().indexOf('exactement un an') >= 0, 'jalon d\'un an');
+    ok.push('jalon relation (un an)');
+
+    ecrireEtat(dirUid, {
+      premierContact: ilYa1an.getTime(), dernierContact: Date.now() - 3600000,
+      souvenirs: [{ ts: ilYa1an.getTime(), texte: 'ses examens ou resultats' }]
+    });
+    await envoyer('tu te souviens de mes revisions de l annee derniere');
+    assert(promptTexte().indexOf('REVIVRE UN SOUVENIR') >= 0, 'anniversaire du souvenir annonce');
+    assert(promptTexte().indexOf('ses examens') >= 0, 'sujet du souvenir present');
+    ok.push('anniversaire d\'un souvenir');
+
+    ecrireEtat(dirUid, {
+      premierContact: Date.now() - 2 * 86400000,
+      dernierContact: Date.now() - 26 * 3600000, souvenirs: []
+    });
+    await envoyer('bonjour toi');
+    assert(promptTexte().indexOf('RITUELS') >= 0, 'rituel annonce au premier echange du jour');
+    await envoyer('un deuxieme message de la journee');
+    assert(promptTexte().indexOf('RITUELS') < 0, 'rituel absent du deuxieme message du jour');
+    ok.push('rituel du jour (present puis absent)');
 
     // 6. Promesse : "rappelle-moi de..." est retenu et injecte
     await envoyer("rappelle-moi de t'envoyer ma photo demain");

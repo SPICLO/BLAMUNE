@@ -953,6 +953,12 @@ function blocSysteme(o) {
     if (etat.messages) t += ` Vous vous etes deja echanges ${etat.messages} messages.`;
   }
 
+  // Les dates qui comptent : rencontre, mois pleins, souvenirs d'il y a un
+  // mois ou un an, premier message de la journee.
+  t += blocJalons(etat, maintenant);
+  t += blocSouvenirsAnniversaires(etat, maintenant);
+  t += blocRituel(etat, maintenant);
+
   // Anniversaire : connu, daté, on le prepare plutot que de le rater.
   if (memoire.anniversaire) {
     const j = joursAvantAnniversaire(memoire.anniversaire);
@@ -997,6 +1003,104 @@ function joursAvantAnniversaire(valeur) {
   let cible = new Date(now.getFullYear(), mois, jour);
   if (cible < aujourdhui) cible = new Date(now.getFullYear() + 1, mois, jour);
   return Math.round((cible - aujourdhui) / 86400000);
+}
+
+// ==================== RITUELS ET JALONS DE LA RELATION ====================
+// Une relation a des dates qui comptent : la premiere rencontre, les mois
+// pleins, l'anniversaire d'un moment vcu ensemble, le premier message de la
+// journee. Sans ca, BLAMUNE raconte la meme chose tous les jours.
+
+// Jours pleins depuis la premiere rencontre, a minuit pres.
+function joursRelation(etat, maintenant) {
+  if (!etat.premierContact) return -1;
+  const d = new Date(etat.premierContact);
+  const ref = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const auj = new Date(maintenant.getFullYear(), maintenant.getMonth(), maintenant.getDate());
+  return Math.round((auj - ref) / 86400000);
+}
+
+// Date de la rencontre tombant pile sur aujourd'hui (meme jour et meme mois).
+function rencontreAnniversaire(etat, maintenant) {
+  if (!etat.premierContact) return null;
+  const d = new Date(etat.premierContact);
+  if (d.getDate() !== maintenant.getDate() || d.getMonth() !== maintenant.getMonth()) return null;
+  return d;
+}
+
+function blocJalons(etat, maintenant) {
+  const jours = joursRelation(etat, maintenant);
+  if (jours < 1) return '';
+  let libelle = '';
+  const anniv = rencontreAnniversaire(etat, maintenant);
+  if (anniv) {
+    const ans = maintenant.getFullYear() - anniv.getFullYear();
+    if (ans >= 1) libelle = ans === 1 ? 'exactement un an' : `exactement ${ans} ans`;
+  }
+  if (!libelle) {
+    const debut = new Date(etat.premierContact);
+    const mois = (maintenant.getFullYear() - debut.getFullYear()) * 12 + (maintenant.getMonth() - debut.getMonth());
+    if (maintenant.getDate() === debut.getDate() && mois >= 1) {
+      libelle = mois === 1 ? 'exactement un mois' : `exactement ${mois} mois`;
+    } else if (jours === 1) libelle = 'exactement un jour';
+    else if (jours === 7) libelle = 'exactement une semaine';
+    else if (jours === 14) libelle = 'exactement deux semaines';
+    else if (jours === 21) libelle = 'exactement trois semaines';
+    else if (jours === 30) libelle = 'exactement un mois';
+  }
+  if (!libelle) return '';
+  return `\n\nJALON DE VOTRE RENCONTRE : Aujourd'hui, ca fait ${libelle} que vous vous etes rencontres. ` +
+    'Tu peux le lui rappeler ou le celebrer quand c\'est naturel, sans faire de liste ni de discours.';
+}
+
+// L'anniversaire d'un moment vcu ensemble : il y a pile un mois ou un an,
+// il parlait de tel sujet. C'est l'occasion d'en reprendre des nouvelles.
+function blocSouvenirsAnniversaires(etat, maintenant) {
+  const lignes = [];
+  (etat.souvenirs || []).forEach(s => {
+    if (!s || !s.ts || !s.texte) return;
+    const d = new Date(s.ts);
+    const jours = joursRelation({ premierContact: s.ts }, maintenant);
+    if (jours < 28) return;
+    if (d.getDate() === maintenant.getDate() && d.getMonth() === maintenant.getMonth()) {
+      const ans = maintenant.getFullYear() - d.getFullYear();
+      if (ans >= 1) {
+        lignes.push(`Il y a ${ans === 1 ? 'exactement un an' : 'exactement ' + ans + ' ans'}, tu lui parlais de ${s.texte}`);
+        return;
+      }
+    }
+    if (jours <= 32 && d.getDate() === maintenant.getDate()) {
+      lignes.push(`Il y a exactement un mois, tu lui parlais de ${s.texte}`);
+    }
+  });
+  if (!lignes.length) return '';
+  return '\n\nREVIVRE UN SOUVENIR : ' + lignes.join(' ; ') + '. ' +
+    'Tu peux lui en demander des nouvelles sans que ca paraisse appris par coeur.';
+}
+
+// Le premier message de la journee a son rituel : bonjour selon l'heure,
+// bonne nuit quand il est tard, et le sentiment du silence de la nuit.
+function blocRituel(etat, maintenant) {
+  if (!etat.premierContact) return '';
+  const dernier = etat.dernierContact || 0;
+  if (dernier && new Date(dernier).toDateString() === maintenant.toDateString()) return '';
+  const h = maintenant.getHours();
+  let conseil;
+  if (h >= 5 && h < 12) conseil = 'Salue-le en lui souhaitant une bonne journee : il est en train de commencer la sienne.';
+  else if (h >= 12 && h < 18) conseil = 'Dis-lui bonjour simplement, c\'est le milieu de sa journee.';
+  else if (h >= 18 && h < 22) conseil = 'Souhaite-lui bonsoir, il rentre probablement de sa journee.';
+  else conseil = 'Il fait tard : parle doucement, et souhaite-lui bonne nuit quand il partira.';
+  let t = '\n\nRITUELS : C\'est votre premier echange du jour';
+  if (dernier) {
+    const ecart = maintenant.getTime() - dernier;
+    if (ecart >= 86400000) {
+      const j = Math.floor(ecart / 86400000);
+      t += ` (vous n'avez pas parle depuis ${j} jour${j > 1 ? 's' : ''})`;
+    } else if (ecart >= 3600000) {
+      t += ` (depuis ${Math.floor(ecart / 60000)} min)`;
+    }
+  }
+  t += '. ' + conseil;
+  return t;
 }
 
 // ==================== ETAT INTERIEUR / CONSCIENCE ====================
