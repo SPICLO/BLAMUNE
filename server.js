@@ -652,7 +652,9 @@ async function modeleClassique(modele, contents, budget, patient) {
   } catch (e) {
     if (e && e.reflexion) return modeleClassiqueBrut(modele, contents, false);
     const delai = delaiIndique(e);
-    if (delai) dernierQuota = Date.now();
+    // Tout 429 remet les taches de fond en veille, meme sans "retry in"
+    // ("Resource has been exhausted" n'en indique pas).
+    if (delai || (e && e.statusCode === 429)) dernierQuota = Date.now();
     if (erreurRetentable(e)) {
       if (!patient && delai > 3000) throw e; // quota long : autre modele
       if (tentable(b)) {
@@ -702,7 +704,9 @@ async function modeleEnFlux(modele, contents, onDelta, budget) {
   } catch (e) {
     if (e && e.reflexion) return modeleEnFluxBrut(modele, contents, surDelta, false);
     const delai = delaiIndique(e);
-    if (delai) dernierQuota = Date.now();
+    // Tout 429 remet les taches de fond en veille, meme sans "retry in"
+    // ("Resource has been exhausted" n'en indique pas).
+    if (delai || (e && e.statusCode === 429)) dernierQuota = Date.now();
     if (!envoyaDuTexte && erreurRetentable(e)) {
       if (delai > 3000) throw e; // quota long : la cascade change de modele
       if (tentable(b)) {

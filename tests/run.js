@@ -218,16 +218,7 @@ async function main() {
     assert(promptTexte().indexOf('Deja') < 0, 'mot de question jamais pris pour un nom');
     ok.push('question sur le nom : nom preserve');
 
-    // 4. Reprise sur quota : 429 puis succes
-    const avant = appels;
-    failProchain = true;
-    const m3 = await envoyer('ca va ?');
-    assert.strictEqual(m3.status, 200, 'reponse apres 429');
-    assert(m3.json.reponses && m3.json.reponses[0].indexOf('Reponse test') >= 0, 'texte present apres reprise');
-    assert(appels - avant >= 2, 'la requete a ete retentee');
-    ok.push('reprise sur 429 (2 appels)');
-
-    // 5. Historique compact
+    // 4. Historique compact
     const fHist = path.join(dirUid, 'historique_mode2.json');
     assert(fs.existsSync(fHist), 'historique ecrit sur disque');
     const brut = fs.readFileSync(fHist, 'utf8');
@@ -235,20 +226,20 @@ async function main() {
     assert(JSON.parse(brut).length >= 3, 'historique lisible');
     ok.push('historique compact');
 
-    // 6. Anniversaire : appris au meme message, annonce si proche
+    // 5. Anniversaire : appris au meme message, annonce si proche
     const dans10 = new Date(Date.now() + 10 * 86400000);
     await envoyer('mon anniversaire est le ' + dans10.getDate() + ' ' + MOIS[dans10.getMonth()]);
     assert(promptTexte().indexOf('ANNIVERSAIRE') >= 0, 'anniversaire detecte et annonce');
     assert(promptTexte().indexOf('dans 10 jours') >= 0, 'denombrement des jours');
     ok.push('anniversaire (dans 10 jours)');
 
-    // 7. Promesse : "rappelle-moi de..." est retenu et injecte
+    // 6. Promesse : "rappelle-moi de..." est retenu et injecte
     await envoyer("rappelle-moi de t'envoyer ma photo demain");
     assert(promptTexte().indexOf('PROMESSES') >= 0, 'promesse retenue');
     assert(promptTexte().indexOf('photo') >= 0, 'contenu de la promesse');
     ok.push('promesse retenue');
 
-    // 8. Extraction par le modele (regex seules : aucune correspondance)
+    // 7. Extraction par le modele (regex seules : aucune correspondance)
     const avantExtraction = nbExtractions;
     await envoyer("au fait je crois que je ne t'ai pas dit, c'est Maeva");
     // Tache de fond : la requete part juste apres la reponse, puis l'ecriture
@@ -263,12 +254,12 @@ async function main() {
     await envoyer('super, et tu as bien tout retenu ?');
     const memoireTexte = fs.existsSync(fMemoire) ? fs.readFileSync(fMemoire, 'utf8') : '(absent)';
     assert(promptTexte().indexOf('Maeva') >= 0,
-      'fait extrait par le modele injecte — memoire: ' + JSON.stringify(memoireTexte));
+      'fait extrait par le modele injecte â€” memoire: ' + JSON.stringify(memoireTexte));
     assert(promptTexte().indexOf('Bordeaux') >= 0,
-      'second fait extrait — memoire: ' + JSON.stringify(memoireTexte));
+      'second fait extrait â€” memoire: ' + JSON.stringify(memoireTexte));
     ok.push('extraction par le modele (Maeva, Bordeaux)');
 
-    // 9. Resume de conversation : les anciens echanges sont plies puis relus
+    // 8. Resume de conversation : les anciens echanges sont plies puis relus
     await condition(() => dernierResume, 4000, 'pliage du resume demande au modele');
     const fResume = path.join(dirUid, 'resume_mode2.json');
     await condition(() => fs.existsSync(fResume), 4000, 'fichier resume cree');
@@ -280,12 +271,23 @@ async function main() {
     assert(promptTexte().indexOf('foot') >= 0, 'contenu du resume present');
     ok.push('resume de conversation (couverts=' + resume.couverts + ')');
 
-    // 10. Mode 1 (EGO) fonctionne aussi
+    // 9. Mode 1 (EGO) fonctionne aussi
     const e1 = await requete(PORT_APP, '/send', 'POST', 'msg=salut&mode=1', h);
     assert.strictEqual(e1.status, 200);
     ok.push('mode 1 EGO ok');
 
-    // 10bis. Quota reel Google : on ne patiente pas 45 s, la cascade change
+    // 10. Reprise sur quota : 429 puis succes. Place ici (et non au debut) :
+    //     un 429 met les taches de fond en veille 60 s, on ne veut pas
+    //     bloquer les tests d'extraction et de resume qui viennent avant.
+    const avant = appels;
+    failProchain = true;
+    const m3 = await envoyer('ca va ?');
+    assert.strictEqual(m3.status, 200, 'reponse apres 429');
+    assert(m3.json.reponses && m3.json.reponses[0].indexOf('Reponse test') >= 0, 'texte present apres reprise');
+    assert(appels - avant >= 2, 'la requete a ete retentee');
+    ok.push('reprise sur 429 (2 appels)');
+
+    // 11. Quota reel Google : on ne patiente pas 45 s, la cascade change
     //       de modele (chaque modele a son propre quota).
     failQuota = true;
     const q1 = await envoyer('bonjour une deuxieme fois');
@@ -296,7 +298,7 @@ async function main() {
       'autre modele utilise (quota=' + modeleQuota + ', reponse=' + modeleReponse + ')');
     ok.push('quota Google : cascade sur ' + modeleReponse + ' sans attendre 45 s');
 
-    // 10ter. Les taches de fond attendent la rechargement de la fenetre de
+    // 12. Les taches de fond attendent le rechargement de la fenetre de
     //        quota au lieu de crever le quota une seconde fois.
     const avantExtQuota = nbExtractions;
     await envoyer('un petit nom pour ce joli oiseau bleu');
@@ -305,7 +307,7 @@ async function main() {
       'extraction en veille apres quota (recues=' + nbExtractions + ')');
     ok.push('taches de fond en veille apres un 429');
 
-    // 11. Journal des erreurs : visible par l'admin
+    // 13. Journal des erreurs : visible par l'admin
     const login = await requete(PORT_APP, '/login', 'POST', 'pseudo=admin&mdp=%40clotaire%232012');
     assert(login.json && login.json.ok, 'login admin: ' + login.texte.substring(0, 120));
     const logs = await requete(PORT_APP, '/admin/logs', 'GET', null,
@@ -315,12 +317,12 @@ async function main() {
     ok.push('journal erreurs: ' + logs.json.lignes.length + ' ligne(s)'
       + (logs.json.lignes.length ? ' -> ' + JSON.stringify(logs.json.lignes[0]) : ''));
 
-    // 12. Fichiers sensibles non servis
+    // 14. Fichiers sensibles non servis
     const fuite = await requete(PORT_APP, '/logs/erreurs.log', 'GET');
     assert.strictEqual(fuite.status, 404, 'logs non servis en public');
     ok.push('logs non exposes publiquement');
 
-    // 13. Compat : ancien format API_URL (URL complete avec :generateContent)
+    // 15. Compat : ancien format API_URL (URL complete avec :generateContent)
     const port2 = librePort();
     const env2 = Object.assign({}, env, { PORT: String(port2),
       API_URL: BASE_MOCK + '/models/modele-test:generateContent' });
