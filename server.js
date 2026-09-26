@@ -85,7 +85,9 @@ let config = {
   memoire_extraction: true
 };
 
-const FALLBACK_MODELS = ['gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
+// gemini-2.5-flash n'existe plus pour les nouveaux comptes Google
+// ("no longer available to new users") : on le remplace par 3.8-flash.
+const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.7-flash'];
 
 // Env vars first
 if (process.env.API_KEY) config.api_key = process.env.API_KEY;
@@ -614,20 +616,50 @@ function tentable(budget) {
   return true;
 }
 
+// Google precise la vraie duree d'attente dans le 429 :
+// "Please retry in 45.411629042s". 0 si le message ne le dit pas.
+function delaiIndique(e) {
+  const m = e && e.message && e.message.match(/retry in\s+(\d+(?:\.\d+)?)\s*s/i);
+  return m ? Math.round(parseFloat(m[1]) * 1000) : 0;
+}
+
+// Dernier quota reel vu (pour garder les taches de fond hors du chemin).
+// Le quota gratuit se recharge en 1 minute.
+let dernierQuota = 0;
+const QUOTA_FENETRE = 60000;
+
+// Les taches de fond (resume, extraction) ajoutent des appels par message :
+// juste apres un 429, on attend la recharger de la fenetre plutot que de
+// crever a nouveau le quota et de voler les requetes de la reponse.
+function reporterTache(lancer) {
+  const ecart = Date.now() - dernierQuota;
+  const delai = ecart >= QUOTA_FENETRE ? 0 : QUOTA_FENETRE - ecart;
+  if (delai <= 0) { lancer(); return; }
+  setTimeout(lancer, delai);
+}
+
 function attendre(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 // --- Reponse classique : tout d'un coup (repli si le flux echoue) ---
-async function modeleClassique(modele, contents, budget) {
+// `patient` : appel en tache de fond, il peut attendre le delai demande par
+// Google ; sinon on laisse la cascade changer de modele (chaque modele a son
+// propre quota) plutot que de faire patienter l'utilisateur 45 secondes.
+async function modeleClassique(modele, contents, budget, patient) {
   const sansReflexion = !reflexionRefusee;
   const b = budget || { n: 1 };
   try {
     return await modeleClassiqueBrut(modele, contents, sansReflexion);
   } catch (e) {
     if (e && e.reflexion) return modeleClassiqueBrut(modele, contents, false);
-    if (erreurRetentable(e) && tentable(b)) {
-      loggerErreur('gemini', modele + ' -> HTTP ' + (e.statusCode || e.code || '?') + ' ' + e.message + ' (nouvelle tentative)');
-      await attendre(600);
-      return modeleClassiqueBrut(modele, contents, sansReflexion);
+    const delai = delaiIndique(e);
+    if (delai) dernierQuota = Date.now();
+    if (erreurRetentable(e)) {
+      if (!patient && delai > 3000) throw e; // quota long : autre modele
+      if (tentable(b)) {
+        loggerErreur('gemini', modele + ' -> HTTP ' + (e.statusCode || e.code || '?') + ' ' + e.message + ' (nouvelle tentative)');
+        await attendre(Math.min(delai || 600, patient ? 60000 : 3000));
+        return modeleClassiqueBrut(modele, contents, sansReflexion);
+      }
     }
     throw e;
   }
@@ -669,10 +701,15 @@ async function modeleEnFlux(modele, contents, onDelta, budget) {
     return await modeleEnFluxBrut(modele, contents, surDelta, sansReflexion);
   } catch (e) {
     if (e && e.reflexion) return modeleEnFluxBrut(modele, contents, surDelta, false);
-    if (!envoyaDuTexte && erreurRetentable(e) && tentable(b)) {
-      loggerErreur('gemini', modele + ' -> flux HTTP ' + (e.statusCode || e.code || '?') + ' ' + e.message + ' (nouvelle tentative)');
-      await attendre(600);
-      return modeleEnFluxBrut(modele, contents, surDelta, sansReflexion);
+    const delai = delaiIndique(e);
+    if (delai) dernierQuota = Date.now();
+    if (!envoyaDuTexte && erreurRetentable(e)) {
+      if (delai > 3000) throw e; // quota long : la cascade change de modele
+      if (tentable(b)) {
+        loggerErreur('gemini', modele + ' -> flux HTTP ' + (e.statusCode || e.code || '?') + ' ' + e.message + ' (nouvelle tentative)');
+        await attendre(Math.min(delai || 600, 3000));
+        return modeleEnFluxBrut(modele, contents, surDelta, sansReflexion);
+      }
     }
     throw e;
   }
@@ -1111,7 +1148,7 @@ async function majResume(uid, mode) {
       (anterieur ? 'Resume deja etabli (le completer sans rien perdre d\'important) :\n' + anterieur + '\n\n' : '') +
       'Suite de la conversation :\n' + donnees;
     const brut = await modeleClassique(config.api_model,
-      [{ role: 'user', parts: [{ text: consigne }] }], { n: 1 });
+      [{ role: 'user', parts: [{ text: consigne }] }], { n: 1 }, true);
     const propre = nettoyerReponse(String(brut || '')).trim();
     if (propre && propre !== '...') {
       ecrireResume(uid, mode, { texte: propre, couverts: debut + bout.length });
@@ -1158,7 +1195,7 @@ async function extraireAvecModele(uid, msg) {
       'si une information est deja connue et identique, ne la repets pas ; si le message ne contient aucun fait, reponds {}.\n' +
       'Deja connu :\n' + (connu.length ? connu.join('\n') : '(rien)') + '\n\nMessage :\n' + msg;
     const brut = await modeleClassique(config.api_model,
-      [{ role: 'user', parts: [{ text: consigne }] }], { n: 1 });
+      [{ role: 'user', parts: [{ text: consigne }] }], { n: 1 }, true);
     const texte = String(brut || '').trim();
     const debut = texte.indexOf('{');
     const fin = texte.lastIndexOf('}');
@@ -1675,11 +1712,12 @@ app.post('/send', async (req, res) => {
   sauvegarderHistorique(auth.uid, mode, hist);
 
   // Taches de fond mode 2, lancees APRES la reponse : elles ne rallongent
-  // jamais l'attente de l'utilisateur.
+  // jamais l'attente de l'utilisateur. Juste apres un 429, reporterTache
+  // laisse la fenetre de quota gratuite se recharger avant de les lancer.
   if (mode === '2') {
-    majResume(auth.uid, '2').catch(e => loggerErreur('resume', e.message));
+    reporterTache(() => majResume(auth.uid, '2').catch(e => loggerErreur('resume', e.message)));
     if (config.memoire_extraction && !dejaAppris && nbMots >= 6) {
-      extraireAvecModele(auth.uid, msg).catch(e => loggerErreur('extraction', e.message));
+      reporterTache(() => extraireAvecModele(auth.uid, msg).catch(e => loggerErreur('extraction', e.message)));
     }
   }
 

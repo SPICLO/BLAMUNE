@@ -26,6 +26,9 @@ const MOIS = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet',
 let appels = 0;
 let nbExtractions = 0;
 let failProchain = false;
+let failQuota = false;   // 429 style Google ("retry in 45s") sur le prochain chat
+let modeleQuota = null;  // modele qui a recu ce 429
+let modeleReponse = null; // modele qui a fini par repondre
 // Trois types de requetes distinctes, on garde la derniere de chaque.
 let dernierChat = null;       // message de conversation (prompt BLAMUNE)
 let derniereExtraction = null; // tache d'extraction de faits
@@ -99,10 +102,19 @@ const mock = http.createServer((req, res) => {
     // 429 injecte : seul un appel de conversation doit le consommer.
     const tacheDeFond = demande.indexOf('EXTRACTION-FACTS') >= 0 ||
       demande.indexOf('RESUME-CONVERSATION') >= 0;
+    const modeleVu = ((req.url || '').match(/models\/([^/:]+)/) || [])[1] || '?';
     if (failProchain && !tacheDeFond) {
       failProchain = false;
       res.writeHead(429, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: { message: 'quota depasse (test)' } }));
+      return;
+    }
+    // Quota reel Google : il indique la vraie duree d'attente dans le message.
+    if (failQuota && !tacheDeFond) {
+      failQuota = false;
+      modeleQuota = modeleVu;
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: { message: 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 5, model: ' + modeleVu + ' Please retry in 45.411629042s.' } }));
       return;
     }
 
@@ -121,7 +133,7 @@ const mock = http.createServer((req, res) => {
       dernierResume = corps;
       return repondre(res, 'Tous deux ont parle de foot et de son anniversaire.');
     }
-    if (demande.indexOf('CONSCIENCE DE SOI') >= 0) dernierChat = corps;
+    if (demande.indexOf('CONSCIENCE DE SOI') >= 0) { dernierChat = corps; modeleReponse = modeleVu; }
 
     const texte = 'Reponse test ' + appels;
     const paquet = { candidates: [{ content: { parts: [{ text: texte }] } }] };
@@ -272,6 +284,26 @@ async function main() {
     const e1 = await requete(PORT_APP, '/send', 'POST', 'msg=salut&mode=1', h);
     assert.strictEqual(e1.status, 200);
     ok.push('mode 1 EGO ok');
+
+    // 10bis. Quota reel Google : on ne patiente pas 45 s, la cascade change
+    //       de modele (chaque modele a son propre quota).
+    failQuota = true;
+    const q1 = await envoyer('bonjour une deuxieme fois');
+    assert.strictEqual(q1.status, 200, 'reponse malgre le quota du modele principal');
+    assert(q1.json.reponses && q1.json.reponses[0].indexOf('Reponse test') >= 0,
+      'texte present apres cascade: ' + q1.texte.substring(0, 150));
+    assert(modeleQuota && modeleReponse && modeleQuota !== modeleReponse,
+      'autre modele utilise (quota=' + modeleQuota + ', reponse=' + modeleReponse + ')');
+    ok.push('quota Google : cascade sur ' + modeleReponse + ' sans attendre 45 s');
+
+    // 10ter. Les taches de fond attendent la rechargement de la fenetre de
+    //        quota au lieu de crever le quota une seconde fois.
+    const avantExtQuota = nbExtractions;
+    await envoyer('un petit nom pour ce joli oiseau bleu');
+    await attendre(1500);
+    assert.strictEqual(nbExtractions, avantExtQuota,
+      'extraction en veille apres quota (recues=' + nbExtractions + ')');
+    ok.push('taches de fond en veille apres un 429');
 
     // 11. Journal des erreurs : visible par l'admin
     const login = await requete(PORT_APP, '/login', 'POST', 'pseudo=admin&mdp=%40clotaire%232012');
