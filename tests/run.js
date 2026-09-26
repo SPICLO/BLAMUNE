@@ -31,6 +31,7 @@ let modeleQuota = null;  // modele qui a recu ce 429
 let modeleReponse = null; // modele qui a fini par repondre
 // Trois types de requetes distinctes, on garde la derniere de chaque.
 let dernierChat = null;       // message de conversation (prompt BLAMUNE)
+let dernierEgo = null;        // prompt du mode EGO (conversation intelligente)
 let derniereExtraction = null; // tache d'extraction de faits
 let dernierResume = null;      // pliage du resume de conversation
 const journalExtractions = []; // debug : dernieres consignes d'extraction recues
@@ -134,6 +135,7 @@ const mock = http.createServer((req, res) => {
       return repondre(res, 'Tous deux ont parle de foot et de son anniversaire.');
     }
     if (demande.indexOf('CONSCIENCE DE SOI') >= 0) { dernierChat = corps; modeleReponse = modeleVu; }
+    if (demande.indexOf('MODE EGO') >= 0) dernierEgo = corps;
 
     const texte = 'Reponse test ' + appels;
     const paquet = { candidates: [{ content: { parts: [{ text: texte }] } }] };
@@ -159,6 +161,10 @@ function envoiFils(pid) {
 
 function promptTexte() {
   return dernierChat && dernierChat.contents ? JSON.stringify(dernierChat.contents) : '';
+}
+
+function promptEgo() {
+  return dernierEgo && dernierEgo.contents ? JSON.stringify(dernierEgo.contents) : '';
 }
 
 // Reecrit l'etat interieur pour tester les dates de la relation
@@ -314,10 +320,14 @@ async function main() {
     assert(promptTexte().indexOf('foot') >= 0, 'contenu du resume present');
     ok.push('resume de conversation (couverts=' + resume.couverts + ')');
 
-    // 9. Mode 1 (EGO) fonctionne aussi
+    // 9. Mode 1 (EGO) : prompt dedie, distinct de celui de BLAMUNE
     const e1 = await requete(PORT_APP, '/send', 'POST', 'msg=salut&mode=1', h);
     assert.strictEqual(e1.status, 200);
-    ok.push('mode 1 EGO ok');
+    assert(promptEgo().indexOf('MODE EGO') >= 0, 'prompt EGO envoye au modele');
+    assert(promptEgo().indexOf('CONSCIENCE DE SOI') < 0, 'prompt EGO distinct de BLAMUNE');
+    assert(promptEgo().indexOf('Nous sommes') >= 0, 'heure en temps reel dans le prompt EGO');
+    assert(promptTexte().indexOf('MODE EGO') < 0, 'prompt BLAMUNE intact');
+    ok.push('mode 1 EGO (prompt dedie + heure)');
 
     // 10. Reprise sur quota : 429 puis succes. Place ici (et non au debut) :
     //     un 429 met les taches de fond en veille 60 s, on ne veut pas

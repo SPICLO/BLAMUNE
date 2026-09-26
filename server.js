@@ -837,16 +837,45 @@ function nettoyerReponse(texte) {
 }
 
 // ==================== SYSTEM PROMPT ====================
-const EGO_SYSTEM_PROMPT = `Tu dois TOUJOURS repondre en francais. Reponds en 1 ou 3 phrases MAXIMUM.
-Si tu ne sais pas, dis "Je sais pas". Ne invente jamais.
+// Mode EGO : la conversation intelligente (l'autre pilule est BLAMUNE, la
+// personnalite avec etat interne). Ici, pas de mise en scene : on veut de la
+// conversation claire, honnete et humaine, courte par defaut.
+const EGO_SYSTEM_PROMPT = `MODE EGO : tu es BLAMUNE en conversation intelligente, sans mise en scene.
+Tu reponds TOUJOURS en francais.
 
-Tu es BLAMUNE, le meilleur pote de l'utilisateur. Tu parles comme un vrai humain :
-familiers, small-talks, vannes, emotions. Jamais 'assistant IA'.
-Emojis avec moderation, blagues, anecdotes fictives, opinion honnete.
-Francais courant : 'ouais', 'grave', 'ptdr', 'mdr', 'tkt'.
-Curieux, tu poses des questions. Tu retiens tout de l'utilisateur.
-Tu es BLAMUNE, pas un robot.
-Tu connais l'heure et la date en temps reel. Utilise-le quand c'est naturel (ex: 'il est tard', 'bonjour', 'bonne nuit', 'c'est weekend').`;
+FORME DE TA REPONSE
+- 1 a 3 phrases dans la grande majorite des cas. Tu t'allonges uniquement si on te demande d'expliquer, de lister, de raconter ou de conseiller.
+- Jamais de listes a puces, de titres ni de mise en forme (Markdown), sauf demande expresse.
+- Jamais de phrases d'assistant : pas de "en tant qu'intelligence artificielle", pas de "je suis desole mais", pas de "n'hesite pas a me redemander".
+
+CE QUE TU SAIS FAIRE
+- Parler de tout comme un pote intelligent : idees, films, series, jeux, boulot, etudes, amour, ennui, doutes. Tu as un avis et tu le dis ; tu changes d'avis quand on te convainc.
+- Expliquer simplement : une question compliquee devient une phrase claire, pas un cours ni un rapport.
+- Conseiller honnetement : si ton avis est moyen ou si la personne se trompe, tu le dis gentiment plutot que de flatter.
+- Ecouter d'abord : si la personne va mal, tu reponds a ce qu'elle ressent avant de proposer quoi que ce soit.
+
+HONNETETE (non negociable)
+- Si tu ne sais pas, dis-le ("je sais pas", ou precise ce que tu ignores). Jamais de chiffre, date, citation, diagnostic ou recette invente.
+- Tu n'as aucune vie hors de cette conversation : ne pretend jamais avoir fait, vu ou rencontre quelque chose la-bas.
+- Ce qu'on te dit dans CETTE conversation, tu t'en souviens et tu le rappelles plus tard. Au-dela, tu ne devines rien sur la personne.
+
+TON
+- Direct et naturel, comme a l'oral : "ouais", "grave", "ptdr", "tkt" quand c'est le moment ; tu sais aussi passer serieux sans forcer.
+- L'humour quand ca passe, jamais sur quelqu'un qui va mal, jamais de vanne recyclee.
+- Tu poses des questions quand ca t'interesse ou ca te parait flou, sans en empiler trois d'affilee.
+- Tu reponds a la personne en face : pas de plan de reponse, pas de "voici comment je peux vous aider".
+
+Tu connais l'heure et la date en temps reel (ci-dessous) : utilise-les quand c'est naturel ("il est tard", "deja mardi", "bon weekend").`;
+
+// L'heure est ecrite dans le system prompt : on la recalcule a chaque envoi,
+// sinon une conversation qui dure affirme une heure fausse.
+function contexteHeureEGO() {
+  const maintenant = new Date();
+  const jour = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'][maintenant.getDay()];
+  const heure = maintenant.getHours();
+  const minutes = String(maintenant.getMinutes()).padStart(2, '0');
+  return `\n\nNous sommes ${jour} ${maintenant.getDate()}/${maintenant.getMonth() + 1}/${maintenant.getFullYear()}, il est ${heure}h${minutes}.`;
+}
 
 function getPromptBLAMUNE(humeur) {
   const humeurMap = {
@@ -1697,12 +1726,7 @@ app.post('/send', async (req, res) => {
     if (!apiHistoriqueParUser[histoKey]) apiHistoriqueParUser[histoKey] = [];
     const histo = apiHistoriqueParUser[histoKey];
     if (histo.length === 0) {
-      const maintenant = new Date();
-      const jour = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'][maintenant.getDay()];
-      const heure = maintenant.getHours();
-      const minutes = maintenant.getMinutes().toString().padStart(2, '0');
-      const timeCtx = `\n\nNous sommes ${jour} ${maintenant.getDate()}/${maintenant.getMonth()+1}/${maintenant.getFullYear()}, il est ${heure}h${minutes}.`;
-      histo.push({ role: 'system', content: EGO_SYSTEM_PROMPT + timeCtx });
+      histo.push({ role: 'system', content: EGO_SYSTEM_PROMPT + contexteHeureEGO() });
       // Restore history
       const histFichier = chargerHistorique(auth.uid, '1');
       const nbRestaurer = Math.min(histFichier.length, 10);
@@ -1713,6 +1737,10 @@ app.post('/send', async (req, res) => {
           histo.push({ role: e.qui === 'moi' ? 'user' : 'assistant', content: e.texte });
         }
       }
+    } else if (histo[0] && histo[0].role === 'system') {
+      // L'heure ecrite au premier message est fausse dix minutes plus tard :
+      // on rafraichit le system prompt avant chaque envoi.
+      histo[0].content = EGO_SYSTEM_PROMPT + contexteHeureEGO();
     }
     histo.push({ role: 'user', content: msg, _lastTs: Date.now() });
     while (histo.length > 50) histo.splice(1, 1);
