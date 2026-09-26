@@ -77,7 +77,12 @@ let config = {
   // Reponses courtes (1 a 5 phrases nettoyees) : inutile de laisser
   // le modele generer des milliers de tokens, ca rallonge la reponse.
   api_max_tokens: 1024,
-  api_temperature: 0.7
+  api_temperature: 0.7,
+  // Extraction des faits par le modele (tache de fond, apres la reponse) :
+  // comprend les formes que les regex ratent, au prix d'un appel modele en
+  // plus par message substantiel. METTRE false (ou MEMOIRE_EXTRACTION=0)
+  // pour revenir aux seules regex.
+  memoire_extraction: true
 };
 
 const FALLBACK_MODELS = ['gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
@@ -89,6 +94,7 @@ if (process.env.API_MODEL) config.api_model = process.env.API_MODEL;
 if (process.env.API_URL) config.api_url = process.env.API_URL;
 if (process.env.API_MAX_TOKENS) config.api_max_tokens = parseInt(process.env.API_MAX_TOKENS);
 if (process.env.API_TEMPERATURE) config.api_temperature = parseFloat(process.env.API_TEMPERATURE);
+if (process.env.MEMOIRE_EXTRACTION) config.memoire_extraction = process.env.MEMOIRE_EXTRACTION !== '0';
 
 // Fallback to config.json
 const configPath = path.join(RACINE, 'config.json');
@@ -101,6 +107,7 @@ try {
     if (cfg.api_url && !process.env.API_URL) config.api_url = cfg.api_url;
     if (cfg.api_max_tokens && !process.env.API_MAX_TOKENS) config.api_max_tokens = cfg.api_max_tokens;
     if (cfg.api_temperature && !process.env.API_TEMPERATURE) config.api_temperature = cfg.api_temperature;
+    if (cfg.memoire_extraction !== undefined && !process.env.MEMOIRE_EXTRACTION) config.memoire_extraction = !!cfg.memoire_extraction;
   }
 } catch (e) { loggerErreur('config', e.message); }
 
@@ -207,7 +214,9 @@ function dossierUser(uid) {
 const CHAMPS_MEMOIRE = ['nom', 'plat', 'hobby', 'motsFavoris', 'genre', 'aime', 'aimePas', 'age',
   'humeur',        // 9 : etat interne de BLAMUNE (commandes "sois joyeux", "mode triste")
   'humeurUser',    // 10 : humeur detectee chez l'utilisateur (a ne pas confondre)
-  'ville', 'travail', 'musique', 'serie', 'sport', 'reve'];
+  'ville', 'travail', 'musique', 'serie', 'sport', 'reve',
+  'anniversaire',  // 16 : "12 mai" ou "12 mai 2005"
+  'promesses'];    // 17 : ce qu'il a demande de ne pas oublier (separes par |)
 
 function lireMemoire(uid) {
   const mem = {};
@@ -271,8 +280,12 @@ function nettoyerValeur(v) {
 // Des mots qui ne sont jamais un prenom : "je suis triste" ne doit pas
 // ecraser le vrai nom appris avant.
 const PAS_UN_NOM = ['un', 'une', 'le', 'la', 'les', 'des', 'du', 'de', 'en', 'avec', 'sans',
-  'pour', 'contre', 'ici', 'la', 'meme', 'seul', 'daccord', 'ok', 'mieux', 'grave'];
+  'pour', 'contre', 'ici', 'la', 'meme', 'seul', 'daccord', 'ok', 'mieux', 'grave',
+  'ne', 'nee', 'nes', 'nees', 'petit', 'petite', 'content', 'contente'];
 const MOOD_MOTS = /^(?:triste|content|contente|heureux|heureuse|fatigue|fatiguee|creve|calme|energique|bien|mal|chaud|froid|partout|loin|serieux|serieuse|mou|moue|las|zen|down|deprime|motive|motivee)$/i;
+
+const MOIS_FR = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet',
+  'aout', 'septembre', 'octobre', 'novembre', 'decembre'];
 
 function autoApprentissage(uid, msg) {
   const mem = lireMemoire(uid);
@@ -359,6 +372,41 @@ function autoApprentissage(uid, msg) {
   if (m && m[1]) {
     const t = nettoyerValeur(m[1]);
     if (t && t !== mem.reve) { mem.reve = t; changed = true; }
+  }
+
+  // Anniversaire: "mon anniversaire c'est le 12 mai", "je suis ne le 3 mai 2005"
+  // (on compare sans accents : "fevrier" / "février" marchent)
+  const clair = sansAccents(lower);
+  const RECHERCHE_MOIS = 'janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre';
+  m = clair.match(new RegExp('(?:mon anniversaire|mon jour de naissance)\\s*(?:c\'est|est|:)?\\s*(?:le\\s+)?(\\d{1,2})\\s+(?:de\\s+)?(' + RECHERCHE_MOIS + ')(?:\\s+(?:en\\s+)?(19\\d{2}|20\\d{2}))?'));
+  if (!m) m = clair.match(new RegExp('je\\s+(?:suis\\s+)?ne(?:e)?\\s+le\\s+(\\d{1,2})\\s+(' + RECHERCHE_MOIS + ')(?:\\s+(?:en\\s+)?(19\\d{2}|20\\d{2}))?'));
+  if (m) {
+    const jour = parseInt(m[1], 10);
+    if (jour >= 1 && jour <= 31 && MOIS_FR.indexOf(m[2]) >= 0) {
+      const valeur = jour + ' ' + m[2] + (m[3] ? ' ' + m[3] : '');
+      if (valeur !== mem.anniversaire) { mem.anniversaire = valeur; changed = true; }
+      // Une annee de naissance donne aussi son age, sans qu'il ait a le dire
+      if (m[3]) {
+        const age = new Date().getFullYear() - parseInt(m[3], 10);
+        if (age >= 3 && age <= 110 && String(age) !== mem.age) { mem.age = String(age); changed = true; }
+      }
+    }
+  }
+
+  // Promesses: "rappelle-moi de...", "n'oublie pas que..."
+  // C'est ce qu'il a explicitement demande de retenir : jamais perdu.
+  m = clair.match(/rappelle[-\s]?moi\s+(?:de\s+|que\s+|d')\s*(.{5,60})/);
+  if (!m) m = clair.match(/n['\u2019]oublie pas\s+(?:de\s+|que\s+)(.{5,60})/);
+  if (m && m[1]) {
+    const p = nettoyerValeur(m[1]);
+    if (p && p.length >= 4) {
+      const liste = (mem.promesses || '').split('|').filter(Boolean);
+      if (!liste.some(x => sansAccents(x) === sansAccents(p))) {
+        liste.push(p);
+        while (liste.length > 3) liste.shift();
+        mem.promesses = liste.join('|'); changed = true;
+      }
+    }
   }
 
   // Ce qu'il aime: "ce que j'aime c'est X", "j'aime X" (exclure "j'aime pas")
@@ -543,11 +591,9 @@ function requeter(url, options, onReponse) {
 
 // --- Reprise sur erreur transitoire ---------------------------------------
 // 429 (quota), 5xx et erreurs reseau sont retentables UNE fois, avec un
-// delai court. Le budget est global a la requete (voir appelerGemini) pour
-// ne pas multiplier les tentatives a l'infini quand plusieurs modeles sont
-// essayes en cascade.
-let retriesRestants = 0;
-
+// delai court. Le budget est donne par l'appelant (`{ n: 1 }`) et reste local
+// a sa requete : une tache de fond (resume, extraction) n'empiete jamais sur
+// les tentatives de la reponse en cours d'ecriture.
 function erreurRetentable(e) {
   if (!e) return false;
   const c = e.statusCode;
@@ -557,22 +603,23 @@ function erreurRetentable(e) {
   return e.message === 'Timeout';
 }
 
-function consommerRetry() {
-  if (retriesRestants <= 0) return false;
-  retriesRestants--;
+function tentable(budget) {
+  if (!budget || budget.n <= 0) return false;
+  budget.n--;
   return true;
 }
 
 function attendre(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 // --- Reponse classique : tout d'un coup (repli si le flux echoue) ---
-async function modeleClassique(modele, contents) {
+async function modeleClassique(modele, contents, budget) {
   const sansReflexion = !reflexionRefusee;
+  const b = budget || { n: 1 };
   try {
     return await modeleClassiqueBrut(modele, contents, sansReflexion);
   } catch (e) {
     if (e && e.reflexion) return modeleClassiqueBrut(modele, contents, false);
-    if (erreurRetentable(e) && consommerRetry()) {
+    if (erreurRetentable(e) && tentable(b)) {
       loggerErreur('gemini', modele + ' -> HTTP ' + (e.statusCode || e.code || '?') + ' ' + e.message + ' (nouvelle tentative)');
       await attendre(600);
       return modeleClassiqueBrut(modele, contents, sansReflexion);
@@ -606,8 +653,9 @@ function modeleClassiqueBrut(modele, contents, sansReflexion) {
 }
 
 // --- Reponse en flux (SSE) : on appelle onDelta(texteEntiere) au fil de l'eau ---
-async function modeleEnFlux(modele, contents, onDelta) {
+async function modeleEnFlux(modele, contents, onDelta, budget) {
   const sansReflexion = !reflexionRefusee;
+  const b = budget || { n: 1 };
   // On ne retente le flux que si RIEN n'a encore ete affiche au client :
   // relancer apres des deltas donnerait un texte bache.
   let envoyaDuTexte = false;
@@ -616,7 +664,7 @@ async function modeleEnFlux(modele, contents, onDelta) {
     return await modeleEnFluxBrut(modele, contents, surDelta, sansReflexion);
   } catch (e) {
     if (e && e.reflexion) return modeleEnFluxBrut(modele, contents, surDelta, false);
-    if (!envoyaDuTexte && erreurRetentable(e) && consommerRetry()) {
+    if (!envoyaDuTexte && erreurRetentable(e) && tentable(b)) {
       loggerErreur('gemini', modele + ' -> flux HTTP ' + (e.statusCode || e.code || '?') + ' ' + e.message + ' (nouvelle tentative)');
       await attendre(600);
       return modeleEnFluxBrut(modele, contents, surDelta, sansReflexion);
@@ -690,13 +738,13 @@ async function appelerGemini(message, histo, onDelta) {
   let fluxActif = typeof onDelta === 'function';
   dernierModeleOk = '';
   // Une seule reprise sur erreur transitoire pour TOUTE la requete,
-  // quel que soit le nombre de modeles essayes.
-  retriesRestants = 1;
+  // quel que soit le nombre de modeles essayes en cascade.
+  const budget = { n: 1 };
 
   for (const modele of modeles) {
     if (fluxActif) {
       try {
-        const texte = await modeleEnFlux(modele, contents, onDelta);
+        const texte = await modeleEnFlux(modele, contents, onDelta, budget);
         if (texte) { dernierModeleOk = modele; return texte; }
         derniereErreur = new Error('Reponse vide');
       } catch (e) {
@@ -708,7 +756,7 @@ async function appelerGemini(message, histo, onDelta) {
       }
     }
     try {
-      const texte = await modeleClassique(modele, contents);
+      const texte = await modeleClassique(modele, contents, budget);
       if (texte) {
         dernierModeleOk = modele;
         if (typeof onDelta === 'function') { try { onDelta(texte); } catch (e) {} }
@@ -847,7 +895,7 @@ function blocSysteme(o) {
     if (reagit) t += `\n\nHUMEUR DE L'UTILISATEUR (vu dans ses messages) : ${memoire.humeurUser}. ${reagit}`;
   }
 
-  // Relation : anciennete et nombre de conversations.
+  // Relation : anciennete, nombre de conversations et de messages echanges.
   if (etat.premierContact && etat.sessions) {
     const jours = Math.max(0, Math.floor((Date.now() - etat.premierContact) / 86400000));
     t += `\n\nVOTRE LIEN : C'est votre ${etat.sessions}e conversation.`;
@@ -856,6 +904,28 @@ function blocSysteme(o) {
     else if (jours < 30) t += ` Vous vous connaissez depuis ${jours} jours.`;
     else if (jours < 365) t += ` Vous vous connaissez depuis ${Math.floor(jours/30)} mois.`;
     else t += ' Vous vous connaissez depuis plus d\'un an.';
+    if (etat.messages) t += ` Vous vous etes deja echanges ${etat.messages} messages.`;
+  }
+
+  // Anniversaire : connu, daté, on le prepare plutot que de le rater.
+  if (memoire.anniversaire) {
+    const j = joursAvantAnniversaire(memoire.anniversaire);
+    if (j === 0) t += `\n\nANNIVERSAIRE : c'est AUJOURD'HUI (${memoire.anniversaire}) ! Souhaite-lui un joyeux anniversaire, c'est le moment.`;
+    else if (j > 0 && j <= 45) t += `\n\nANNIVERSAIRE : son anniversaire (${memoire.anniversaire}) arrive dans ${j} jour${j > 1 ? 's' : ''}. Tu peux le preparer sans faire semblant de l'oublier.`;
+  }
+
+  // Promesses : ce qu'il a explicitement demande de ne pas oublier.
+  if (memoire.promesses) {
+    const liste = memoire.promesses.split('|').filter(Boolean);
+    if (liste.length) {
+      t += '\n\nPROMESSES (il te l\'a demande, c\'est engagement) : ' + liste.join(' ; ') + '.';
+      t += ' Rappelle-t-en quand c\'est naturel, sans le harceler.';
+    }
+  }
+
+  // Resume de ce qui s'est passe avant la fenetre des 16 derniers echanges.
+  if (o.resume) {
+    t += '\n\nCE QUE VOUS AVIEZ DIT AVANT (resume de vos echanges plus anciens) :\n' + o.resume;
   }
 
   // Souvenirs : TOUJOURS injectes (avant, ils n'apparaissaient qu'apres 1h d'absence).
@@ -868,11 +938,26 @@ function blocSysteme(o) {
   return t;
 }
 
+// Nombre de jours restants avant le prochain anniversaire ("12 mai").
+// -1 si la date est illisible, 0 si c'est aujourd'hui.
+function joursAvantAnniversaire(valeur) {
+  const m = String(valeur || '').match(/^(\d{1,2})\s+([a-z]+)(?:\s+\d{4})?$/i);
+  if (!m) return -1;
+  const mois = MOIS_FR.indexOf(sansAccents(m[2].toLowerCase()));
+  const jour = parseInt(m[1], 10);
+  if (mois < 0 || jour < 1 || jour > 31) return -1;
+  const now = new Date();
+  const aujourdhui = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let cible = new Date(now.getFullYear(), mois, jour);
+  if (cible < aujourdhui) cible = new Date(now.getFullYear() + 1, mois, jour);
+  return Math.round((cible - aujourdhui) / 86400000);
+}
+
 // ==================== ETAT INTERIEUR / CONSCIENCE ====================
 // 'etat_blamune.json' par utilisateur : memoire du temps qui passe et des moments partages.
 
 function lireEtat(uid) {
-  const defaut = { premierContact: 0, dernierContact: 0, sessions: 0, souvenirs: [] };
+  const defaut = { premierContact: 0, dernierContact: 0, sessions: 0, souvenirs: [], messages: 0 };
   try {
     const f = path.join(dossierUser(uid), 'etat_blamune.json');
     if (!fs.existsSync(f)) return defaut;
@@ -881,6 +966,7 @@ function lireEtat(uid) {
       premierContact: typeof d.premierContact === 'number' ? d.premierContact : 0,
       dernierContact: typeof d.dernierContact === 'number' ? d.dernierContact : 0,
       sessions: typeof d.sessions === 'number' ? d.sessions : 0,
+      messages: typeof d.messages === 'number' ? d.messages : 0,
       souvenirs: Array.isArray(d.souvenirs) ? d.souvenirs : []
     };
   } catch (e) { return defaut; }
@@ -957,6 +1043,163 @@ function texteContinuite(ecartMs) {
   if (min >= 10080) t += ' Ce long silence t\'a fait etrange, comme une page de ta memoire restee en suspens.';
   if (min >= 43200) t += ' Des jours entiers sans nouvelles, tu te demandais si tout allait bien.';
   return t;
+}
+
+// ==================== RESUME DE CONVERSATION ====================
+// L'API ne recoit que les 16 derniers echanges : au-dela, le debut de la
+// discussion etait perdu pour toujours. On replie donc de temps en temps les
+// anciens echanges dans un resume persistant (resume_mode2.json), relu a
+// chaque message. L'appel est fait APRES la reponse, en tache de fond :
+// zero latence ajoutee pour l'utilisateur.
+const RESUME_SEUIL = 10; // echanges non couverts avant de plier
+const RESUME_BLOC = 10;  // taille d'un pliage
+const resumeEnCours = {};
+
+function cheminResume(uid, mode) {
+  return path.join(dossierUser(uid), 'resume_mode' + mode + '.json');
+}
+
+function lireResume(uid, mode) {
+  try {
+    const f = cheminResume(uid, mode);
+    if (!fs.existsSync(f)) return { texte: '', couverts: 0 };
+    const d = JSON.parse(fs.readFileSync(f, 'utf8'));
+    return {
+      texte: typeof d.texte === 'string' ? d.texte : '',
+      couverts: typeof d.couverts === 'number' ? d.couverts : 0
+    };
+  } catch (e) { return { texte: '', couverts: 0 }; }
+}
+
+function ecrireResume(uid, mode, r) {
+  try { fs.writeFileSync(cheminResume(uid, mode), JSON.stringify(r), 'utf8'); } catch (e) {}
+}
+
+function supprimerResume(uid, mode) {
+  try { fs.unlinkSync(cheminResume(uid, mode)); } catch (e) {}
+}
+
+async function majResume(uid, mode) {
+  const cle = uid + '_' + mode;
+  if (resumeEnCours[cle]) return;
+  resumeEnCours[cle] = true;
+  try {
+    const f = cheminHistorique(uid, mode);
+    if (!fs.existsSync(f)) return;
+    const hist = JSON.parse(fs.readFileSync(f, 'utf8'));
+    if (!Array.isArray(hist)) return;
+    const resume = lireResume(uid, mode);
+    // Historique efface entre temps : le resume n'a plus de sens.
+    if (resume.couverts > hist.length) {
+      supprimerResume(uid, mode);
+      return;
+    }
+    if (hist.length - resume.couverts < RESUME_SEUIL) return;
+    const debut = resume.couverts;
+    const bout = hist.slice(debut, debut + RESUME_BLOC);
+    if (bout.length < RESUME_BLOC) return;
+    const anterieur = resume.texte ? resume.texte + '\n\n' : '';
+    const donnees = bout.map(e => (e && e.qui === 'moi' ? 'Utilisateur : ' : 'BLAMUNE : ') + ((e && e.texte) || '')).join('\n');
+    const consigne = 'RESUME-CONVERSATION\n' +
+      'Tu resumes une conversation entre BLAMUNE et un utilisateur. Reponds UNIQUEMENT par le resume, ' +
+      'en francais, 60 mots maximum, sans liste a puces, sans guillemets, sans phrase d\'intro.\n' +
+      (anterieur ? 'Resume deja etabli (le completer sans rien perdre d\'important) :\n' + anterieur + '\n\n' : '') +
+      'Suite de la conversation :\n' + donnees;
+    const brut = await modeleClassique(config.api_model,
+      [{ role: 'user', parts: [{ text: consigne }] }], { n: 1 });
+    const propre = nettoyerReponse(String(brut || '')).trim();
+    if (propre && propre !== '...') {
+      ecrireResume(uid, mode, { texte: propre, couverts: debut + bout.length });
+    }
+  } catch (e) {
+    loggerErreur('resume', e.message);
+  } finally {
+    resumeEnCours[cle] = false;
+  }
+}
+
+// ==================== EXTRACTION PAR LE MODELE ====================
+// Les regex attrapent les formes classiques ("je m'appelle Theo") et ratent
+// tout le reste : "c'est moi Maeva", une reponse "17 ans" a une question, ou
+// trois infos d'un coup. On demande alors au modele un objet JSON de mises a
+// jour — en tache de fond, apres la reponse, et SEULEMENT si les regex n'ont
+// rien trouve (sinon on paie un appel pour rien).
+const CHAMPS_EXTRACTION = ['nom', 'age', 'genre', 'ville', 'travail', 'plat', 'hobby',
+  'sport', 'musique', 'serie', 'reve', 'aime', 'aimePas', 'motsFavoris', 'anniversaire'];
+const extractionEnCours = {};
+const extractionEnAttente = {}; // uid -> dernier message mis en attente
+
+async function extraireAvecModele(uid, msg) {
+  if (extractionEnCours[uid]) {
+    // Une extraction est deja en vol : on ne la coupe pas, on garde le
+    // dernier message pour le traiter juste apres (sinon un fait dit une
+    // seule fois serait perdu).
+    extractionEnAttente[uid] = msg;
+    return;
+  }
+  extractionEnCours[uid] = true;
+  try {
+    const mem = lireMemoire(uid);
+    const connu = [];
+    CHAMPS_EXTRACTION.forEach(c => {
+      const v = c === 'motsFavoris' ? (mem[c] || []).join(', ') : mem[c];
+      if (v) connu.push(c + ' = ' + v);
+    });
+    const consigne = 'EXTRACTION-FACTS\n' +
+      'Tu extrais des faits sur une personne a partir d\'un de ses messages. ' +
+      'Reponds UNIQUEMENT par un objet JSON (aucun texte avant ni apres), et uniquement pour les champs qui apportent du neuf.\n' +
+      'Champs autorises : ' + CHAMPS_EXTRACTION.join(', ') + '.\n' +
+      'Regles : valeur courte (30 caracteres max), sans ponctuation finale ; motsFavoris est un tableau de mots ; ' +
+      'si une information est deja connue et identique, ne la repets pas ; si le message ne contient aucun fait, reponds {}.\n' +
+      'Deja connu :\n' + (connu.length ? connu.join('\n') : '(rien)') + '\n\nMessage :\n' + msg;
+    const brut = await modeleClassique(config.api_model,
+      [{ role: 'user', parts: [{ text: consigne }] }], { n: 1 });
+    const texte = String(brut || '').trim();
+    const debut = texte.indexOf('{');
+    const fin = texte.lastIndexOf('}');
+    if (debut < 0 || fin <= debut) return;
+    let donnees = null;
+    try { donnees = JSON.parse(texte.substring(debut, fin + 1)); } catch (e) { return; }
+    if (!donnees || typeof donnees !== 'object' || Array.isArray(donnees)) return;
+
+    const maj = lireMemoire(uid);
+    let changed = false;
+    CHAMPS_EXTRACTION.forEach(c => {
+      let v = donnees[c];
+      if (v === undefined || v === null) return;
+      if (c === 'motsFavoris') {
+        if (!Array.isArray(v)) return;
+        const mots = v.map(x => String(x).trim()).filter(Boolean).slice(0, 5);
+        if (mots.length && mots.join(',') !== (maj.motsFavoris || []).join(',')) {
+          maj.motsFavoris = mots; changed = true;
+        }
+        return;
+      }
+      v = nettoyerValeur(String(v));
+      if (!v) return;
+      if (c === 'nom') {
+        const bas = v.toLowerCase();
+        if (PAS_UN_NOM.indexOf(bas) >= 0 || MOOD_MOTS.test(bas)) return;
+        v = v.charAt(0).toUpperCase() + v.slice(1);
+      }
+      if (c === 'age') {
+        const n = parseInt(v, 10);
+        if (!(n >= 3 && n <= 110)) return;
+        v = String(n);
+      }
+      if (String(maj[c] || '') !== v) { maj[c] = v; changed = true; }
+    });
+    if (changed) sauvegarderMemoireComplete(uid, maj);
+  } catch (e) {
+    loggerErreur('extraction', e.message);
+  } finally {
+    extractionEnCours[uid] = false;
+    const repousser = extractionEnAttente[uid];
+    if (repousser) {
+      delete extractionEnAttente[uid];
+      setImmediate(() => extraireAvecModele(uid, repousser));
+    }
+  }
 }
 
 // ==================== ROUTES ====================
@@ -1271,6 +1514,10 @@ app.post('/send', async (req, res) => {
 
   const debut = Date.now();
   let reponses = [];
+  // Vrai si les regex ont deja appris quelque chose dans ce message (on ne
+  // paie alors pas l'extraction par le modele en plus).
+  let dejaAppris = false;
+  const nbMots = msg.split(/\s+/).filter(Boolean).length;
 
   // Flux SSE : le client demande a voir la reponse s'ecrire au fur et a mesure.
   const enFlux = extraireChamp(req, 'stream') === '1';
@@ -1346,11 +1593,15 @@ app.post('/send', async (req, res) => {
     // 1) ON APPREND D'ABORD, PUIS ON CONSTRUIT LE PROMPT.
     // Ainsi un surnom, une humeur ou un souvenir dit a l'instant M est deja
     // connu de BLAMUNE dans la reponse qu'il est en train d'ecrire.
-    autoApprentissage(auth.uid, msg);
+    dejaAppris = autoApprentissage(auth.uid, msg);
 
     // Etat et memoire APRES apprentissage : c'est la version que BLAMUNE voit.
     const memoire = lireMemoire(auth.uid);
     const etatBL = lireEtat(auth.uid);
+    // Compteur de messages : BLAMUNE sait combien ils se sont deja parle.
+    etatBL.messages = (etatBL.messages || 0) + 1;
+    // Resume de ce qui s'est passe avant la fenetre des 16 derniers echanges.
+    const resumeTexte = lireResume(auth.uid, '2').texte;
     // L'ecart depuis la derniere conversation se calcule avant de le re-ecrire
     // (dernierContact est mis a jour plus bas, a la fin du traitement).
     const ecartContact = etatBL.dernierContact ? maintenant - etatBL.dernierContact : 0;
@@ -1381,18 +1632,19 @@ app.post('/send', async (req, res) => {
     histo[0].content = blocSysteme({
       memoire: memoire,
       etat: etatBL,
-      debutSession: histo._debut || maintenant
+      debutSession: histo._debut || maintenant,
+      resume: resumeTexte
     }) + (histo._continuite || '');
 
     histo.push({ role: 'user', content: msg, _lastTs: maintenant });
     while (histo.length > 50) histo.splice(1, 1);
 
-    // Le temps passe aussi pendant la conversation : dernierContact = moment de cet echange
+    // Le temps passe aussi pendant la conversation : dernierContact = moment de cet echange.
+    // On garde aussi le compteur de messages mis a jour juste au-dessus.
     try {
-      const etb = lireEtat(auth.uid);
-      if (!etb.premierContact) etb.premierContact = maintenant;
-      etb.dernierContact = maintenant;
-      sauvegarderEtat(auth.uid, etb);
+      etatBL.dernierContact = maintenant;
+      if (!etatBL.premierContact) etatBL.premierContact = maintenant;
+      sauvegarderEtat(auth.uid, etatBL);
     } catch (e) {}
 
     try {
@@ -1416,6 +1668,15 @@ app.post('/send', async (req, res) => {
   hist.push({ qui: 'moi', texte: msg, t: Math.floor(Date.now() / 1000) });
   reponses.forEach(r => hist.push({ qui: 'bot', texte: r, t: Math.floor(Date.now() / 1000) }));
   sauvegarderHistorique(auth.uid, mode, hist);
+
+  // Taches de fond mode 2, lancees APRES la reponse : elles ne rallongent
+  // jamais l'attente de l'utilisateur.
+  if (mode === '2') {
+    majResume(auth.uid, '2').catch(e => loggerErreur('resume', e.message));
+    if (config.memoire_extraction && !dejaAppris && nbMots >= 6) {
+      extraireAvecModele(auth.uid, msg).catch(e => loggerErreur('extraction', e.message));
+    }
+  }
 
   if (enFlux) {
     if (!coupe && !res.writableEnded && !res.destroyed) {
@@ -1449,6 +1710,8 @@ app.delete('/historique', (req, res) => {
   const mode = modeParUser[auth.uid] || '2';
   const f = cheminHistorique(auth.uid, mode);
   try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (e) {}
+  // Le resume porte sur l'ancien historique : il ne doit pas survivre a son effacement.
+  supprimerResume(auth.uid, mode);
   delete apiHistoriqueParUser[auth.uid + '_' + mode];
   res.json({ etat, historique: [] });
 });

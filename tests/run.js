@@ -5,8 +5,9 @@
 //
 //   node tests/run.js        ou    npm test
 //
-// Couvre : decouverte du modele (URL), apprentissage mode 2, reprise sur
-// quota (429), historique compact, journal des erreurs, compat ancien API_URL.
+// Couvre : decouverte du modele (URL), apprentissage mode 2, extraction par
+// le modele, resume de conversation, anniversaire, promesses, reprise sur
+// quota (429), historique compact, journal des erreurs, ancien API_URL.
 
 const assert = require('assert');
 const { spawn } = require('child_process');
@@ -19,16 +20,33 @@ const RACINE = path.resolve(__dirname, '..');
 const PORT_APP = librePort();
 const PORT_MOCK = librePort();
 const BASE_MOCK = `http://127.0.0.1:${PORT_MOCK}/v1beta`;
+const MOIS = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet',
+  'aout', 'septembre', 'octobre', 'novembre', 'decembre'];
 
 let appels = 0;
+let nbExtractions = 0;
 let failProchain = false;
-let derniereRequete = null;
+// Trois types de requetes distinctes, on garde la derniere de chaque.
+let dernierChat = null;       // message de conversation (prompt BLAMUNE)
+let derniereExtraction = null; // tache d'extraction de faits
+let dernierResume = null;      // pliage du resume de conversation
+const journalExtractions = []; // debug : dernieres consignes d'extraction recues
 
 function librePort() {
   return 20000 + Math.floor(Math.random() * 20000);
 }
 
 function attendre(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Attends qu'une condition soit vraie (taches de fond : jamais de delai fige).
+async function condition(fn, ms, message) {
+  const debut = Date.now();
+  while (Date.now() - debut < ms) {
+    if (fn()) return;
+    await attendre(100);
+  }
+  throw new Error('trop long : ' + message);
+}
 
 function requete(port, chemin, methode, corps, headers) {
   return new Promise((resolve, reject) => {
@@ -62,19 +80,49 @@ async function attendreServeur(port, essais) {
   throw new Error('Le serveur ne repond pas sur le port ' + port);
 }
 
-// ---- Faux Gemini : renvoie un texte simple et note le prompt recu ----
+function repondre(res, texte) {
+  const paquet = { candidates: [{ content: { parts: [{ text: texte }] } }] };
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(paquet));
+}
+
+// ---- Faux Gemini : repond selon la nature de la requete ----
 const mock = http.createServer((req, res) => {
   let data = '';
   req.on('data', c => data += c);
   req.on('end', () => {
     appels++;
-    if (failProchain) {
+    let corps = null;
+    try { corps = JSON.parse(data); } catch (e) {}
+    const demande = corps && corps.contents ? JSON.stringify(corps.contents) : '';
+    // Les taches de fond (extraction, resume) ne doivent jamais absorber le
+    // 429 injecte : seul un appel de conversation doit le consommer.
+    const tacheDeFond = demande.indexOf('EXTRACTION-FACTS') >= 0 ||
+      demande.indexOf('RESUME-CONVERSATION') >= 0;
+    if (failProchain && !tacheDeFond) {
       failProchain = false;
       res.writeHead(429, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: { message: 'quota depasse (test)' } }));
       return;
     }
-    try { derniereRequete = JSON.parse(data); } catch (e) {}
+
+    // Tache de fond d'extraction : le serveur attend un objet JSON de faits.
+    // Le modele "invente" un fait uniquement si le message en contient un
+    // (sinon il repond {} comme le demandait la consigne).
+    if (demande.indexOf('EXTRACTION-FACTS') >= 0) {
+      derniereExtraction = corps;
+      nbExtractions++;
+      journalExtractions.push(Date.now() + ' ...' + demande.substring(demande.length - 260));
+      return repondre(res, demande.indexOf('Maeva') >= 0
+        ? '{"nom":"Maeva","ville":"Bordeaux"}' : '{}');
+    }
+    // Pliage du resume : le serveur attend une phrase de resume.
+    if (demande.indexOf('RESUME-CONVERSATION') >= 0) {
+      dernierResume = corps;
+      return repondre(res, 'Tous deux ont parle de foot et de son anniversaire.');
+    }
+    if (demande.indexOf('CONSCIENCE DE SOI') >= 0) dernierChat = corps;
+
     const texte = 'Reponse test ' + appels;
     const paquet = { candidates: [{ content: { parts: [{ text: texte }] } }] };
     if ((req.url || '').indexOf('streamGenerateContent') >= 0) {
@@ -88,7 +136,7 @@ const mock = http.createServer((req, res) => {
   });
 });
 
-function envoiFils(pid, code) {
+function envoiFils(pid) {
   return new Promise(resolve => {
     if (!pid || pid.exitCode !== null) return resolve();
     pid.on('exit', () => resolve());
@@ -98,8 +146,7 @@ function envoiFils(pid, code) {
 }
 
 function promptTexte() {
-  return derniereRequete && derniereRequete.contents
-    ? JSON.stringify(derniereRequete.contents) : '';
+  return dernierChat && dernierChat.contents ? JSON.stringify(dernierChat.contents) : '';
 }
 
 async function main() {
@@ -131,61 +178,111 @@ async function main() {
     assert(/^inv_[0-9a-f]{24}$/.test(inv.json.uid), 'uid invite = inv_ + 96 bits, recu: ' + inv.json.uid);
     const uid = inv.json.uid;
     const h = { 'X-UID': uid };
+    const dirUid = path.join(dataDir, 'users', uid);
     ok.push('invite ' + uid);
 
+    const envoyer = (msg) => requete(PORT_APP, '/send', 'POST', 'msg=' + encodeURIComponent(msg) + '&mode=2', h);
+
     // 2. Premier message : prompt de personnalite + contexte temps reel
-    const m1 = await requete(PORT_APP, '/send', 'POST', 'msg=je%20m%27appelle%20Theo&mode=2', h);
+    const m1 = await envoyer("je m'appelle Theo");
     assert.strictEqual(m1.status, 200, 'envoi 1 en 200');
     assert(m1.json.reponses && m1.json.reponses[0].indexOf('Reponse test') >= 0, 'reponse du modele presente');
     assert(promptTexte().indexOf('CONSCIENCE DE SOI') >= 0, 'prompt BLAMUNE present');
     assert(promptTexte().indexOf('CONTEXTE TEMPS REEL') >= 0, 'contexte temps reel present');
     ok.push('prompt mode 2 construit');
 
-    // 3. Apprentissage : le prénom dit il y a 2s est deja dans le prompt
-    const m2 = await requete(PORT_APP, '/send', 'POST',
-      'msg=tu%20te%20souviens%20de%20mon%20nom%20%3F&mode=2', h);
+    // 3. Apprentissage : le prenom dit il y a 2s est deja dans le prompt,
+    //    ainsi que le compteur de messages partages.
+    const m2 = await envoyer('tu te souviens de mon nom ?');
     assert.strictEqual(m2.status, 200);
     assert(promptTexte().indexOf('Theo') >= 0, 'nom appris injecte dans le prompt');
     assert(promptTexte().indexOf('INFOS SUR L\'UTILISATEUR') >= 0, 'bloc profil present');
-    ok.push('apprentissage immediat (Theo dans le prompt)');
+    assert(promptTexte().indexOf('Vous vous etes deja echanges 2 messages') >= 0, 'compteur de messages');
+    ok.push('apprentissage immediat + compteur de messages');
 
     // 4. Reprise sur quota : 429 puis succes
     const avant = appels;
     failProchain = true;
-    const m3 = await requete(PORT_APP, '/send', 'POST', 'msg=ca%20va%20%3F&mode=2', h);
+    const m3 = await envoyer('ca va ?');
     assert.strictEqual(m3.status, 200, 'reponse apres 429');
     assert(m3.json.reponses && m3.json.reponses[0].indexOf('Reponse test') >= 0, 'texte present apres reprise');
     assert(appels - avant >= 2, 'la requete a ete retentee');
     ok.push('reprise sur 429 (2 appels)');
 
     // 5. Historique compact
-    const fHist = path.join(dataDir, 'users', uid, 'historique_mode2.json');
+    const fHist = path.join(dirUid, 'historique_mode2.json');
     assert(fs.existsSync(fHist), 'historique ecrit sur disque');
     const brut = fs.readFileSync(fHist, 'utf8');
     assert(brut.indexOf('\n  {') < 0, 'historique compact (sans indentation)');
     assert(JSON.parse(brut).length >= 3, 'historique lisible');
     ok.push('historique compact');
 
-    // 6. Mode 1 (EGO) fonctionne aussi
+    // 6. Anniversaire : appris au meme message, annonce si proche
+    const dans10 = new Date(Date.now() + 10 * 86400000);
+    await envoyer('mon anniversaire est le ' + dans10.getDate() + ' ' + MOIS[dans10.getMonth()]);
+    assert(promptTexte().indexOf('ANNIVERSAIRE') >= 0, 'anniversaire detecte et annonce');
+    assert(promptTexte().indexOf('dans 10 jours') >= 0, 'denombrement des jours');
+    ok.push('anniversaire (dans 10 jours)');
+
+    // 7. Promesse : "rappelle-moi de..." est retenu et injecte
+    await envoyer("rappelle-moi de t'envoyer ma photo demain");
+    assert(promptTexte().indexOf('PROMESSES') >= 0, 'promesse retenue');
+    assert(promptTexte().indexOf('photo') >= 0, 'contenu de la promesse');
+    ok.push('promesse retenue');
+
+    // 8. Extraction par le modele (regex seules : aucune correspondance)
+    const avantExtraction = nbExtractions;
+    await envoyer("au fait je crois que je ne t'ai pas dit, c'est Maeva");
+    // Tache de fond : la requete part juste apres la reponse, puis l'ecriture
+    // de la memoire suit. On attend la condition, pas un delai au hasard.
+    await condition(() => nbExtractions > avantExtraction, 4000,
+      'appel d\'extraction envoye au modele');
+    const fMemoire = path.join(dirUid, 'memoire.txt');
+    await condition(() => fs.existsSync(fMemoire) &&
+      fs.readFileSync(fMemoire, 'utf8').indexOf('Bordeaux') >= 0, 4000,
+      'fait extrait ecrit dans memoire.txt');
+    ok.push('extraction par le modele (appel + ecriture)');
+    await envoyer('super, et tu as bien tout retenu ?');
+    const memoireTexte = fs.existsSync(fMemoire) ? fs.readFileSync(fMemoire, 'utf8') : '(absent)';
+    assert(promptTexte().indexOf('Maeva') >= 0,
+      'fait extrait par le modele injecte — memoire: ' + JSON.stringify(memoireTexte));
+    assert(promptTexte().indexOf('Bordeaux') >= 0,
+      'second fait extrait — memoire: ' + JSON.stringify(memoireTexte));
+    ok.push('extraction par le modele (Maeva, Bordeaux)');
+
+    // 9. Resume de conversation : les anciens echanges sont plies puis relus
+    await condition(() => dernierResume, 4000, 'pliage du resume demande au modele');
+    const fResume = path.join(dirUid, 'resume_mode2.json');
+    await condition(() => fs.existsSync(fResume), 4000, 'fichier resume cree');
+    const resume = JSON.parse(fs.readFileSync(fResume, 'utf8'));
+    assert(resume.couverts >= 10, 'au moins 10 echanges plies, recu: ' + resume.couverts);
+    assert(resume.texte && resume.texte.length > 10, 'texte du resume non vide');
+    await envoyer('tu te souviens de tout ce qu on s est dit ?');
+    assert(promptTexte().indexOf('CE QUE VOUS AVIEZ DIT AVANT') >= 0, 'resume injecte dans le prompt');
+    assert(promptTexte().indexOf('foot') >= 0, 'contenu du resume present');
+    ok.push('resume de conversation (couverts=' + resume.couverts + ')');
+
+    // 10. Mode 1 (EGO) fonctionne aussi
     const e1 = await requete(PORT_APP, '/send', 'POST', 'msg=salut&mode=1', h);
     assert.strictEqual(e1.status, 200);
     ok.push('mode 1 EGO ok');
 
-    // 7. Journal des erreurs : visible par l'admin
+    // 11. Journal des erreurs : visible par l'admin
     const login = await requete(PORT_APP, '/login', 'POST', 'pseudo=admin&mdp=%40clotaire%232012');
     assert(login.json && login.json.ok, 'login admin: ' + login.texte.substring(0, 120));
     const logs = await requete(PORT_APP, '/admin/logs', 'GET', null,
       { 'X-UID': login.json.uid, 'X-EGO': login.json.ego });
     assert.strictEqual(logs.status, 200, 'lecture des logs admin');
     assert(Array.isArray(logs.json.lignes), 'logs en tableau');
-    ok.push('journal erreurs: ' + logs.json.lignes.length + ' ligne(s)');
+    ok.push('journal erreurs: ' + logs.json.lignes.length + ' ligne(s)'
+      + (logs.json.lignes.length ? ' -> ' + JSON.stringify(logs.json.lignes[0]) : ''));
 
-    // 8. Fichiers sensibles non servis
+    // 12. Fichiers sensibles non servis
     const fuite = await requete(PORT_APP, '/logs/erreurs.log', 'GET');
     assert.strictEqual(fuite.status, 404, 'logs non servis en public');
     ok.push('logs non exposes publiquement');
 
-    // 9. Compat : ancien format API_URL (URL complete avec :generateContent)
+    // 13. Compat : ancien format API_URL (URL complete avec :generateContent)
     const port2 = librePort();
     const env2 = Object.assign({}, env, { PORT: String(port2),
       API_URL: BASE_MOCK + '/models/modele-test:generateContent' });
@@ -209,6 +306,10 @@ async function main() {
   } catch (e) {
     console.error('\nECHEC : ' + e.message);
     if (journal) console.error('\n--- journal serveur ---\n' + journal.slice(-3000));
+    if (journalExtractions.length) {
+      console.error('\n--- extractions recues (' + journalExtractions.length + ', nbExtractions=' + nbExtractions + ') ---');
+      journalExtractions.forEach((j, i) => console.error('[' + i + '] ' + j));
+    }
     process.exitCode = 1;
   } finally {
     await envoiFils(serveur);
