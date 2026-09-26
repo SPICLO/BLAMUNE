@@ -10,6 +10,7 @@
 // quota (429), historique compact, journal des erreurs, ancien API_URL.
 
 const assert = require('assert');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 const http = require('http');
 const fs = require('fs');
@@ -214,12 +215,48 @@ async function main() {
     const inv = await requete(PORT_APP, '/invite', 'POST', '');
     assert(inv.json && inv.json.ok, 'invite doit reussir');
     assert(/^inv_[0-9a-f]{24}$/.test(inv.json.uid), 'uid invite = inv_ + 96 bits, recu: ' + inv.json.uid);
+    assert(/^[0-9a-f]{64}$/.test(inv.json.jeton || ''), 'jeton invite = 256 bits, recu: ' + String(inv.json.jeton).substring(0, 20));
     const uid = inv.json.uid;
-    const h = { 'X-UID': uid };
+    const h = { 'X-UID': uid, 'X-Jeton': inv.json.jeton };
     const dirUid = path.join(dataDir, 'users', uid);
     ok.push('invite ' + uid);
 
     const envoyer = (msg) => requete(PORT_APP, '/send', 'POST', 'msg=' + encodeURIComponent(msg) + '&mode=2', h);
+
+    // 1bis. Jeton invite : possession du uid ne suffit plus
+    const sansJeton = await requete(PORT_APP, '/send', 'POST', 'msg=sans+jeton&mode=2', { 'X-UID': uid });
+    assert.strictEqual(sansJeton.status, 401, 'uid seul refuse: HTTP ' + sansJeton.status);
+    const mauvaisJeton = await requete(PORT_APP, '/send', 'POST', 'msg=mauvais+jeton&mode=2',
+      { 'X-UID': uid, 'X-Jeton': '0'.repeat(64) });
+    assert.strictEqual(mauvaisJeton.status, 401, 'mauvais jeton refuse: HTTP ' + mauvaisJeton.status);
+    const sansJetonHisto = await requete(PORT_APP, '/historique', 'GET', null, { 'X-UID': uid });
+    assert.strictEqual(sansJetonHisto.status, 401, 'historique refuse sans jeton');
+    ok.push('jeton invite: uid seul et mauvais jeton refuses');
+
+    // 1ter. Migration sans deconnexion : une invite d'avant les jetons n'a
+    //       aucun enregistrement, elle continue au uid seul, puis le client
+    //       l'echange contre un jeton et la striction s'applique.
+    const uidLegacy = 'inv_' + crypto.randomBytes(12).toString('hex');
+    const leg1 = await requete(PORT_APP, '/send', 'POST', 'msg=bonjour&mode=2', { 'X-UID': uidLegacy });
+    assert.strictEqual(leg1.status, 200, 'invite legacy acceptee (aucun enregistrement): HTTP ' + leg1.status);
+    const ech = await requete(PORT_APP, '/invite/jeton', 'POST', 'uid=' + uidLegacy);
+    assert.strictEqual(ech.status, 200, 'echange legacy: HTTP ' + ech.status + ' ' + ech.texte.substring(0, 120));
+    assert(/^[0-9a-f]{64}$/.test((ech.json && ech.json.jeton) || ''), 'jeton rendu par l echange');
+    const leg2 = await requete(PORT_APP, '/send', 'POST', 'msg=toujours+la&mode=2', { 'X-UID': uidLegacy });
+    assert.strictEqual(leg2.status, 401, 'apres echange, le uid seul ne suffit plus: HTTP ' + leg2.status);
+    const leg3 = await requete(PORT_APP, '/send', 'POST', 'msg=avec+jeton&mode=2',
+      { 'X-UID': uidLegacy, 'X-Jeton': ech.json.jeton });
+    assert.strictEqual(leg3.status, 200, 'uid + jeton accepte apres echange');
+    const ech2 = await requete(PORT_APP, '/invite/jeton', 'POST', 'uid=' + uidLegacy);
+    assert.strictEqual(ech2.status, 401, 'second echange sans jeton refuse');
+    const ech3 = await requete(PORT_APP, '/invite/jeton', 'POST', 'uid=' + uidLegacy,
+      { 'X-Jeton': ech.json.jeton });
+    assert.strictEqual(ech3.status, 200, 'rotation possible quand on connait le jeton');
+    assert(ech3.json && ech3.json.jeton && ech3.json.jeton !== ech.json.jeton, 'nouveau jeton different');
+    const echInconnu = await requete(PORT_APP, '/invite/jeton', 'POST',
+      'uid=inv_' + crypto.randomBytes(12).toString('hex'));
+    assert.strictEqual(echInconnu.status, 401, 'echange refuse pour un uid inconnu du serveur');
+    ok.push('jeton invite: migration legacy puis striction');
 
     // 2. Premier message : prompt de personnalite + contexte temps reel
     const m1 = await envoyer("je m'appelle Theo");
@@ -337,7 +374,7 @@ async function main() {
     //     Compte a part : le rate limit (20 messages / 60 s) est par uid et la
     //     suite principale en est deja proche.
     const inv2 = await requete(PORT_APP, '/invite', 'POST', '');
-    const h2 = { 'X-UID': inv2.json.uid };
+    const h2 = { 'X-UID': inv2.json.uid, 'X-Jeton': inv2.json.jeton };
     const envoyer2 = (msg) => requete(PORT_APP, '/send', 'POST',
       'msg=' + encodeURIComponent(msg) + '&mode=2', h2);
 
@@ -458,9 +495,9 @@ async function main() {
       { cwd: RACINE, env: env2, stdio: 'pipe' });
     try {
       await attendreServeur(port2);
-      const inv2 = await requete(port2, '/invite', 'POST', '');
-      const m4 = await requete(port2, '/send', 'POST', 'msg=bonjour&mode=2',
-        { 'X-UID': inv2.json.uid });
+        const inv2 = await requete(port2, '/invite', 'POST', '');
+        const m4 = await requete(port2, '/send', 'POST', 'msg=bonjour&mode=2',
+          { 'X-UID': inv2.json.uid, 'X-Jeton': inv2.json.jeton });
       assert.strictEqual(m4.status, 200, 'ancien API_URL accepte');
       assert(m4.json.reponses && m4.json.reponses[0].indexOf('Reponse test') >= 0);
       ok.push('ancien API_URL (URL complete) accepte');

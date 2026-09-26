@@ -185,7 +185,65 @@ function extraireAuth(req) {
     }
   }
   if (uid && !uid.startsWith('inv_') && !ego) return { uid: '', ego: '' };
+  // Jeton invite : un uid invite avec enregistrement n'est accepte QUE
+  // muni de son jeton (possession du uid ne suffit plus).
+  if (uid && uid.startsWith('inv_')) {
+    const enregistrement = lireJetonInvite(uid);
+    if (enregistrement) {
+      const jeton = req.headers['x-jeton'] || req.body?.jeton || req.query?.jeton || '';
+      if (!jeton || hashJeton(jeton) !== enregistrement.h) return { uid: '', ego: '' };
+    }
+    // Pas d'enregistrement : invite creee avant les jetons, on laisse passer
+    // (migration sans deconnexion ; le client l'echange au chargement).
+  }
   return { uid, ego };
+}
+
+// ==================== JETON INVITE ====================
+// Chaque invite recoit un jeton secret de 256 bits, conserve HACHE cote
+// serveur : le uid devient une simple identite. Une invite d'avant cette
+// fonction n'a aucun enregistrement : elle continue de marcher au uid seul,
+// puis le client l'echange contre un vrai jeton via POST /invite/jeton.
+const FICHIER_INVITES = path.join(RACINE, 'invites.json');
+
+function chargerInvites() {
+  try {
+    if (fs.existsSync(FICHIER_INVITES)) {
+      const brut = JSON.parse(fs.readFileSync(FICHIER_INVITES, 'utf8'));
+      if (brut && typeof brut === 'object') return brut;
+    }
+  } catch (e) {}
+  return {};
+}
+
+let invitesJeton = chargerInvites();
+
+function ecrireInvites() {
+  try {
+    // Oubli des invites inactives depuis plus de 30 jours.
+    const seuil = Date.now() - 30 * 86400000;
+    const propre = {};
+    for (const u of Object.keys(invitesJeton)) {
+      const e = invitesJeton[u];
+      if (e && e.h && e.c >= seuil) propre[u] = e;
+    }
+    invitesJeton = propre;
+    fs.writeFileSync(FICHIER_INVITES, JSON.stringify(propre), 'utf8');
+  } catch (e) {}
+}
+
+function hashJeton(jeton) {
+  return crypto.createHash('sha256').update(String(jeton)).digest('hex');
+}
+
+function lireJetonInvite(uid) {
+  const e = invitesJeton[uid];
+  return e && typeof e.h === 'string' ? e : null;
+}
+
+function enregistrerJetonInvite(uid, jeton) {
+  invitesJeton[uid] = { h: hashJeton(jeton), c: Date.now() };
+  ecrireInvites();
 }
 
 function hashMdp(mdp, sel) {
@@ -1748,13 +1806,35 @@ app.post('/login', (req, res) => {
 app.post('/invite', (req, res) => {
   const ip = getIp(req);
   if (!checkRateLimit(`invite:${ip}`, 10)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  // 12 octets (96 bits) : ce uid sert aussi de jeton d'acces pour l'invite,
-  // il doit rester impossible a deviner.
+  // 12 octets (96 bits) pour l'identite, 32 octets (256 bits) pour le jeton
+  // qui prouve qu'on est bien le proprietaire de ce uid.
   const uid = 'inv_' + crypto.randomBytes(12).toString('hex');
+  const jeton = crypto.randomBytes(32).toString('hex');
   const pseudo = 'Invite_' + crypto.randomBytes(3).toString('hex');
+  enregistrerJetonInvite(uid, jeton);
   connexionsActives[uid] = { uid, pseudo, ip, debut: new Date().toISOString(), derniereActivite: Date.now() };
   stats.sessionsTotal++;
-  res.json({ ok: true, uid, pseudo });
+  res.json({ ok: true, uid, pseudo, jeton });
+});
+
+// Migration : une invite d'avant les jetons n'a que son uid. Elle l'envoie et
+// recoit un jeton (une seule fois connue : ensuite, plus d'echange sans le
+// jeton valide). Refuse pour un uid inconnu du serveur.
+app.post('/invite/jeton', (req, res) => {
+  const ip = getIp(req);
+  if (!checkRateLimit(`invite:${ip}`, 10)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
+  const uid = req.headers['x-uid'] || req.body?.uid || req.query?.uid || '';
+  const jetonClient = req.headers['x-jeton'] || req.body?.jeton || req.query?.jeton || '';
+  if (!/^inv_[0-9a-f]{24}$/.test(uid)) return res.status(401).json({ ok: false, message: 'Non autorise' });
+  const connu = !!connexionsActives[uid] || fs.existsSync(path.join(USERS_DIR, uid));
+  if (!connu) return res.status(401).json({ ok: false, message: 'Non autorise' });
+  const enregistrement = lireJetonInvite(uid);
+  if (enregistrement && (!jetonClient || hashJeton(jetonClient) !== enregistrement.h)) {
+    return res.status(401).json({ ok: false, message: 'Non autorise' });
+  }
+  const jeton = crypto.randomBytes(32).toString('hex');
+  enregistrerJetonInvite(uid, jeton);
+  res.json({ ok: true, jeton });
 });
 
 // Logout

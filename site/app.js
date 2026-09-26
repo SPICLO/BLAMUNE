@@ -73,7 +73,8 @@ function genererUserId() {
 var AUTH_CLES = {
   ego: 'blamune_ego',
   pseudo: 'blamune_pseudo_auth',
-  userId: 'blamune_userId'
+  userId: 'blamune_userId',
+  jeton: 'blamune_invite_jeton'
 };
 
 function getAuthEgo() { return localStorage.getItem(AUTH_CLES.ego) || ''; }
@@ -82,15 +83,19 @@ function getAuthUserId() {
   var uid = localStorage.getItem(AUTH_CLES.userId);
   return uid || '';
 }
+function getAuthJeton() { return localStorage.getItem(AUTH_CLES.jeton) || ''; }
 function setAuthInfo(ego, pseudo, uid) {
   localStorage.setItem(AUTH_CLES.ego, ego);
   localStorage.setItem(AUTH_CLES.pseudo, pseudo);
   localStorage.setItem(AUTH_CLES.userId, uid);
+  // Un compte classique n'a pas besoin du jeton invite.
+  localStorage.removeItem(AUTH_CLES.jeton);
 }
 function clearAuth() {
   localStorage.removeItem(AUTH_CLES.ego);
   localStorage.removeItem(AUTH_CLES.pseudo);
   localStorage.removeItem(AUTH_CLES.userId);
+  localStorage.removeItem(AUTH_CLES.jeton);
 }
 function estAuth() { return !!getAuthEgo(); }
 function estInvite() { return !estAuth(); }
@@ -100,6 +105,8 @@ function authHeaders() {
   var e = getAuthEgo();
   if (e) h['X-EGO'] = e;
   h['X-UID'] = getAuthUserId();
+  var j = getAuthJeton();
+  if (j) h['X-Jeton'] = j;
   return h;
 }
 
@@ -108,7 +115,32 @@ function authBody() {
   var e = getAuthEgo();
   if (e) p.ego = e;
   p.uid = getAuthUserId();
+  var j = getAuthJeton();
+  if (j) p.jeton = j;
   return p;
+}
+
+// Migration des invites creees avant les jetons : elles n'ont que leur uid.
+// Une fois par chargement, on l'envoie au serveur qui rend un jeton ; a partir
+// de la, le uid seul n'est plus accepte. Echec silencieux (hors ligne) :
+// on continue en mode legacy, le serveur accepte encore le uid sans record.
+async function migrerJetonInvite() {
+  var uid = getAuthUserId();
+  if (!uid || uid.indexOf('inv_') !== 0 || getAuthJeton()) return;
+  try {
+    var ctrl = new AbortController();
+    var minuteur = setTimeout(function () { ctrl.abort(); }, 8000);
+    var r = await fetch('/invite/jeton', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-UID': uid },
+      body: 'uid=' + encodeURIComponent(uid),
+      signal: ctrl.signal
+    });
+    clearTimeout(minuteur);
+    if (!r.ok) return;
+    var j = await r.json();
+    if (j && j.ok && j.jeton) localStorage.setItem(AUTH_CLES.jeton, j.jeton);
+  } catch (e) {}
 }
 
 function afficherApp() {
@@ -348,6 +380,7 @@ async function authInvite() {
       localStorage.removeItem(AUTH_CLES.ego);
       localStorage.removeItem(AUTH_CLES.pseudo);
       localStorage.setItem(AUTH_CLES.userId, j.uid);
+      if (j.jeton) localStorage.setItem(AUTH_CLES.jeton, j.jeton);
       jouerTransitionConnexion('Mode invite active !');
     }
   } catch (e) {
@@ -1241,11 +1274,14 @@ function lireVoix(texte) {
   });
 })();
 
-window.addEventListener('load', function () {
+window.addEventListener('load', async function () {
   var profil = chargerProfilLocal();
   if (profil.mode === '3') {
     sauverProfilLocal('mode', '2');
   }
+  // Avant la premiere requete : l'invite legacy echange son uid contre un
+  // jeton, pour ne pas se faire refuser des la seconde appelee.
+  try { await migrerJetonInvite(); } catch (e) {}
   initAuth();
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(function() {});
