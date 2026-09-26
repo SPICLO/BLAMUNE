@@ -281,7 +281,9 @@ function nettoyerValeur(v) {
 // ecraser le vrai nom appris avant.
 const PAS_UN_NOM = ['un', 'une', 'le', 'la', 'les', 'des', 'du', 'de', 'en', 'avec', 'sans',
   'pour', 'contre', 'ici', 'la', 'meme', 'seul', 'daccord', 'ok', 'mieux', 'grave',
-  'ne', 'nee', 'nes', 'nees', 'petit', 'petite', 'content', 'contente'];
+  'ne', 'nee', 'nes', 'nees', 'petit', 'petite', 'content', 'contente',
+  // mots de question : "comment je m'appelle deja ?" ne doit pas apprendre "deja"
+  'deja', 'quoi', 'comment', 'pourquoi', 'ou', 'qui', 'quand', 'combien', 'tel'];
 const MOOD_MOTS = /^(?:triste|content|contente|heureux|heureuse|fatigue|fatiguee|creve|calme|energique|bien|mal|chaud|froid|partout|loin|serieux|serieuse|mou|moue|las|zen|down|deprime|motive|motivee)$/i;
 
 const MOIS_FR = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet',
@@ -296,7 +298,10 @@ function autoApprentissage(uid, msg) {
   // "je suis X" seulement en fin de phrase (sinon on confond avec un etat).
   let m = lower.match(/(?:je m['\u2019]appelle|mon nom c['\u2019]est|mon prenom c['\u2019]est|appelle[- ]moi)\s+([a-z\u00e0-\u00fc]{2,20})/);
   if (!m) m = lower.match(/je suis\s+([a-z\u00e0-\u00fc]{2,15})(?=\s*[.!?]?\s*$)/);
-  if (m && m[1] && PAS_UN_NOM.indexOf(m[1]) < 0 && !MOOD_MOTS.test(m[1])) {
+  // Une question ("je m'appelle deja ?") ne donne pas de nom : le mot capture
+  // est suivi d'un point d'interrogation.
+  const poseQuestion = m && /^\s*\?/.test(lower.slice(m.index + m[0].length));
+  if (m && m[1] && !poseQuestion && PAS_UN_NOM.indexOf(m[1]) < 0 && !MOOD_MOTS.test(m[1])) {
     mem.nom = m[1].charAt(0).toUpperCase() + m[1].slice(1); changed = true;
   }
 

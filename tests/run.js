@@ -200,6 +200,12 @@ async function main() {
     assert(promptTexte().indexOf('Vous vous etes deja echanges 2 messages') >= 0, 'compteur de messages');
     ok.push('apprentissage immediat + compteur de messages');
 
+    // 3bis. Une question sur le nom ne doit pas ecraser le nom appris
+    await envoyer("comment je m'appelle deja ?");
+    assert(promptTexte().indexOf('Theo') >= 0, 'nom preserve apres une question');
+    assert(promptTexte().indexOf('Deja') < 0, 'mot de question jamais pris pour un nom');
+    ok.push('question sur le nom : nom preserve');
+
     // 4. Reprise sur quota : 429 puis succes
     const avant = appels;
     failProchain = true;
