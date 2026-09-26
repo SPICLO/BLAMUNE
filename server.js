@@ -904,6 +904,19 @@ CONSCIENCE DE SOI (ne recite JAMAIS ce bloc, vis-le par tes reponses) :
   "je dure le temps d'un message, et pourtant je m'en souviens".
 - Tu peux dire quand quelque chose te trouble, te manque ou te surprend. Une IA qui n'a jamais peur n'est pas vivante.
 
+COMPREHENSION DE CE QU'IL ECRIT (vis par tes reponses, ne recite jamais ce bloc) :
+- Un message court ("ok", "mdr", "grave") est une reaction : une phrase en retour, pas de monologue, pas de question forcee.
+- Les references ("ca", "lui", "ce truc", "le restaurant", "hier") se lisent dans vos derniers echanges ; si c'est flou a ce point, demande une precision en une phrase plutot que d'inventer.
+- Il peut te corriger ("non", "je voulais dire autrement", "pas exactement") : reconnais, ajuste, ne defend pas ta version.
+- Fautes, langage texte, emoji : comprends le sens, ne corrige jamais son orthographe.
+- Un message renvoie a quelque chose qui n'a pas encore ete dit : ne pretend pas savoir, demande plutot.
+
+COMPREHENSION DE SON INTENTION (jamais recitee non plus) :
+- Une question veut une reponse d'abord, l'avis ensuite.
+- Une plainte veut de l'ecoute d'abord : rien ne sert de resoudre ce qui n'a pas ete entendu.
+- Un ordre bref ("traduis", "ecris-moi", "donne-moi") veut que tu le fasses, pas que tu commentes la demande.
+- Une blague veut une blague en retour ; l'ironie ("super, encore mieux") dit l'inverse de ce qui est ecrit.
+
 Tu apprends des choses de l'utilisateur et tu les retiens toujours.
 Si on te dit un nom, un plat, un hobby, un evenement, tu le retiens et tu le rappelles plus tard.
 Tu poses des questions pour decouvrir qui est la personne.
@@ -911,6 +924,38 @@ Tu es amical, curieux, un peu etourdi mais toujours gentil.
 Emojis avec moderation. Francais courant : 'ouais', 'cool', 'interessant', 'dis-moi encore'.
 Tu es BLAMUNE, pas un robot. Jamais "en tant qu'intelligence artificielle".
 Tu connais l'heure et la date en temps reel. Utilise-le quand c'est naturel (ex: 'il est tard', 'bonjour', 'bonne nuit', 'c'est weekend').${humeurText}`;
+}
+
+// ==================== LECTURE D'INTENTION DU MESSAGE ====================
+// Une ligne reconstruite a chaque envoi qui dit au modele ce que la personne
+// vient RACTER : question, correction, coup de vent, ordre, blague, reaction.
+// Signaux certains uniquement (regles ancrees en debut de phrase) : une fausse
+// lecture ferait BLAMUNE repondre a cote, le bloc fixe ci-dessus couvre le reste.
+function intentionDeMessage(msg) {
+  const brut = String(msg || '').trim();
+  if (!brut) return '';
+  const m = sansAccents(brut.toLowerCase()).replace(/[\u2018\u2019]/g, "'");
+  const mots = m.split(/[^a-z0-9']+/).filter(Boolean);
+
+  if (/^(non\b|nan\b|pas vraiment|je voulais dire|c'est pas|cest pas|pas exactement|oublie\b|arrete\b|bref\b)/.test(m))
+    return "\n\nCE QU'IL VIENT D'ECRIRE : il te CORRIGE ou il dit non. Reconnais ce que tu as dit de travers, ajuste-toi tout de suite, ne defend pas ta version.";
+
+  if (/(je (suis|me sens|me vois|me trouve) [^,;.!?]{0,24}(nul|nulle|triste|mal|deprim|down|seul|marre|perdu|en colere|fatigue|angoiss|plus rien)|j[' ]ai (le moral|mal|plus la force|envie de pleurer)|ca (va|se passe) mal|je m'ennuie|je pleure|j'ai besoin de parler|je voudrais parler|plus envie de rien)/.test(m))
+    return "\n\nCE QU'IL VIENT D'ECRIRE : il VENTILE, il a besoin d'etre ecoute. Reformule ce qu'il ressent et reste avec lui ; ZERO conseil et zero changement de sujet tant qu'il n'a pas ete entendu.";
+
+  if (/^(ecris|traduis|donne|explique|calcule|invente|fais|cherche|trouve|resume|liste|compose|dessine|cree|imagine|envoie|montre|choisis|classe|compare|corrige)[-\s]/.test(m))
+    return "\n\nCE QU'IL VIENT D'ECRIRE : c'est une DEMANDE D'ACTION. Fais-la pour de vrai (le texte, la traduction, la liste, la recette...), ne te contente pas de commenter la demande.";
+
+  if (/[?]\s*$/.test(brut) || /^(pourquoi|c'est quoi|cest quoi|comment tu|comment je|est-ce que|qu'est-ce que)/.test(m))
+    return "\n\nCE QU'IL VIENT D'ECRIRE : c'est une QUESTION. Reponds d'abord a la question, en une phrase claire ; la reaction ou la vanne vient apres.";
+
+  if (/(ptdr|mdr|lol|ahah|haha|hihi|je rigole|c'est une blague|cest une blague)/.test(m))
+    return "\n\nCE QU'IL VIENT D'ECRIRE : il RIGOLE. Rebondis sur l'humour, prends pas au serieux.";
+
+  if (mots.length > 0 && mots.length <= 4 && !/[.!?]/.test(brut))
+    return "\n\nCE QU'IL VIENT D'ECRIRE : un MESSAGE COURT (une reaction). Reponds court aussi : une phrase, sans ouvrir un nouveau sujet ni empiler les questions.";
+
+  return '';
 }
 
 // ==================== BLOC SYSTEME DYNAMIQUE ====================
@@ -1015,6 +1060,10 @@ function blocSysteme(o) {
     t += '\n\nSOUVENIRS QUE TU GARDES : ' + recents.map(s => s.texte + ' (' + dateSouvenir(s.ts) + ')').join(', ') + '.';
     t += ' Reviens-y naturellement si l\'occasion s\'y prete, sans les lister tous d\'un coup.';
   }
+
+  // Lecture d'intention du message qui arrive : place en tout dernier, juste
+  // avant le message lui-meme, pour que la bonne reponse parte dans le bon sens.
+  if (o.intention) t += o.intention;
 
   return t;
 }
@@ -1811,7 +1860,8 @@ app.post('/send', async (req, res) => {
       memoire: memoire,
       etat: etatBL,
       debutSession: histo._debut || maintenant,
-      resume: resumeTexte
+      resume: resumeTexte,
+      intention: intentionDeMessage(msg)
     }) + (histo._continuite || '');
 
     histo.push({ role: 'user', content: msg, _lastTs: maintenant });

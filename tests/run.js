@@ -320,6 +320,42 @@ async function main() {
     assert(promptTexte().indexOf('foot') >= 0, 'contenu du resume present');
     ok.push('resume de conversation (couverts=' + resume.couverts + ')');
 
+    // 8bis. Comprehension : regles fixes + intention lue a chaque message.
+    //     Compte a part : le rate limit (20 messages / 60 s) est par uid et la
+    //     suite principale en est deja proche.
+    const inv2 = await requete(PORT_APP, '/invite', 'POST', '');
+    const h2 = { 'X-UID': inv2.json.uid };
+    const envoyer2 = (msg) => requete(PORT_APP, '/send', 'POST',
+      'msg=' + encodeURIComponent(msg) + '&mode=2', h2);
+
+    await envoyer2('tu te souviens de quoi je te parlais hier au sujet du foot ?');
+    assert(promptTexte().indexOf('COMPREHENSION DE CE QU\'IL ECRIT') >= 0, 'regles de texte dans le prompt');
+    assert(promptTexte().indexOf('COMPREHENSION DE SON INTENTION') >= 0, 'regles d\'intention dans le prompt');
+    assert(promptTexte().indexOf('CE QU\'IL VIENT D\'ECRIRE') >= 0, 'intention lue a chaque envoi');
+    assert(promptTexte().indexOf('QUESTION') >= 0, 'intention: question reconnue');
+    ok.push('comprehension: question reconnue');
+
+    await envoyer2('non, je voulais dire autrement');
+    assert(promptTexte().indexOf('CORRIGE') >= 0, 'intention: correction reconnue');
+    ok.push('comprehension: correction reconnue');
+
+    await envoyer2('je me sens vraiment nul ce soir, j ai le moral dans les chaussettes');
+    assert(promptTexte().indexOf('VENTILE') >= 0, 'intention: coup de vent reconnu');
+    ok.push('comprehension: plainte ecoutee');
+
+    await envoyer2('traduis-moi bonjour en anglais');
+    assert(promptTexte().indexOf('DEMANDE D\'ACTION') >= 0, 'intention: action reconnue');
+    ok.push('comprehension: demande d action');
+
+    await envoyer2('ok');
+    assert(promptTexte().indexOf('MESSAGE COURT') >= 0, 'intention: message court reconnu');
+    ok.push('comprehension: message court');
+
+    await envoyer2('un long message du tout simplement personne rien pour repliquer le contexte ici bas');
+    assert(promptTexte().indexOf('CE QU\'IL VIENT D\'ECRIRE') < 0,
+      'aucune lecture forcee quand le signal est absent');
+    ok.push('comprehension: rien de force sans signal');
+
     // 9. Mode 1 (EGO) : prompt dedie, distinct de celui de BLAMUNE
     const e1 = await requete(PORT_APP, '/send', 'POST', 'msg=salut&mode=1', h);
     assert.strictEqual(e1.status, 200);
@@ -335,7 +371,8 @@ async function main() {
     const avant = appels;
     failProchain = true;
     const m3 = await envoyer('ca va ?');
-    assert.strictEqual(m3.status, 200, 'reponse apres 429');
+    assert.strictEqual(m3.status, 200,
+      'reponse apres 429 (HTTP ' + m3.status + ') ' + m3.texte.substring(0, 200));
     assert(m3.json.reponses && m3.json.reponses[0].indexOf('Reponse test') >= 0, 'texte present apres reprise');
     assert(appels - avant >= 2, 'la requete a ete retentee');
     ok.push('reprise sur 429 (2 appels)');
