@@ -640,6 +640,34 @@ function reporterTache(lancer) {
 
 function attendre(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+// Tous les modeles en meme temps (vu en live a 22h10) : la cascade rend la
+// main et l'utilisateur a droit a "probleme technique". On prefere attendre le
+// rechargement de la fenetre gratuite puis repasser la cascade UNE fois.
+// Cap d'attente (ms) : surchargeable en test pour ne pas rallonger la suite.
+const QUOTA_ATTENTE_MAX = parseInt(process.env.QUOTA_ATTENTE_MAX_MS || '', 10) || 70000;
+
+function estQuota(e) {
+  if (!e) return false;
+  if (e.statusCode === 429) return true;
+  return /quota|exhausted|high demand|rate.?limit|resource has been/i.test(e.message || '');
+}
+
+// Attente avant la seconde passe : le "retry in 45s" de Google ou le temps
+// restant de la fenetre d'une minute, on prend le plus long des deux (borne).
+function delaiAvantNouvellePasse(erreur) {
+  const indique = delaiIndique(erreur) || 0;
+  const resteFenetre = Math.max(0, QUOTA_FENETRE - (Date.now() - dernierQuota));
+  const d = Math.max(indique, resteFenetre);
+  return Math.min(Math.max(d, 500), QUOTA_ATTENTE_MAX);
+}
+
+// Ce que l'utilisateur voit quand tout a echoue : on distingue le quota
+// (il n'y a rien a faire d'autre que d'attendre) d'un vrai souci technique.
+function messageTechnique(e) {
+  if (estQuota(e)) return 'Beaucoup de monde en ce moment, mon quota est sature. Reessaie dans une minute, je suis la.';
+  return 'Desole, j\'ai eu un probleme technique. Reessaie.';
+}
+
 // --- Reponse classique : tout d'un coup (repli si le flux echoue) ---
 // `patient` : appel en tache de fond, il peut attendre le delai demande par
 // Google ; sinon on laisse la cascade changer de modele (chaque modele a son
@@ -777,42 +805,63 @@ function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion) {
 let dernierModeleOk = '';
 
 // onDelta est optionnel : sans lui on garde l'ancien comportement.
+// Deux passes possibles : si TOUTES les tentatives de la premiere etaient des
+// quotas, on attend le rechargement de la fenetre gratuite puis on reessaie
+// une fois plutot que de rendre la main sur "probleme technique".
 async function appelerGemini(message, histo, onDelta) {
   const contents = construireContenus(limiterHisto(histo, HISTO_API_MAX));
   const modeles = [config.api_model, ...FALLBACK_MODELS.filter(m => m !== config.api_model)];
   let derniereErreur = null;
-  let fluxActif = typeof onDelta === 'function';
   dernierModeleOk = '';
-  // Une seule reprise sur erreur transitoire pour TOUTE la requete,
-  // quel que soit le nombre de modeles essayes en cascade.
-  const budget = { n: 1 };
 
-  for (const modele of modeles) {
-    if (fluxActif) {
+  for (let passe = 0; passe < 2; passe++) {
+    let fluxActif = typeof onDelta === 'function';
+    let quotaPartout = true;
+    // Une seule reprise sur erreur transitoire pour TOUTE la passe,
+    // quel que soit le nombre de modeles essayes en cascade.
+    const budget = { n: 1 };
+
+    for (const modele of modeles) {
+      if (fluxActif) {
+        try {
+          const texte = await modeleEnFlux(modele, contents, onDelta, budget);
+          if (texte) { dernierModeleOk = modele; return texte; }
+          derniereErreur = new Error('Reponse vide');
+          quotaPartout = false;
+        } catch (e) {
+          // Le flux a echoue : on retente la meme modele en classique, et on
+          // n'insiste plus sur le flux pour le reste de la requete.
+          derniereErreur = e;
+          if (!estQuota(e)) quotaPartout = false;
+          fluxActif = false;
+          loggerErreur('gemini', modele + ' flux KO: ' + e.message);
+        }
+      }
       try {
-        const texte = await modeleEnFlux(modele, contents, onDelta, budget);
-        if (texte) { dernierModeleOk = modele; return texte; }
+        const texte = await modeleClassique(modele, contents, budget);
+        if (texte) {
+          dernierModeleOk = modele;
+          if (typeof onDelta === 'function') { try { onDelta(texte); } catch (e) {} }
+          return texte;
+        }
         derniereErreur = new Error('Reponse vide');
+        quotaPartout = false;
       } catch (e) {
-        // Le flux a echoue : on retente la meme modele en classique, et on
-        // n'insiste plus sur le flux pour le reste de la requete.
         derniereErreur = e;
-        fluxActif = false;
-        loggerErreur('gemini', modele + ' flux KO: ' + e.message);
+        if (!estQuota(e)) quotaPartout = false;
+        loggerErreur('gemini', modele + ' KO: ' + e.message);
       }
     }
-    try {
-      const texte = await modeleClassique(modele, contents, budget);
-      if (texte) {
-        dernierModeleOk = modele;
-        if (typeof onDelta === 'function') { try { onDelta(texte); } catch (e) {} }
-        return texte;
-      }
-      derniereErreur = new Error('Reponse vide');
-    } catch (e) {
-      derniereErreur = e;
-      loggerErreur('gemini', modele + ' KO: ' + e.message);
+
+    // Tout le parcours etait du quota : on attend puis on repasse une fois.
+    if (passe === 0 && quotaPartout && estQuota(derniereErreur)) {
+      const attenteMs = delaiAvantNouvellePasse(derniereErreur);
+      loggerErreur('gemini', 'tous les modeles en quota -> nouvelle passe dans ' +
+        Math.round(attenteMs / 1000) + ' s');
+      await attendre(attenteMs);
+      continue;
     }
+    break;
   }
   throw new Error(derniereErreur ? derniereErreur.message : 'Tous les modeles Gemini ont echoue');
 }
@@ -1801,7 +1850,7 @@ app.post('/send', async (req, res) => {
       reponses = [texte];
     } catch (e) {
       loggerErreur('EGO', e.message);
-      reponses = ['Desole, j\'ai eu un probleme technique. Reessaie.'];
+      reponses = [messageTechnique(e)];
     }
   } else {
     // BLAMUNE mode - Gemini with different personality
@@ -1882,7 +1931,7 @@ app.post('/send', async (req, res) => {
       reponses = [texte];
     } catch (e) {
       loggerErreur('BLAMUNE', e.message);
-      reponses = ['Desole, j\'ai eu un probleme technique. Reessaie.'];
+      reponses = [messageTechnique(e)];
     }
   }
 

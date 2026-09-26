@@ -27,6 +27,7 @@ let appels = 0;
 let nbExtractions = 0;
 let failProchain = false;
 let failQuota = false;   // 429 style Google ("retry in 45s") sur le prochain chat
+let quotaGeneralRestant = 0; // 429 sur les N prochains chats : tout le parcours est sature
 let modeleQuota = null;  // modele qui a recu ce 429
 let modeleReponse = null; // modele qui a fini par repondre
 // Trois types de requetes distinctes, on garde la derniere de chaque.
@@ -118,6 +119,14 @@ const mock = http.createServer((req, res) => {
       res.end(JSON.stringify({ error: { message: 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 5, model: ' + modeleVu + ' Please retry in 45.411629042s.' } }));
       return;
     }
+    // Tous les modeles en quota en meme temps : le serveur doit attendre le
+    // rechargement de la fenetre puis reessayer une passe, pas rendre la main.
+    if (quotaGeneralRestant > 0 && !tacheDeFond) {
+      quotaGeneralRestant--;
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: { message: 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. Please retry in 0.2s.' } }));
+      return;
+    }
 
     // Tache de fond d'extraction : le serveur attend un objet JSON de faits.
     // Le modele "invente" un fait uniquement si le message en contient un
@@ -185,7 +194,10 @@ async function main() {
     API_PROVIDER: 'gemini',
     API_MODEL: 'modele-test',
     API_URL: BASE_MOCK,
-    BLAMUNE_DATA_DIR: dataDir
+    BLAMUNE_DATA_DIR: dataDir,
+    // L'attente avant la seconde passe est bornee : la suite ne doit pas
+    // dormir 60 s le temps que la fenetre de quota se recharge.
+    QUOTA_ATTENTE_MAX_MS: '1000'
   });
   const serveur = spawn(process.execPath, [path.join(RACINE, 'server.js')],
     { cwd: RACINE, env, stdio: 'pipe' });
@@ -389,6 +401,20 @@ async function main() {
     assert(modeleQuota && modeleReponse && modeleQuota !== modeleReponse,
       'autre modele utilise (quota=' + modeleQuota + ', reponse=' + modeleReponse + ')');
     ok.push('quota Google : cascade sur ' + modeleReponse + ' sans attendre 45 s');
+
+    // 11bis. TOUT le parcours en quota en meme temps : le serveur attend le
+    //        rechargement puis repasse la cascade une fois, au lieu de rendre
+    //        "probleme technique" (vu en live quand les 3 modeles crevent).
+    quotaGeneralRestant = 6;
+    const gq = await envoyer('un long message pour tester le quota general sur tous les modeles');
+    await condition(() => journal.indexOf('tous les modeles en quota -> nouvelle passe') >= 0, 6000,
+      'attente de la seconde passe apres le quota general');
+    assert.strictEqual(gq.status, 200,
+      'reponse malgre le quota general (HTTP ' + gq.status + ') ' + gq.texte.substring(0, 200));
+    assert(gq.json.reponses && gq.json.reponses[0].indexOf('Reponse test') >= 0,
+      'texte present apres la deuxieme passe: ' + gq.texte.substring(0, 200));
+    assert.strictEqual(quotaGeneralRestant, 0, 'tous les 429 injectes ont ete consommes');
+    ok.push('quota general : passe apres attente (pas de probleme technique)');
 
     // 12. Les taches de fond attendent le rechargement de la fenetre de
     //        quota au lieu de crever le quota une seconde fois.
