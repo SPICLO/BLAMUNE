@@ -8,14 +8,34 @@ const storage = require('./storage');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-const RACINE = __dirname;
+// Repertoire des donnees. Surchargeable par l'environnement pour lancer des
+// tests sans jamais toucher aux vraies donnees (users/, comptes.json...).
+const RACINE = process.env.BLAMUNE_DATA_DIR ? path.resolve(process.env.BLAMUNE_DATA_DIR) : __dirname;
+
+// ==================== JOURNAL DES ERREURS ====================
+// Sur Render la console est ephemere : on garde aussi les 500 dernieres
+// erreurs sur disque pour pouvoir diagnostiquer un plantage apres coup.
+const LOGS_DIR = path.join(RACINE, 'logs');
+function loggerErreur(serie, message) {
+  const ligne = new Date().toISOString() + ' [' + serie + '] ' +
+                String(message == null ? '' : message).replace(/\s+/g, ' ').trim();
+  console.error(ligne);
+  try {
+    if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
+    const f = path.join(LOGS_DIR, 'erreurs.log');
+    const contenu = (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') + '\n' : '') + ligne;
+    const lignes = contenu.split('\n').filter(Boolean);
+    const garde = lignes.length > 500 ? lignes.slice(-500) : lignes;
+    fs.writeFileSync(f, garde.join('\n') + '\n', 'utf8');
+  } catch (e) {}
+}
 
 // ==================== MIDDLEWARE ====================
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json({ limit: '8kb' }));
 
 // CORS + Security Headers
-const SENSITIVE_FILES = ['comptes.json', 'config.json', '.protection_hash.json', 'stats.json'];
+const SENSITIVE_FILES = ['comptes.json', 'config.json', '.protection_hash.json', 'stats.json', 'erreurs.log'];
 app.use((req, res, next) => {
   const reqPath = req.path.toLowerCase();
   if (SENSITIVE_FILES.some(f => reqPath.endsWith(f))) return res.status(404).end();
@@ -51,7 +71,9 @@ let config = {
   api_provider: 'gemini',
   api_key: process.env.API_KEY || '',
   api_model: 'gemini-3.5-flash',
-  api_url: process.env.API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',
+  // Base de l'API : on y ajoute '/models/<modele>:...' selon l'appel.
+  // Accepte aussi l'URL complete (ancien format) : voir baseGemini().
+  api_url: process.env.API_URL || 'https://generativelanguage.googleapis.com/v1beta',
   // Reponses courtes (1 a 5 phrases nettoyees) : inutile de laisser
   // le modele generer des milliers de tokens, ca rallonge la reponse.
   api_max_tokens: 1024,
@@ -80,7 +102,7 @@ try {
     if (cfg.api_max_tokens && !process.env.API_MAX_TOKENS) config.api_max_tokens = cfg.api_max_tokens;
     if (cfg.api_temperature && !process.env.API_TEMPERATURE) config.api_temperature = cfg.api_temperature;
   }
-} catch (e) { console.log('[config] Erreur:', e.message); }
+} catch (e) { loggerErreur('config', e.message); }
 
 // ==================== DATA ====================
 const COMPTES_PATH = path.join(RACINE, 'comptes.json');
@@ -90,7 +112,7 @@ try {
   if (fs.existsSync(COMPTES_PATH)) {
     comptes = JSON.parse(fs.readFileSync(COMPTES_PATH, 'utf8'));
   }
-} catch (e) { console.log('[comptes] Erreur lecture:', e.message); }
+} catch (e) { loggerErreur('comptes', 'lecture: ' + e.message); }
 
 function sauvegarderComptes() {
   try {
@@ -410,7 +432,8 @@ function chargerHistorique(uid, mode) {
 }
 
 function sauvegarderHistorique(uid, mode, historique) {
-  try { fs.writeFileSync(cheminHistorique(uid, mode), JSON.stringify(historique, null, 2), 'utf8'); } catch (e) {}
+  // Ecriture compacte : meme contenu, fichiers 3 a 4 fois plus legers.
+  try { fs.writeFileSync(cheminHistorique(uid, mode), JSON.stringify(historique), 'utf8'); } catch (e) {}
   if (storage.estConfigure()) storage.setHistorique(uid, mode, historique);
 }
 
@@ -491,27 +514,88 @@ function texteDepuisReponse(data) {
     .map(p => p.text).join('');
 }
 
+// --- Construction des URL -------------------------------------------------
+// config.api_url accepte deux formats :
+//   - la base : https://host/v1beta                              (recommande)
+//   - l'URL complete : https://host/v1beta/models/modele:generateContent
+//     (ancien format, cf. config.json.example)
+// Dans les deux cas on en deduit la base, puis on construit l'URL exacte du
+// modele demande. Ca permet de pointer API_URL vers un proxy (http://...).
+const URL_GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+function baseGemini() {
+  let u = String(config.api_url || '').trim().replace(/\/+$/, '');
+  if (!u) return URL_GEMINI_BASE;
+  u = u.replace(/\/models\/[^/:?]+:(?:generateContent|streamGenerateContent)(?:\?.*)?$/i, '');
+  u = u.replace(/\/models\/[^/:?]+$/i, '');
+  return u || URL_GEMINI_BASE;
+}
+
+function urlGemini(modele, enFlux) {
+  return baseGemini() + '/models/' + modele +
+    (enFlux ? ':streamGenerateContent?alt=sse' : ':generateContent');
+}
+
+// http ou https selon la base (un proxy local est en http).
+function requeter(url, options, onReponse) {
+  return (url.indexOf('http:') === 0 ? http : https).request(url, options, onReponse);
+}
+
+// --- Reprise sur erreur transitoire ---------------------------------------
+// 429 (quota), 5xx et erreurs reseau sont retentables UNE fois, avec un
+// delai court. Le budget est global a la requete (voir appelerGemini) pour
+// ne pas multiplier les tentatives a l'infini quand plusieurs modeles sont
+// essayes en cascade.
+let retriesRestants = 0;
+
+function erreurRetentable(e) {
+  if (!e) return false;
+  const c = e.statusCode;
+  if (c === 429 || c === 500 || c === 502 || c === 503 || c === 504) return true;
+  const code = e.code || '';
+  if (['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN', 'EPIPE', 'ENOTFOUND'].indexOf(code) >= 0) return true;
+  return e.message === 'Timeout';
+}
+
+function consommerRetry() {
+  if (retriesRestants <= 0) return false;
+  retriesRestants--;
+  return true;
+}
+
+function attendre(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
 // --- Reponse classique : tout d'un coup (repli si le flux echoue) ---
-function modeleClassique(modele, contents) {
+async function modeleClassique(modele, contents) {
   const sansReflexion = !reflexionRefusee;
-  return modeleClassiqueBrut(modele, contents, sansReflexion).catch(function (e) {
+  try {
+    return await modeleClassiqueBrut(modele, contents, sansReflexion);
+  } catch (e) {
     if (e && e.reflexion) return modeleClassiqueBrut(modele, contents, false);
+    if (erreurRetentable(e) && consommerRetry()) {
+      loggerErreur('gemini', modele + ' -> HTTP ' + (e.statusCode || e.code || '?') + ' ' + e.message + ' (nouvelle tentative)');
+      await attendre(600);
+      return modeleClassiqueBrut(modele, contents, sansReflexion);
+    }
     throw e;
-  });
+  }
 }
 
 function modeleClassiqueBrut(modele, contents, sansReflexion) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modele}:generateContent`;
+  const url = urlGemini(modele, false);
   const body = corpsGemini(contents, sansReflexion);
   return new Promise((resolve, reject) => {
-    const req = https.request(url, optionsGemini(), (res) => {
+    const req = requeter(url, optionsGemini(), (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         const refuse = refusReflexion(res.statusCode, sansReflexion);
         if (refuse) return reject(refuse);
         try { resolve(texteDepuisReponse(data)); }
-        catch (e) { reject(e); }
+        catch (e) {
+          if (res.statusCode !== 200) e.statusCode = res.statusCode;
+          reject(e);
+        }
       });
     });
     req.on('error', reject);
@@ -522,27 +606,40 @@ function modeleClassiqueBrut(modele, contents, sansReflexion) {
 }
 
 // --- Reponse en flux (SSE) : on appelle onDelta(texteEntiere) au fil de l'eau ---
-function modeleEnFlux(modele, contents, onDelta) {
+async function modeleEnFlux(modele, contents, onDelta) {
   const sansReflexion = !reflexionRefusee;
-  return modeleEnFluxBrut(modele, contents, onDelta, sansReflexion).catch(function (e) {
-    if (e && e.reflexion) return modeleEnFluxBrut(modele, contents, onDelta, false);
+  // On ne retente le flux que si RIEN n'a encore ete affiche au client :
+  // relancer apres des deltas donnerait un texte bache.
+  let envoyaDuTexte = false;
+  const surDelta = (t) => { envoyaDuTexte = true; onDelta(t); };
+  try {
+    return await modeleEnFluxBrut(modele, contents, surDelta, sansReflexion);
+  } catch (e) {
+    if (e && e.reflexion) return modeleEnFluxBrut(modele, contents, surDelta, false);
+    if (!envoyaDuTexte && erreurRetentable(e) && consommerRetry()) {
+      loggerErreur('gemini', modele + ' -> flux HTTP ' + (e.statusCode || e.code || '?') + ' ' + e.message + ' (nouvelle tentative)');
+      await attendre(600);
+      return modeleEnFluxBrut(modele, contents, surDelta, sansReflexion);
+    }
     throw e;
-  });
+  }
 }
 
 function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modele}:streamGenerateContent?alt=sse`;
+  const url = urlGemini(modele, true);
   const body = corpsGemini(contents, sansReflexion);
   return new Promise((resolve, reject) => {
     let fini = false;
     const echouer = (err) => { if (!fini) { fini = true; reject(err); } };
-    const req = https.request(url, optionsGemini(), (res) => {
+    const req = requeter(url, optionsGemini(), (res) => {
       if (res.statusCode !== 200) {
         let data = '';
         res.on('data', c => data += c);
         res.on('end', () => {
           const refuse = refusReflexion(res.statusCode, sansReflexion);
-          echouer(refuse || new Error('HTTP ' + res.statusCode + ' ' + data.substring(0, 200)));
+          const err = refuse || new Error('HTTP ' + res.statusCode + ' ' + data.substring(0, 200));
+          if (!refuse) err.statusCode = res.statusCode;
+          echouer(err);
         });
         res.resume();
         return;
@@ -592,6 +689,9 @@ async function appelerGemini(message, histo, onDelta) {
   let derniereErreur = null;
   let fluxActif = typeof onDelta === 'function';
   dernierModeleOk = '';
+  // Une seule reprise sur erreur transitoire pour TOUTE la requete,
+  // quel que soit le nombre de modeles essayes.
+  retriesRestants = 1;
 
   for (const modele of modeles) {
     if (fluxActif) {
@@ -604,6 +704,7 @@ async function appelerGemini(message, histo, onDelta) {
         // n'insiste plus sur le flux pour le reste de la requete.
         derniereErreur = e;
         fluxActif = false;
+        loggerErreur('gemini', modele + ' flux KO: ' + e.message);
       }
     }
     try {
@@ -616,6 +717,7 @@ async function appelerGemini(message, histo, onDelta) {
       derniereErreur = new Error('Reponse vide');
     } catch (e) {
       derniereErreur = e;
+      loggerErreur('gemini', modele + ' KO: ' + e.message);
     }
   }
   throw new Error(derniereErreur ? derniereErreur.message : 'Tous les modeles Gemini ont echoue');
@@ -1012,6 +1114,21 @@ app.get('/admin/users', (req, res) => {
   res.json({ ok: true, users });
 });
 
+// Journal des erreurs (admin) : les 200 dernieres lignes de logs/erreurs.log.
+// Sert a voir en prod ce qui a casse (modeles en echec, quota, plantages).
+app.get('/admin/logs', (req, res) => {
+  const ip = getIp(req);
+  if (!checkRateLimit(`admin:${ip}`, 30)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
+  const auth = extraireAuth(req);
+  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
+  let texte = '';
+  try {
+    const f = path.join(LOGS_DIR, 'erreurs.log');
+    if (fs.existsSync(f)) texte = fs.readFileSync(f, 'utf8');
+  } catch (e) {}
+  res.json({ ok: true, lignes: texte.split('\n').filter(l => l.trim()).slice(-200) });
+});
+
 // All messages (admin only)
 app.get('/tous-les-messages', (req, res) => {
   const auth = extraireAuth(req);
@@ -1111,7 +1228,9 @@ app.post('/login', (req, res) => {
 app.post('/invite', (req, res) => {
   const ip = getIp(req);
   if (!checkRateLimit(`invite:${ip}`, 10)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  const uid = 'inv_' + crypto.randomBytes(6).toString('hex');
+  // 12 octets (96 bits) : ce uid sert aussi de jeton d'acces pour l'invite,
+  // il doit rester impossible a deviner.
+  const uid = 'inv_' + crypto.randomBytes(12).toString('hex');
   const pseudo = 'Invite_' + crypto.randomBytes(3).toString('hex');
   connexionsActives[uid] = { uid, pseudo, ip, debut: new Date().toISOString(), derniereActivite: Date.now() };
   stats.sessionsTotal++;
@@ -1207,7 +1326,7 @@ app.post('/send', async (req, res) => {
       histo.push({ role: 'assistant', content: texte, _lastTs: Date.now() });
       reponses = [texte];
     } catch (e) {
-      console.error('[Gemini EGO]', e.message);
+      loggerErreur('EGO', e.message);
       reponses = ['Desole, j\'ai eu un probleme technique. Reessaie.'];
     }
   } else {
@@ -1282,7 +1401,7 @@ app.post('/send', async (req, res) => {
       histo.push({ role: 'assistant', content: texte, _lastTs: Date.now() });
       reponses = [texte];
     } catch (e) {
-      console.error('[Gemini BLAMUNE]', e.message);
+      loggerErreur('BLAMUNE', e.message);
       reponses = ['Desole, j\'ai eu un probleme technique. Reessaie.'];
     }
   }
@@ -1486,6 +1605,17 @@ app.get('*', (req, res) => {
 });
 
 // ==================== START ====================
+// Une erreur qui echappe au serveur ne doit pas mourir silencieusement :
+// on la journalise (logs/erreurs.log + console Render), puis on sort pour
+// que la plateforme relance le process.
+process.on('uncaughtException', (e) => {
+  loggerErreur('crash', (e && e.stack) || String(e));
+  process.exit(1);
+});
+process.on('unhandledRejection', (e) => {
+  loggerErreur('crash', 'unhandledRejection: ' + ((e && e.stack) || e));
+});
+
 const server = http.createServer(app);
 
 // Initialize cloud storage

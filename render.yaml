@@ -13,5 +13,5 @@ services:
       - key: API_MODEL
         value: gemini-3.5-flash
       - key: API_URL
-        value: https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent
+        value: https://generativelanguage.googleapis.com/v1beta
     healthCheckPath: /ping

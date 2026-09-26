@@ -22,3 +22,4 @@ bot.exe
 stats.json
 .bin-id
 bins.json
+logs/
