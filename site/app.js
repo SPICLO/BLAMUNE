@@ -1040,6 +1040,7 @@ async function envoyer() {
         reps.forEach(function (rep) { ajouterMessage('bot', rep, j.confiance); });
       }
       if (j.etat === 'arrete' || j.etat === 'erreur') signalerArret();
+      lireVoix(reps[0]);
     } else if (bulleBot) {
       bulleBot.remove();
       bulleBot = null;
@@ -1139,6 +1140,106 @@ async function changerMode(m) {
   var z = document.getElementById('zone');
   if (z) z.focus();
 }
+
+// ---------------- MODE VOCAL ----------------
+// Un seul bouton dans la barre : il ecoute (dictee vocale), il lit les
+// reponses (synthese vocale), et en mode actif la conversation tourne toute
+// seule : BLAMUNE parle, puis il ecoute la reponse, puis il recommence.
+// La langue du micro suit celle du navigateur (anglais, francais...).
+var voixOn = false;
+var reco = null;
+var recoEnCours = false;
+var langueVoix = navigator.language || 'fr-FR';
+
+function eteindreVoix() {
+  voixOn = false;
+  var b = document.getElementById('btnVoix');
+  if (b) { b.classList.remove('actif'); b.setAttribute('aria-pressed', 'false'); }
+  try { if (reco) reco.stop(); } catch (e) {}
+  recoEnCours = false;
+  try { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); } catch (e) {}
+}
+
+function ecouterVoix() {
+  if (!voixOn || recoEnCours || actionEnCours) return;
+  if (!reco) {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    reco = new SR();
+    reco.lang = langueVoix;
+    reco.interimResults = true;
+    reco.continuous = false;
+    reco.maxAlternatives = 1;
+    var entendu = '';          // ce qui a deja ete tranche par le navigateur
+    reco.onresult = function (ev) {
+      var interim = '';
+      for (var i = ev.resultIndex; i < ev.results.length; i++) {
+        var res = ev.results[i];
+        if (res.isFinal) entendu += res[0].transcript;
+        else interim += res[0].transcript;
+      }
+      var z = document.getElementById('zone');
+      if (z) z.value = (entendu + ' ' + interim).trim();
+    };
+    reco.onerror = function (ev) {
+      recoEnCours = false;
+      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        eteindreVoix();
+        afficherToastDeco('Micro refuse : mode vocal eteint.');
+      }
+    };
+    reco.onend = function () {
+      recoEnCours = false;
+      if (!voixOn) return;
+      var z = document.getElementById('zone');
+      var texte = z ? z.value.trim() : '';
+      if (texte) {
+        var attendreEnvoi = function () {
+          if (!voixOn) return;
+          if (!actionEnCours) { envoyer(); return; }
+          setTimeout(attendreEnvoi, 600);
+        };
+        attendreEnvoi();
+        return;
+      }
+      // Silence : on garde l'oreille ouverte tant que le mode est actif.
+      if (!actionEnCours) setTimeout(ecouterVoix, 600);
+    };
+  }
+  try {
+    recoEnCours = true;
+    reco.start();
+  } catch (e) { recoEnCours = false; }
+}
+
+function lireVoix(texte) {
+  if (!voixOn || !('speechSynthesis' in window) || !texte) return;
+  try {
+    window.speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance(texte);
+    u.lang = langueVoix;
+    u.rate = 1;
+    u.onend = function () { if (voixOn) setTimeout(ecouterVoix, 500); };
+    u.onerror = function () { if (voixOn) setTimeout(ecouterVoix, 500); };
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+(function initBoutonVoix() {
+  var b = document.getElementById('btnVoix');
+  if (!b) return;
+  var sr = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!sr && !('speechSynthesis' in window)) { b.style.display = 'none'; return; }
+  b.addEventListener('click', function () {
+    if (voixOn) { eteindreVoix(); afficherToastDeco('Mode vocal eteint.'); return; }
+    if (!sr) { afficherToastDeco('Ce navigateur ne gere pas la dictee vocale.'); return; }
+    voixOn = true;
+    b.classList.add('actif');
+    b.setAttribute('aria-pressed', 'true');
+    afficherToastDeco('Mode vocal : je t\u2019ecoute.', 'ok');
+    ecouterVoix();
+  });
+})();
 
 window.addEventListener('load', function () {
   var profil = chargerProfilLocal();

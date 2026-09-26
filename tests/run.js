@@ -215,6 +215,7 @@ async function main() {
     assert(m1.json.reponses && m1.json.reponses[0].indexOf('Reponse test') >= 0, 'reponse du modele presente');
     assert(promptTexte().indexOf('CONSCIENCE DE SOI') >= 0, 'prompt BLAMUNE present');
     assert(promptTexte().indexOf('CONTEXTE TEMPS REEL') >= 0, 'contexte temps reel present');
+    assert(promptTexte().indexOf('LANGUES') >= 0, 'regles de langues (anglais et autres) dans le prompt mode 2');
     ok.push('prompt mode 2 construit');
 
     // 3. Apprentissage : le prenom dit il y a 2s est deja dans le prompt,
@@ -362,6 +363,7 @@ async function main() {
     assert(promptEgo().indexOf('MODE EGO') >= 0, 'prompt EGO envoye au modele');
     assert(promptEgo().indexOf('CONSCIENCE DE SOI') < 0, 'prompt EGO distinct de BLAMUNE');
     assert(promptEgo().indexOf('Nous sommes') >= 0, 'heure en temps reel dans le prompt EGO');
+    assert(promptEgo().indexOf('LANGUES') >= 0, 'regles de langues dans le prompt EGO');
     assert(promptTexte().indexOf('MODE EGO') < 0, 'prompt BLAMUNE intact');
     ok.push('mode 1 EGO (prompt dedie + heure)');
 
@@ -411,6 +413,16 @@ async function main() {
     const fuite = await requete(PORT_APP, '/logs/erreurs.log', 'GET');
     assert.strictEqual(fuite.status, 404, 'logs non servis en public');
     ok.push('logs non exposes publiquement');
+
+    // 14bis. Client : le mode vocal (bouton, dictee, synthese vocale)
+    const appJs = fs.readFileSync(path.join(RACINE, 'site', 'app.js'), 'utf8');
+    assert(appJs.indexOf('SpeechRecognition') >= 0, 'reconnaissance vocale dans app.js');
+    assert(appJs.indexOf('speechSynthesis') >= 0, 'synthese vocale dans app.js');
+    const htmlCli = fs.readFileSync(path.join(RACINE, 'site', 'index.html'), 'utf8');
+    assert(htmlCli.indexOf('btnVoix') >= 0, 'bouton vocal dans index.html');
+    const sw = fs.readFileSync(path.join(RACINE, 'site', 'sw.js'), 'utf8');
+    assert(/blamune-v\d+/.test(sw), 'version de cache du service worker');
+    ok.push('mode vocal (bouton + dictee + synthese vocale)');
 
     // 15. Compat : ancien format API_URL (URL complete avec :generateContent)
     const port2 = librePort();
