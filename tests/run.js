@@ -477,6 +477,53 @@ async function main() {
     assert.strictEqual(fuite.status, 404, 'logs non servis en public');
     ok.push('logs non exposes publiquement');
 
+    // 14ter. Sauvegarde complete : telechargement admin (sans la cle API)
+    //        puis restauration appliquee immediatement, sans redemarrage.
+    const hAdmin = { 'X-UID': login.json.uid, 'X-EGO': login.json.ego };
+    const backup = await requete(PORT_APP, '/admin/backup', 'GET', null, hAdmin);
+    assert.strictEqual(backup.status, 200, 'sauvegarde admin: HTTP ' + backup.status);
+    const snap = JSON.parse(backup.texte);
+    assert.strictEqual(snap.format, 'blamune-sauvegarde-1', 'format de sauvegarde');
+    assert(snap.fichiers['comptes.json'], 'comptes.json present dans la sauvegarde');
+    assert(snap.fichiers['users/' + uid + '/memoire.txt'],
+      'memoire du visiteur presente dans la sauvegarde');
+    assert(!snap.fichiers['config.json'], 'cle API jamais incluse dans la sauvegarde');
+    const backupInvite = await requete(PORT_APP, '/admin/backup', 'GET', null, h);
+    assert.strictEqual(backupInvite.status, 403, 'sauvegarde refusee aux non-admin');
+    const backupAnonyme = await requete(PORT_APP, '/admin/backup', 'GET', null);
+    assert.strictEqual(backupAnonyme.status, 403, 'sauvegarde refusee sans identite');
+    ok.push('sauvegarde complete (admin only, sans cle API)');
+
+    snap.fichiers['savoir.txt'] = (snap.fichiers['savoir.txt'] || '') +
+      '\nmarqueur-restauration|la sauvegarde est appliquee';
+    const restaurer = await requete(PORT_APP, '/admin/restore', 'POST',
+      JSON.stringify(snap), Object.assign({ 'Content-Type': 'application/json' }, hAdmin));
+    assert.strictEqual(restaurer.status, 200,
+      'restauration: HTTP ' + restaurer.status + ' ' + restaurer.texte.substring(0, 150));
+    assert(restaurer.json && restaurer.json.ok && restaurer.json.fichiers > 0,
+      'fichiers reecrits: ' + restaurer.texte.substring(0, 120));
+    const profilApres = await requete(PORT_APP, '/profil', 'GET', null, h);
+    assert.strictEqual(profilApres.status, 200, 'profil relu apres restauration');
+    assert((profilApres.json.savoir || []).some(s => s.cle === 'marqueur-restauration'),
+      'savoir restaure visible sans redemarrage du serveur');
+    ok.push('restauration appliquee sans redemarrage');
+
+    // 14quater. La restauration valide tout avant la moindre ecriture.
+    const mechante = await requete(PORT_APP, '/admin/restore', 'POST',
+      JSON.stringify({ format: 'blamune-sauvegarde-1', fichiers: { '../evil.txt': 'x' } }),
+      Object.assign({ 'Content-Type': 'application/json' }, hAdmin));
+    assert.strictEqual(mechante.status, 400, 'chemin hors racine refuse: HTTP ' + mechante.status);
+    const fausse = await requete(PORT_APP, '/admin/restore', 'POST',
+      JSON.stringify({ format: 'autre-chose' }),
+      Object.assign({ 'Content-Type': 'application/json' }, hAdmin));
+    assert.strictEqual(fausse.status, 400, 'format inconnu refuse');
+    const restoreInvite = await requete(PORT_APP, '/admin/restore', 'POST', JSON.stringify(snap),
+      Object.assign({ 'Content-Type': 'application/json' }, h));
+    assert.strictEqual(restoreInvite.status, 403, 'restauration refusee aux non-admin');
+    const evilFichier = path.join(dataDir, 'evil.txt');
+    assert(!fs.existsSync(evilFichier), 'aucun fichier cree hors de la racine');
+    ok.push('restauration securisee (chemin, format, non-admin)');
+
     // 14bis. Client : le mode vocal (bouton, dictee, synthese vocale)
     const appJs = fs.readFileSync(path.join(RACINE, 'site', 'app.js'), 'utf8');
     assert(appJs.indexOf('SpeechRecognition') >= 0, 'reconnaissance vocale dans app.js');

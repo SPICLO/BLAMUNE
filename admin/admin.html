@@ -126,6 +126,22 @@
       </div>
     </section>
 
+    <!-- SAUVEGARDE -->
+    <section class="panel">
+      <h2>Sauvegarde &amp; restauration <span class="subtitle">toutes les donnees du serveur</span></h2>
+      <div class="panel-body" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button id="btnBackup" class="btn-secondary" type="button">Telecharger la sauvegarde</button>
+        <button id="btnRestore" class="btn-secondary" type="button">Restaurer un fichier</button>
+        <input type="file" id="fichierRestore" accept="application/json,.json" style="display:none;">
+        <span id="backupMessage" style="font-size:12px;color:var(--texte-doux);"></span>
+      </div>
+      <p style="font-size:12px;color:var(--texte-doux);padding:0 16px 14px;margin:0;">
+        La sauvegarde contient les comptes, les jetons d'invite, les memoires,
+        les historiques, les etats et les stats (jamais la cle API).
+        La restauration reecrit les fichiers immediatement, sans redemarrer le serveur.
+      </p>
+    </section>
+
     <!-- CHANGER MDP -->
     <section class="panel">
       <h2>Changer le mot de passe</h2>
@@ -139,7 +155,7 @@
   </main>
 </div>
 
-<script src="/admin/admin.js?v=4"></script>
+<script src="/admin/admin.js?v=5"></script>
 <noscript>
   <div style="max-width:400px;margin:80px auto;text-align:center;color:#e2e8f0;font-family:sans-serif;">
     <h2 style="color:#f87171;">JavaScript requis</h2>

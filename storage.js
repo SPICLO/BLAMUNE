@@ -12,8 +12,18 @@ const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID || '';
 let data = {
   comptes: {},
   historiques: {},
-  memories: {}
+  memories: {},
+  sauvegarde: null
 };
+
+// Fabrique de la sauvegarde complète (fournie par server.js) : comptes,
+// jetons, savoir, stats et tous les fichiers users/.
+let fabriqueSauvegarde = null;
+let _snapDate = 0;
+const SNAP_MIN_INTERVAL = 60000; // au plus une reconstruction par minute
+
+function enregistrerFabrique(fn) { fabriqueSauvegarde = fn; }
+function getSauvegarde() { return data.sauvegarde; }
 
 // Debouncing pour la sauvegarde cloud
 let _saveTimer = null;
@@ -68,6 +78,16 @@ function jsonbinRequest(method, urlPath, body) {
 async function sauvegarderTout() {
   if (!JSONBIN_API_KEY) return;
   try {
+    if (fabriqueSauvegarde && Date.now() - _snapDate > SNAP_MIN_INTERVAL) {
+      try {
+        const s = fabriqueSauvegarde();
+        // Jamais d'écrasement du cloud par un disque vide : une instance
+        // perdue avant restauration ne doit pas effacer la sauvegarde.
+        const utile = s && s.fichiers &&
+          (s.fichiers['comptes.json'] || Object.keys(s.fichiers).some(k => k.indexOf('users/') === 0));
+        if (utile) { data.sauvegarde = s; _snapDate = Date.now(); }
+      } catch (e) { console.log('[storage] Snapshot impossible:', e.message); }
+    }
     if (!JSONBIN_BIN_ID) {
       // Créer un nouveau bin
       const r = await jsonbinRequest('POST', '/v3', data);
@@ -136,5 +156,7 @@ module.exports = {
   getHistorique, setHistorique,
   getMemoire, setMemoire,
   sauvegarderTout,
+  enregistrerFabrique, getSauvegarde,
+  declencherSauvegarde: planifierSauvegarde,
   estConfigure: () => !!JSONBIN_API_KEY
 };

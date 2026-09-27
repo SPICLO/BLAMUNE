@@ -32,7 +32,12 @@ function loggerErreur(serie, message) {
 
 // ==================== MIDDLEWARE ====================
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json({ limit: '8kb' }));
+// Le parser JSON global reste serr (8 kb) : la route /admin/restore recoit
+// des sauvegarde volumineuses et installe son propre parser limite a 50 mb.
+app.use((req, res, next) => {
+  if (req.path === '/admin/restore') return next();
+  express.json({ limit: '8kb' })(req, res, next);
+});
 
 // CORS + Security Headers
 const SENSITIVE_FILES = ['comptes.json', 'config.json', '.protection_hash.json', 'stats.json', 'erreurs.log'];
@@ -53,7 +58,7 @@ app.use((req, res, next) => {
   }
   res.setHeader('Access-Control-Allow-Origin', corsOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-UID, X-EGO');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-UID, X-EGO, X-Jeton');
   res.setHeader('Access-Control-Expose-Headers', 'Content-Length');
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -143,6 +148,26 @@ let stats = {
   demarrage: new Date().toISOString()
 };
 
+// Les stats repartaient de zero a chaque demarrage : on les garde sur disque.
+function chargerStats() {
+  try {
+    const f = path.join(RACINE, 'stats.json');
+    if (fs.existsSync(f)) {
+      const s = JSON.parse(fs.readFileSync(f, 'utf8'));
+      if (s && typeof s === 'object') stats = Object.assign({}, stats, s);
+    }
+  } catch (e) { loggerErreur('stats', e.message); }
+  stats.demarrage = new Date().toISOString();
+}
+
+function sauverStats() {
+  try {
+    fs.writeFileSync(path.join(RACINE, 'stats.json'), JSON.stringify(stats, null, 2), 'utf8');
+  } catch (e) {}
+}
+
+chargerStats();
+
 // ==================== RATE LIMITING ====================
 const rateLimits = {};
 const userRateLimits = {};
@@ -230,6 +255,7 @@ function ecrireInvites() {
     invitesJeton = propre;
     fs.writeFileSync(FICHIER_INVITES, JSON.stringify(propre), 'utf8');
   } catch (e) {}
+  storage.declencherSauvegarde();
 }
 
 function hashJeton(jeton) {
@@ -244,6 +270,90 @@ function lireJetonInvite(uid) {
 function enregistrerJetonInvite(uid, jeton) {
   invitesJeton[uid] = { h: hashJeton(jeton), c: Date.now() };
   ecrireInvites();
+}
+
+// ==================== SAUVEGARDE COMPLETE ====================
+// Une copie de tout ce qui doit survivre a la perte de l'instance Render :
+// comptes, jetons d'invite, savoir, vocabulaire, stats et l'integralite de
+// users/ (memoire, historique, etat, resumes, extractions). Servie en
+// telechargement par /admin/backup, restauree par /admin/restore, et
+// poussee dans le cloud quand JSONBIN_API_KEY est defini.
+const FICHIERS_RACINE = ['comptes.json', 'invites.json', 'savoir.txt', 'vocabulaire.txt', 'stats.json'];
+// config.json (cle API) et logs/ ne quittent jamais le serveur.
+const CHEMIN_SAUVEGARDE = /^(comptes\.json|invites\.json|savoir\.txt|vocabulaire\.txt|stats\.json|users\/[A-Za-z0-9_\-]{1,64}\/[A-Za-z0-9_.\-]{1,64})$/;
+const TAILLE_MAX_FICHIER = 2 * 1024 * 1024;
+const TAILLE_MAX_TOTALE = 40 * 1024 * 1024;
+
+function creerSauvegarde() {
+  const fichiers = {};
+  for (const nom of FICHIERS_RACINE) {
+    try {
+      const f = path.join(RACINE, nom);
+      if (fs.existsSync(f)) fichiers[nom] = fs.readFileSync(f, 'utf8');
+    } catch (e) {}
+  }
+  let total = 0;
+  try {
+    if (fs.existsSync(USERS_DIR)) {
+      for (const d of fs.readdirSync(USERS_DIR, { withFileTypes: true })) {
+        if (!d.isDirectory()) continue;
+        let noms = [];
+        try { noms = fs.readdirSync(path.join(USERS_DIR, d.name)); } catch (e) { continue; }
+        for (const nom of noms) {
+          const rel = 'users/' + d.name + '/' + nom;
+          if (!CHEMIN_SAUVEGARDE.test(rel)) continue;
+          try {
+            const f = path.join(USERS_DIR, d.name, nom);
+            const st = fs.statSync(f);
+            if (!st.isFile() || st.size > TAILLE_MAX_FICHIER) continue;
+            if (total + st.size > TAILLE_MAX_TOTALE) continue;
+            fichiers[rel] = fs.readFileSync(f, 'utf8');
+            total += st.size;
+          } catch (e) {}
+        }
+      }
+    }
+  } catch (e) {}
+  return { format: 'blamune-sauvegarde-1', date: new Date().toISOString(), stats: stats, fichiers: fichiers };
+}
+
+function appliquerSauvegarde(snap) {
+  if (!snap || typeof snap !== 'object' || snap.format !== 'blamune-sauvegarde-1')
+    throw new Error('format de sauvegarde inconnu');
+  if (!snap.fichiers || typeof snap.fichiers !== 'object' || Array.isArray(snap.fichiers))
+    throw new Error('liste de fichiers manquante');
+  const cles = Object.keys(snap.fichiers);
+  if (cles.length === 0) throw new Error('sauvegarde vide');
+  // Validation de tous les chemins AVANT la moindre ecriture.
+  let total = 0;
+  for (const rel of cles) {
+    if (typeof rel !== 'string' || !CHEMIN_SAUVEGARDE.test(rel))
+      throw new Error('chemin refuse: ' + String(rel).substring(0, 60));
+    const contenu = snap.fichiers[rel];
+    if (typeof contenu !== 'string') throw new Error('contenu invalide: ' + rel);
+    total += Buffer.byteLength(contenu);
+    if (total > TAILLE_MAX_TOTALE) throw new Error('sauvegarde trop volumineuse');
+  }
+  const racine = path.resolve(RACINE);
+  let ecrits = 0;
+  for (const rel of cles) {
+    const abs = path.resolve(racine, rel);
+    if (abs.indexOf(racine + path.sep) !== 0) throw new Error('hors racine: ' + rel);
+    try {
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, snap.fichiers[rel], 'utf8');
+      ecrits++;
+    } catch (e) { throw new Error('ecriture impossible (' + rel + '): ' + e.message); }
+  }
+  // Rechargement immediat : aucun redemarrage necessaire.
+  try { comptes = JSON.parse(fs.readFileSync(COMPTES_PATH, 'utf8')); } catch (e) {}
+  invitesJeton = chargerInvites();
+  if (snap.stats && typeof snap.stats === 'object') {
+    stats = Object.assign({}, stats, snap.stats);
+    stats.demarrage = new Date().toISOString();
+  }
+  if (storage.estConfigure()) storage.setComptes(comptes);
+  return ecrits;
 }
 
 function hashMdp(mdp, sel) {
@@ -1707,6 +1817,42 @@ app.get('/admin/logs', (req, res) => {
   res.json({ ok: true, lignes: texte.split('\n').filter(l => l.trim()).slice(-200) });
 });
 
+// Sauvegarde complete (admin) : telecharge tout ce qui doit survivre a la
+// perte de l'instance Render. Meme reponse que celle envoyee au cloud.
+app.get('/admin/backup', (req, res) => {
+  const ip = getIp(req);
+  if (!checkRateLimit(`admin:${ip}`, 30)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
+  const auth = extraireAuth(req);
+  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
+  try {
+    const snap = creerSauvegarde();
+    const nom = 'blamune-sauvegarde-' + new Date().toISOString().slice(0, 10) + '.json';
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + nom + '"');
+    res.send(JSON.stringify(snap, null, 2));
+  } catch (e) {
+    loggerErreur('backup', e.message);
+    res.status(500).json({ ok: false, message: 'Erreur de sauvegarde' });
+  }
+});
+
+// Restauration (admin) : reecrit les fichiers de la sauvegarde puis
+// recharge comptes/invites/stats en memoire. Pas de redemarrage.
+app.post('/admin/restore', express.json({ limit: '50mb' }), (req, res) => {
+  const ip = getIp(req);
+  if (!checkRateLimit(`restore:${ip}`, 5)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
+  const auth = extraireAuth(req);
+  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
+  try {
+    const ecrits = appliquerSauvegarde(req.body);
+    console.log(`[BLAMUNE] Restauration : ${ecrits} fichier(s) reecrit(s)`);
+    res.json({ ok: true, fichiers: ecrits });
+  } catch (e) {
+    loggerErreur('restore', e.message);
+    res.status(400).json({ ok: false, message: e.message });
+  }
+});
+
 // All messages (admin only)
 app.get('/tous-les-messages', (req, res) => {
   const auth = extraireAuth(req);
@@ -2240,9 +2386,20 @@ process.on('unhandledRejection', (e) => {
 const server = http.createServer(app);
 
 // Initialize cloud storage
+storage.enregistrerFabrique(creerSauvegarde);
 storage.initialiser().then(ok => {
   if (ok) {
     console.log('[BLAMUNE] Stockage cloud JSONBin.io active');
+    // Instance vierge (perte de disque, nouveau deploy) : on reconstitue
+    // tout depuis la derniere sauvegarde cloud avant d'accepter du monde.
+    const snapCloud = storage.getSauvegarde();
+    const localVide = !fs.existsSync(COMPTES_PATH) && !fs.existsSync(USERS_DIR);
+    if (snapCloud && localVide) {
+      try {
+        const nb = appliquerSauvegarde(snapCloud);
+        console.log(`[BLAMUNE] ${nb} fichiers restaures depuis le cloud`);
+      } catch (e) { loggerErreur('cloud', 'restauration: ' + e.message); }
+    }
     // Restore comptes from cloud if local is empty
     if (Object.keys(comptes).length === 0) {
       const cloudComptes = storage.getComptes();
@@ -2255,8 +2412,10 @@ storage.initialiser().then(ok => {
   } else {
     console.log('[BLAMUNE] Mode fichier local (pas de JSONBIN_API_KEY)');
   }
-}).catch(e => console.log('[BLAMUNE] Erreur storage:', e.message));
+}).catch(e => console.log('[BLAMUNE] Erreur storage:', e.message))
+  .then(() => serverListen());
 
+function serverListen() {
 server.listen(PORT, () => {
   etat = 'pret';
   stats.demarrages++;
@@ -2276,6 +2435,15 @@ server.listen(PORT, () => {
   console.log(`[BLAMUNE] API Key: ${config.api_key ? 'Configuree' : 'NON CONFIGUREE'}`);
   console.log(`[BLAMUNE] Cloud: ${storage.estConfigure() ? 'JSONBin.io' : 'Local'}`);
 });
+}
+
+// Sauvegarde cloud reguliere (memoire, etats, resumes...) + stats sur disque.
+if (storage.estConfigure()) {
+  setInterval(() => storage.declencherSauvegarde(), 600000);
+}
+setInterval(sauverStats, 60000);
+process.on('SIGTERM', () => { sauverStats(); process.exit(0); });
+process.on('SIGINT', () => { sauverStats(); process.exit(0); });
 
 // Cleanup old connections every 5 min
 setInterval(() => {

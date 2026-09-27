@@ -121,6 +121,71 @@ function initDashboard() {
       }
       btn.disabled = false;
     };
+    document.getElementById('btnBackup').onclick = async function() {
+      var msg = document.getElementById('backupMessage');
+      var btn = this;
+      btn.disabled = true;
+      msg.style.color = 'var(--texte-doux)';
+      msg.textContent = 'Preparation...';
+      try {
+        var r = await fetch(API + '/admin/backup', { headers: { 'X-EGO': adminToken } });
+        if (!r.ok) {
+          var j = null;
+          try { j = await r.json(); } catch(e) {}
+          msg.style.color = 'var(--danger)';
+          msg.textContent = (j && j.message) || ('Erreur ' + r.status);
+          return;
+        }
+        var blob = await r.blob();
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'blamune-sauvegarde-' + new Date().toISOString().slice(0, 10) + '.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function() { URL.revokeObjectURL(a.href); }, 5000);
+        msg.style.color = 'var(--ok)';
+        msg.textContent = 'Sauvegarde telechargee.';
+      } catch(e) {
+        msg.style.color = 'var(--danger)';
+        msg.textContent = 'Erreur reseau.';
+      }
+      btn.disabled = false;
+    };
+    document.getElementById('btnRestore').onclick = function() {
+      document.getElementById('fichierRestore').click();
+    };
+    document.getElementById('fichierRestore').onchange = async function() {
+      var fichier = this.files && this.files[0];
+      this.value = '';
+      if (!fichier) return;
+      var msg = document.getElementById('backupMessage');
+      if (!window.confirm('Restaurer cette sauvegarde ? Les fichiers actuels seront remplaces par ceux du fichier.')) return;
+      msg.style.color = 'var(--texte-doux)';
+      msg.textContent = 'Restauration...';
+      try {
+        var texte = await fichier.text();
+        var donnees = JSON.parse(texte);
+        var r = await fetch(API + '/admin/restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-EGO': adminToken },
+          body: JSON.stringify(donnees)
+        });
+        var out = null;
+        try { out = await r.json(); } catch(e) {}
+        if (r.ok && out && out.ok) {
+          msg.style.color = 'var(--ok)';
+          msg.textContent = 'Restauration reussie : ' + out.fichiers + ' fichier(s).';
+          chargerDonnees();
+        } else {
+          msg.style.color = 'var(--danger)';
+          msg.textContent = (out && out.message) || ('Erreur ' + r.status);
+        }
+      } catch(e) {
+        msg.style.color = 'var(--danger)';
+        msg.textContent = 'Fichier invalide.';
+      }
+    };
     dashboardInit = true;
   }
   chargerDonnees();
