@@ -557,6 +557,7 @@ async function main() {
     //        nuit ou Render remplace l'instance : rien ne doit se perdre.
     const PORT_JSONBIN = librePort();
     let binFaux = null; // { id, record }
+    let creationsBin = 0;
     const fauxJsonbin = http.createServer((req, res) => {
       let d = '';
       req.on('data', c => d += c);
@@ -566,17 +567,18 @@ async function main() {
           res.end(JSON.stringify(obj));
         };
         const url = (req.url || '').split('?')[0];
-        // Vraie route de l API : liste paginee des bins non classes.
+        // Vraie route de l API (reponse reelle : id dans "record").
         const estListe = req.method === 'GET' && url.indexOf('/v3/c/uncategorized/bins') === 0;
         if (estListe) {
           const aCurseur = /^\/v3\/c\/uncategorized\/bins\/[^/]+$/.test(url);
           if (binFaux && !aCurseur) {
-            return rep(200, { bins: [{ id: binFaux.id, createdAt: new Date().toISOString() }] });
+            return rep(200, [{ record: binFaux.id, private: true, createdAt: new Date().toISOString() }]);
           }
-          return rep(200, { bins: [] });
+          return rep(200, []);
         }
         if (req.method === 'POST' && url === '/v3/b') {
           if (!d || d === '{}') return rep(400, { message: 'Bin cannot be blank' });
+          creationsBin++;
           binFaux = { id: 'bin-test', record: JSON.parse(d) };
           return rep(200, { id: binFaux.id });
         }
@@ -644,6 +646,14 @@ async function main() {
         const loginB = await requete(portB, '/login', 'POST', 'pseudo=admin&mdp=%40clotaire%232012');
         assert(loginB.json && loginB.json.ok,
           'compte admin reconstitue: ' + loginB.texte.substring(0, 120));
+        const statsB = await requete(portB, '/stats', 'GET', null,
+          { 'X-UID': loginB.json.uid, 'X-EGO': loginB.json.ego });
+        const decB = statsB.json && statsB.json.sauvegarde && statsB.json.sauvegarde.decouverte;
+        assert(decB && decB.source === 'liste' && decB.choisi === 'bin-test',
+          'bin retrouve par la vraie route de liste: ' + JSON.stringify(decB));
+        assert.strictEqual(creationsBin, 1,
+          'aucun bin cree au second demarrage (creations=' + creationsBin + ')');
+        ok.push('cloud: bin retrouve par la liste reelle (pas de creation)');
         const histoB = await requete(portB, '/historique', 'GET', null,
           { 'X-UID': invCloud.json.uid, 'X-Jeton': invCloud.json.jeton });
         assert.strictEqual(histoB.status, 200,

@@ -49,6 +49,8 @@ const SNAP_MIN_INTERVAL = Number(process.env.JSONBIN_SNAP_MIN_MS || 60000);
 let derniereSauvegarde = null;
 let derniereErreur = null;
 let derniereTaille = null;
+// Comment le bin a ete choisi (diagnostic dans /stats).
+let decouverte = null;
 
 function enregistrerFabrique(fn) { fabriqueSauvegarde = fn; }
 function getSauvegarde() { return data.sauvegarde; }
@@ -116,23 +118,24 @@ async function binSemblable(id) {
 }
 
 // Liste les ids des bins non classes : c'est la vraie route de l'API v3
-// (GET /v3/b n'existe pas, elle rend 404). Paginee, du plus recent au plus
-// ancien : on s'arrete au premier bin a nous.
+// (GET /v3/b n'existe pas, elle rend 404). Reponse reelle :
+//   [{ "record": "<ID>", "private": true, "createdAt": "..." }, ...]
+// l'id est donc dans "record". Paginee, du plus recent au plus ancien.
 async function listerNosBins() {
   const ids = [];
   let curseur = '';
   for (let page = 0; page < 5; page++) {
     const chemin = '/v3/c/uncategorized/bins' + (curseur ? '/' + curseur : '');
-    const l = await jsonbinRequest('GET', chemin, null, { 'X-Sort-Order': 'Desc' });
+    const l = await jsonbinRequest('GET', chemin);
     const bins = Array.isArray(l) ? l : (l && (l.bins || l.data || l.records)) || [];
-    if (!bins.length) break;
+    if (!Array.isArray(bins) || !bins.length) break;
     for (const b of bins) {
-      const id = b && (b.id || b.binId || b._id);
-      if (id && ids.indexOf(id) < 0) ids.push(id);
+      const id = b && (b.record || b.id || b.binId || b._id);
+      if (typeof id === 'string' && id && ids.indexOf(id) < 0) ids.push(id);
     }
     const dernier = bins[bins.length - 1];
-    const idDernier = dernier && (dernier.id || dernier.binId || dernier._id);
-    if (!idDernier || idDernier === curseur || bins.length < 10) break;
+    const idDernier = dernier && (dernier.record || dernier.id || dernier.binId || dernier._id);
+    if (typeof idDernier !== 'string' || !idDernier || idDernier === curseur || bins.length < 10) break;
     curseur = idDernier;
   }
   return ids;
@@ -140,10 +143,11 @@ async function listerNosBins() {
 
 // Trouve le bin existant, ou en cree un. Jamais de bin cree a chaque sauvegarde.
 async function trouverOuCreerBin() {
-  if (JSONBIN_BIN_ID) { binIdCourant = JSONBIN_BIN_ID; return binIdCourant; }
+  if (JSONBIN_BIN_ID) { binIdCourant = JSONBIN_BIN_ID; decouverte = { source: 'env' }; return binIdCourant; }
   // Un .bin-id local connu, apres validation de son contenu.
   if (binIdFichier && (await binSemblable(binIdFichier))) {
     binIdCourant = binIdFichier;
+    decouverte = { source: 'fichier' };
     console.log(`[storage] Bin repris du fichier .bin-id: ${binIdFichier}`);
     return binIdCourant;
   }
@@ -151,14 +155,19 @@ async function trouverOuCreerBin() {
   try {
     const ids = await listerNosBins();
     listeOk = true;
+    decouverte = { source: 'liste', nb: ids.length };
     for (const id of ids) {
       if (await binSemblable(id)) {
         binIdCourant = id;
+        decouverte = { source: 'liste', nb: ids.length, choisi: id };
         console.log(`[storage] Bin retrouve: ${id}`);
         return binIdCourant;
       }
     }
-  } catch (e) { console.log(`[storage] liste bins KO: ${e.message}`); }
+  } catch (e) {
+    decouverte = { source: 'liste', erreur: e.message };
+    console.log(`[storage] liste bins KO: ${e.message}`);
+  }
   if (!listeOk && binIdFichier) { binIdCourant = binIdFichier; return binIdCourant; }
   // L'API refuse un corps vide (400 "Bin cannot be blank") : on cree le bin
   // deja remplit avec les donnees du moment.
@@ -166,6 +175,7 @@ async function trouverOuCreerBin() {
   const id = (r && r.id) || (r && r.metadata && r.metadata.id);
   if (!id) throw new Error('creation du bin impossible');
   binIdCourant = id;
+  decouverte = Object.assign({}, decouverte, { creation: id });
   try { fs.writeFileSync(FICHIER_BIN_ID, id, 'utf8'); } catch (e) {}
   console.log(`[storage] Bin cree: ${id}`);
   console.log(`[storage] Pour figer ce bin: ajoute JSONBIN_BIN_ID=${id} (Render > Environment)`);
@@ -265,6 +275,7 @@ function etatSauvegarde() {
   return {
     configure: !!JSONBIN_API_KEY,
     bin: binIdCourant || null,
+    decouverte,
     derniereSauvegarde,
     derniereErreur,
     derniereTaille,
