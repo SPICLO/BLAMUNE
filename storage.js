@@ -28,8 +28,10 @@ try { binIdFichier = fs.readFileSync(FICHIER_BIN_ID, 'utf8').trim(); } catch (e)
 let binIdCourant = JSONBIN_BIN_ID;
 let _binPromise = null;
 
-// Donnees en memoire (cache)
+// Donnees en memoire (cache). "application" sert de marqueur : un bin vide
+// est refuse par l API (400 "Bin cannot be blank"), on le remplit toujours.
 let data = {
+  application: 'blamune',
   comptes: {},
   historiques: {},
   memories: {},
@@ -109,7 +111,7 @@ async function binSemblable(id) {
     const r = await jsonbinRequest('GET', `/v3/b/${id}`);
     const rec = r && r.record !== undefined ? r.record : r;
     return !!(rec && typeof rec === 'object' && !Array.isArray(rec) &&
-      (rec.comptes || rec.memories || rec.historiques || rec.sauvegarde));
+      (rec.application === 'blamune' || rec.sauvegarde || rec.comptes || rec.memories || rec.historiques));
   } catch (e) { return false; }
 }
 
@@ -138,7 +140,9 @@ async function trouverOuCreerBin() {
     }
   } catch (e) { console.log(`[storage] liste bins KO: ${e.message}`); }
   if (!listeOk && binIdFichier) { binIdCourant = binIdFichier; return binIdCourant; }
-  const r = await jsonbinRequest('POST', '/v3/b', {}, { 'X-Bin-Name': 'blamune' });
+  // L'API refuse un corps vide (400 "Bin cannot be blank") : on cree le bin
+  // deja remplit avec les donnees du moment.
+  const r = await jsonbinRequest('POST', '/v3/b', data, { 'X-Bin-Name': 'blamune' });
   const id = (r && r.id) || (r && r.metadata && r.metadata.id);
   if (!id) throw new Error('creation du bin impossible');
   binIdCourant = id;
@@ -196,7 +200,8 @@ async function chargerDuCloud() {
     const r = await jsonbinRequest('GET', `/v3/b/${id}`);
     const rec = r && r.record !== undefined ? r.record : r;
     if (rec && typeof rec === 'object' && !Array.isArray(rec)) {
-      data = Object.assign({ comptes: {}, historiques: {}, memories: {}, sauvegarde: null }, rec);
+      data = Object.assign({ application: 'blamune', comptes: {}, historiques: {}, memories: {}, sauvegarde: null }, rec);
+      data.application = 'blamune';
       console.log(`[storage] Charge depuis le cloud: ${Object.keys(data.comptes || {}).length} comptes`
         + (data.sauvegarde ? `, sauvegarde du ${data.sauvegarde.date}` : ''));
       return true;

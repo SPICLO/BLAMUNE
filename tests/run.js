@@ -571,7 +571,8 @@ async function main() {
           return rep(200, binFaux ? [{ id: binFaux.id, createdAt: new Date().toISOString() }] : []);
         }
         if (req.method === 'POST' && url === '/v3/b') {
-          binFaux = { id: 'bin-test', record: {} };
+          if (!d || d === '{}') return rep(400, { message: 'Bin cannot be blank' });
+          binFaux = { id: 'bin-test', record: JSON.parse(d) };
           return rep(200, { id: binFaux.id });
         }
         const cheminBin = /^\/v3\/b\/([^/]+)$/.exec(url);
