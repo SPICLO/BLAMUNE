@@ -90,9 +90,9 @@ function jsonbinRequest(method, chemin, corps, entetes) {
         try {
           const json = JSON.parse(raw);
           if (res.statusCode >= 200 && res.statusCode < 300) resolve(json);
-          else reject(new Error(json.message || `HTTP ${res.statusCode}`));
+          else reject(new Error(`${method} ${chemin} -> HTTP ${res.statusCode}: ${json.message || raw.substring(0, 160)}`));
         } catch (e) {
-          reject(new Error(`Parse error: ${raw.substring(0, 200)}`));
+          reject(new Error(`${method} ${chemin} -> HTTP ${res.statusCode}: ${raw.substring(0, 160) || '(reponse vide)'}`));
         }
       });
     });
@@ -116,6 +116,12 @@ async function binSemblable(id) {
 // Trouve le bin existant, ou en cree un. Jamais de bin cree a chaque sauvegarde.
 async function trouverOuCreerBin() {
   if (JSONBIN_BIN_ID) { binIdCourant = JSONBIN_BIN_ID; return binIdCourant; }
+  // Un .bin-id local connu, apres validation de son contenu.
+  if (binIdFichier && (await binSemblable(binIdFichier))) {
+    binIdCourant = binIdFichier;
+    console.log(`[storage] Bin repris du fichier .bin-id: ${binIdFichier}`);
+    return binIdCourant;
+  }
   let listeOk = false;
   try {
     const l = await jsonbinRequest('GET', '/v3/b?limit=50');
@@ -173,7 +179,7 @@ async function sauvegarderTout() {
     derniereErreur = null;
   } catch (e) {
     derniereErreur = e.message;
-    console.log('[storage] Erreur sauvegarde:', e.message);
+    console.log(`[storage] Erreur sauvegarde (bin=${binIdCourant || 'inconnu'}):`, e.message);
   }
 }
 
