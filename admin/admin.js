@@ -207,6 +207,41 @@ function afficherErreur(msg) {
   setSectionErreur('savoirContenu', msg);
   setSectionErreur('vocabContenu', msg);
   setSectionErreur('configContenu', msg);
+  var bann = document.getElementById('alerteBanniere');
+  if (bann) { bann.style.display = 'none'; bann.textContent = ''; }
+}
+
+// Duree lisible depuis une date ISO ("12 s", "4 min", "2 h").
+function depuis(iso) {
+  var s = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
+  if (!isFinite(s)) return '?';
+  if (s < 60) return s + ' s';
+  if (s < 3600) return Math.floor(s / 60) + ' min';
+  if (s < 86400) return Math.floor(s / 3600) + ' h';
+  return Math.floor(s / 86400) + ' j';
+}
+
+// Banniere rouge quand tout casse (quota / plus aucun modele) : l'info arrive
+// sur le dashboard au lieu de rester enfouie dans /admin/logs.
+function afficherAlertes(j) {
+  var bann = document.getElementById('alerteBanniere');
+  if (!bann) return;
+  var al = j.alertes || {};
+  var texte = '';
+  if (al.quota) {
+    texte = 'ALERTE QUOTA : tous les modeles satur\u00e9s depuis ' + depuis(al.quota.debut) +
+      ' (' + (al.quota.compteur || 1) + ' fois)';
+  } else if (al.technique) {
+    texte = 'ALERTE MODELE : plus aucune reponse depuis ' + depuis(al.technique.debut);
+  } else if (al.derniereResolution &&
+             Date.now() - Date.parse(al.derniereResolution.fin) < 86400000) {
+    texte = 'Incident ' + (al.derniereResolution.type === 'quota' ? 'quota' : 'modele') +
+      ' resolu a ' + new Date(al.derniereResolution.fin).toLocaleTimeString('fr-FR');
+  }
+  var alerteActive = !!(al.quota || al.technique);
+  bann.className = 'banniere-alerte' + (alerteActive ? '' : ' banniere-ok');
+  bann.style.display = texte ? 'block' : 'none';
+  bann.textContent = texte;
 }
 
 async function chargerDonnees() {
@@ -240,6 +275,12 @@ async function chargerDonnees() {
     document.getElementById('statDemarrages').textContent = s.demarrages || 0;
     document.getElementById('statTemps').textContent = (s.tempsMoyen || 0) + 'ms';
     document.getElementById('uptime').textContent = 'Demarre le ' + (s.demarrage || '?');
+
+    // Modele qui repond vraiment + alertes quota/modele
+    var md = j.modele || {};
+    var elModele = document.getElementById('statModele');
+    if (elModele) elModele.textContent = md.actif || md.principal || '-';
+    afficherAlertes(j);
 
     // Utilisateurs en ligne
     var connexions = j.connexions || [];

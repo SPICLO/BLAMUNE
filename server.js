@@ -94,6 +94,34 @@ let config = {
 // ("no longer available to new users") : on le remplace par 3.8-flash.
 const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.7-flash'];
 
+// Tous les modeles utilisables, du principal au fallback.
+function modelesConnus() {
+  return [config.api_model, ...FALLBACK_MODELS.filter(m => m !== config.api_model)];
+}
+
+// Dernier modele qui a repondu. Le gaspillage avant : chaque requete
+// recommencait par le modele principal (mort ou en quota) et depensait
+// 2 appels inutiles avant de trouver celui qui repondait vraiment.
+let dernierModeleOk = '';
+function modeleActif() {
+  return (dernierModeleOk && modelesConnus().indexOf(dernierModeleOk) >= 0)
+    ? dernierModeleOk
+    : modelesConnus()[0];
+}
+function ordreModeles() {
+  const premier = modeleActif();
+  return [premier, ...modelesConnus().filter(m => m !== premier)];
+}
+function memoriserModeleOk(modele) {
+  if (!modele || modelesConnus().indexOf(modele) < 0) return;
+  if (dernierModeleOk === modele) return;
+  dernierModeleOk = modele;
+  // Survit a un redemarrage : stats.json est ecrit sur disque tout de suite.
+  stats.dernierModeleOk = modele;
+  stats.modeleOkDate = new Date().toISOString();
+  sauverStats();
+}
+
 // Env vars first
 if (process.env.API_KEY) config.api_key = process.env.API_KEY;
 if (process.env.API_PROVIDER) config.api_provider = process.env.API_PROVIDER;
@@ -167,6 +195,55 @@ function sauverStats() {
 }
 
 chargerStats();
+// Apres un redemarrage on repart du modele qui repondait avant.
+if (stats.dernierModeleOk && modelesConnus().indexOf(stats.dernierModeleOk) >= 0) {
+  dernierModeleOk = stats.dernierModeleOk;
+}
+
+// ==================== ALERTES ====================
+// Avant : quand tout casse, la seule trace est une ligne dans /admin/logs.
+// Desormais l'etat est expose dans /stats et /admin/data, et affiche en
+// banniere rouge sur le dashboard admin.
+let alertes = { quota: null, technique: null, derniereResolution: null };
+function alerter(type, message) {
+  const maintenant = new Date().toISOString();
+  const a = alertes[type];
+  if (a) {
+    a.compteur++;
+    a.derniere = message;
+    a.vu = maintenant;
+  } else {
+    alertes[type] = { debut: maintenant, vu: maintenant, compteur: 1, message };
+    loggerErreur('alerte', (type === 'quota' ? 'QUOTA' : 'MODELE') + ' : ' + message);
+  }
+}
+function resoudreAlertes() {
+  ['quota', 'technique'].forEach(type => {
+    if (!alertes[type]) return;
+    alertes.derniereResolution = {
+      type, debut: alertes[type].debut, fin: new Date().toISOString(),
+      message: alertes[type].message
+    };
+    loggerErreur('alerte', (type === 'quota' ? 'QUOTA' : 'MODELE') + ' : resolu ' +
+      alertes.derniereResolution.fin);
+    alertes[type] = null;
+  });
+}
+function etatAlertes() {
+  return {
+    quota: alertes.quota,
+    technique: alertes.technique,
+    derniereResolution: alertes.derniereResolution
+  };
+}
+function etatModele() {
+  return {
+    principal: config.api_model,
+    actif: modeleActif(),
+    reussi: dernierModeleOk,
+    ordre: ordreModeles()
+  };
+}
 
 // ==================== RATE LIMITING ====================
 const rateLimits = {};
@@ -351,13 +428,56 @@ function appliquerSauvegarde(snap) {
   if (snap.stats && typeof snap.stats === 'object') {
     stats = Object.assign({}, stats, snap.stats);
     stats.demarrage = new Date().toISOString();
+    if (stats.dernierModeleOk && modelesConnus().indexOf(stats.dernierModeleOk) >= 0) {
+      dernierModeleOk = stats.dernierModeleOk;
+    }
   }
   if (storage.estConfigure()) storage.setComptes(comptes);
   return ecrits;
 }
 
+// Ancien format sha256(mdp + sel) : trop rapide a casser hors ligne.
+// Nouveau format scrypt (derive natif Node) : "scrypt$N$r$p$hash", le sel
+// reste dans compte.sel. Un ancien compte passe encore en legacy une derniere
+// fois a la connexion, puis son hash est immediatement remplace par scrypt.
 function hashMdp(mdp, sel) {
   return crypto.createHash('sha256').update(mdp + sel).digest('hex');
+}
+
+const SCRYPT_N = 16384, SCRYPT_R = 8, SCRYPT_P = 1;
+const SCRYPT_OPTS = { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P, maxmem: 64 * 1024 * 1024 };
+
+function hashMdpScrypt(mdp, sel) {
+  const h = crypto.scryptSync(String(mdp), String(sel), 64, SCRYPT_OPTS);
+  return 'scrypt$' + SCRYPT_N + '$' + SCRYPT_R + '$' + SCRYPT_P + '$' + h.toString('hex');
+}
+
+function verifierMdp(mdp, compte) {
+  const h = compte && compte.hash;
+  if (!h) return false;
+  if (String(h).indexOf('scrypt$') === 0) {
+    const p = String(h).split('$');
+    const N = parseInt(p[1], 10), r = parseInt(p[2], 10), pr = parseInt(p[3], 10);
+    const attendu = p[4] || '';
+    if (!N || !r || !pr || attendu.length !== 128) return false;
+    let obtenu;
+    try {
+      obtenu = crypto.scryptSync(String(mdp), String(compte.sel || ''), 64,
+        { N, r, p: pr, maxmem: 64 * 1024 * 1024 });
+    } catch (e) { return false; }
+    return crypto.timingSafeEqual(Buffer.from(attendu, 'hex'), obtenu);
+  }
+  // Legacy : comparaison en temps constant.
+  const attendu = Buffer.from(String(h), 'hex');
+  const obtenu = Buffer.from(hashMdp(mdp, compte.sel || ''), 'hex');
+  return attendu.length === 32 && obtenu.length === 32 &&
+    crypto.timingSafeEqual(attendu, obtenu);
+}
+
+// Migration : appelee au moment ou le mot de passe legacy vient de passer.
+function rehacherMdp(compte, mdp) {
+  compte.sel = crypto.randomBytes(16).toString('hex');
+  compte.hash = hashMdpScrypt(mdp, compte.sel);
 }
 
 function genererEgo() {
@@ -969,18 +1089,14 @@ function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion) {
   });
 }
 
-// Dernier modele qui a repondu (diagnostic affiche en commentaire SSE).
-let dernierModeleOk = '';
-
 // onDelta est optionnel : sans lui on garde l'ancien comportement.
 // Deux passes possibles : si TOUTES les tentatives de la premiere etaient des
 // quotas, on attend le rechargement de la fenetre gratuite puis on reessaie
 // une fois plutot que de rendre la main sur "probleme technique".
 async function appelerGemini(message, histo, onDelta) {
   const contents = construireContenus(limiterHisto(histo, HISTO_API_MAX));
-  const modeles = [config.api_model, ...FALLBACK_MODELS.filter(m => m !== config.api_model)];
+  const modeles = ordreModeles();
   let derniereErreur = null;
-  dernierModeleOk = '';
 
   for (let passe = 0; passe < 2; passe++) {
     let fluxActif = typeof onDelta === 'function';
@@ -993,7 +1109,7 @@ async function appelerGemini(message, histo, onDelta) {
       if (fluxActif) {
         try {
           const texte = await modeleEnFlux(modele, contents, onDelta, budget);
-          if (texte) { dernierModeleOk = modele; return texte; }
+          if (texte) { memoriserModeleOk(modele); resoudreAlertes(); return texte; }
           derniereErreur = new Error('Reponse vide');
           quotaPartout = false;
         } catch (e) {
@@ -1008,7 +1124,8 @@ async function appelerGemini(message, histo, onDelta) {
       try {
         const texte = await modeleClassique(modele, contents, budget);
         if (texte) {
-          dernierModeleOk = modele;
+          memoriserModeleOk(modele);
+          resoudreAlertes();
           if (typeof onDelta === 'function') { try { onDelta(texte); } catch (e) {} }
           return texte;
         }
@@ -1024,14 +1141,18 @@ async function appelerGemini(message, histo, onDelta) {
     // Tout le parcours etait du quota : on attend puis on repasse une fois.
     if (passe === 0 && quotaPartout && estQuota(derniereErreur)) {
       const attenteMs = delaiAvantNouvellePasse(derniereErreur);
-      loggerErreur('gemini', 'tous les modeles en quota -> nouvelle passe dans ' +
-        Math.round(attenteMs / 1000) + ' s');
+      const info = 'tous les modeles en quota -> nouvelle passe dans ' +
+        Math.round(attenteMs / 1000) + ' s';
+      loggerErreur('gemini', info);
+      alerter('quota', info);
       await attendre(attenteMs);
       continue;
     }
     break;
   }
-  throw new Error(derniereErreur ? derniereErreur.message : 'Tous les modeles Gemini ont echoue');
+  const echec = derniereErreur ? derniereErreur.message : 'Tous les modeles Gemini ont echoue';
+  alerter(estQuota(derniereErreur) ? 'quota' : 'technique', echec);
+  throw new Error(echec);
 }
 
 function nettoyerReponse(texte) {
@@ -1550,7 +1671,7 @@ async function majResume(uid, mode) {
       'en francais, 60 mots maximum, sans liste a puces, sans guillemets, sans phrase d\'intro.\n' +
       (anterieur ? 'Resume deja etabli (le completer sans rien perdre d\'important) :\n' + anterieur + '\n\n' : '') +
       'Suite de la conversation :\n' + donnees;
-    const brut = await modeleClassique(config.api_model,
+    const brut = await modeleClassique(modeleActif(),
       [{ role: 'user', parts: [{ text: consigne }] }], { n: 1 }, true);
     const propre = nettoyerReponse(String(brut || '')).trim();
     if (propre && propre !== '...') {
@@ -1597,7 +1718,7 @@ async function extraireAvecModele(uid, msg) {
       'Regles : valeur courte (30 caracteres max), sans ponctuation finale ; motsFavoris est un tableau de mots ; ' +
       'si une information est deja connue et identique, ne la repets pas ; si le message ne contient aucun fait, reponds {}.\n' +
       'Deja connu :\n' + (connu.length ? connu.join('\n') : '(rien)') + '\n\nMessage :\n' + msg;
-    const brut = await modeleClassique(config.api_model,
+    const brut = await modeleClassique(modeleActif(),
       [{ role: 'user', parts: [{ text: consigne }] }], { n: 1 }, true);
     const texte = String(brut || '').trim();
     const debut = texte.indexOf('{');
@@ -1762,6 +1883,8 @@ app.get('/admin/data', (req, res) => {
   res.json({
     ok: true,
     stats,
+    alertes: etatAlertes(),
+    modele: etatModele(),
     connexions,
     messages: messagesLimite,
     messagesTotal: messages.length,
@@ -1901,8 +2024,8 @@ app.post('/register', (req, res) => {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ ok: false, message: 'Email invalide.' });
   const cle = pseudo.toLowerCase();
   if (comptes[cle]) return res.status(409).json({ ok: false, message: 'Ce pseudo est deja pris.' });
-  const sel = crypto.randomBytes(8).toString('hex');
-  const hash = hashMdp(mdp, sel);
+  const sel = crypto.randomBytes(16).toString('hex');
+  const hash = hashMdpScrypt(mdp, sel);
   const uid = 'u' + crypto.randomBytes(6).toString('hex');
   const ego = genererEgo();
   comptes[cle] = { pseudo, email, hash, sel, uid, ego, tokenCree: new Date().toISOString(), cree: new Date().toISOString().split('T')[0] };
@@ -1933,7 +2056,7 @@ app.post('/login', (req, res) => {
   if (compte.lockoutUntil && new Date(compte.lockoutUntil) > new Date()) {
     return res.status(423).json({ ok: false, message: 'Compte verrouille. Reessayez plus tard.' });
   }
-  if (hashMdp(mdp, compte.sel) !== compte.hash) {
+  if (!verifierMdp(mdp, compte)) {
     compte.erreursLogin = (compte.erreursLogin || 0) + 1;
     if (compte.erreursLogin >= 5) compte.lockoutUntil = new Date(Date.now() + 900000).toISOString();
     sauvegarderComptes();
@@ -1942,6 +2065,9 @@ app.post('/login', (req, res) => {
   compte.erreursLogin = 0;
   compte.lockoutUntil = null;
   compte.tokenCree = new Date().toISOString();
+  // Migration : un ancien hash sha256 est remplace par scrypt des que le
+  // mot de passe est reconnu (une seule fois, puis c'est fini).
+  if (String(compte.hash).indexOf('scrypt$') !== 0) rehacherMdp(compte, mdp);
   sauvegarderComptes();
   ecrireMemoire(compte.uid, 'nom', compte.pseudo);
   stats.sessionsTotal++;
@@ -2276,7 +2402,9 @@ app.get('/stats', (req, res) => {
     ...stats,
     apiProvider: config.api_provider,
     apiConfigured: !!config.api_key && config.api_key !== 'ego',
-    sauvegarde: storage.etatSauvegarde()
+    sauvegarde: storage.etatSauvegarde(),
+    alertes: etatAlertes(),
+    modele: etatModele()
   });
 });
 
@@ -2303,9 +2431,9 @@ app.post('/admin/change-mdp', (req, res) => {
   if (nouveauMdp.length < 6) return res.status(400).json({ ok: false, message: 'Mot de passe trop court (6 min).' });
   for (const cle of Object.keys(comptes)) {
     if (comptes[cle].uid === auth.uid) {
-      const sel = crypto.randomBytes(8).toString('hex');
+      const sel = crypto.randomBytes(16).toString('hex');
       comptes[cle].sel = sel;
-      comptes[cle].hash = hashMdp(nouveauMdp, sel);
+      comptes[cle].hash = hashMdpScrypt(nouveauMdp, sel);
       comptes[cle].erreursLogin = 0;
       comptes[cle].lockoutUntil = null;
       sauvegarderComptes();
@@ -2421,8 +2549,8 @@ server.listen(PORT, () => {
   etat = 'pret';
   stats.demarrages++;
   if (!comptes['admin']) {
-    const sel = crypto.randomBytes(8).toString('hex');
-    const hash = hashMdp('@clotaire#2012', sel);
+    const sel = crypto.randomBytes(16).toString('hex');
+    const hash = hashMdpScrypt('@clotaire#2012', sel);
     const uid = 'u' + crypto.randomBytes(6).toString('hex');
     const ego = genererEgo();
     comptes['admin'] = { pseudo: 'admin', email: 'admin@blamune.com', hash, sel, uid, ego, tokenCree: new Date().toISOString(), cree: new Date().toISOString().split('T')[0] };

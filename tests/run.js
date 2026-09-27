@@ -30,6 +30,7 @@ let failProchain = false;
 let failQuota = false;   // 429 style Google ("retry in 45s") sur le prochain chat
 let quotaGeneralRestant = 0; // 429 sur les N prochains chats : tout le parcours est sature
 let modeleQuota = null;  // modele qui a recu ce 429
+const modelesChat = [];  // modeles appeles pour les vrais messages (ordre vu)
 let modeleReponse = null; // modele qui a fini par repondre
 // Trois types de requetes distinctes, on garde la derniere de chaque.
 let dernierChat = null;       // message de conversation (prompt BLAMUNE)
@@ -144,7 +145,7 @@ const mock = http.createServer((req, res) => {
       dernierResume = corps;
       return repondre(res, 'Tous deux ont parle de foot et de son anniversaire.');
     }
-    if (demande.indexOf('CONSCIENCE DE SOI') >= 0) { dernierChat = corps; modeleReponse = modeleVu; }
+    if (demande.indexOf('CONSCIENCE DE SOI') >= 0) { dernierChat = corps; modeleReponse = modeleVu; modelesChat.push(modeleVu); }
     if (demande.indexOf('MODE EGO') >= 0) dernierEgo = corps;
 
     const texte = 'Reponse test ' + appels;
@@ -442,16 +443,36 @@ async function main() {
     // 11bis. TOUT le parcours en quota en meme temps : le serveur attend le
     //        rechargement puis repasse la cascade une fois, au lieu de rendre
     //        "probleme technique" (vu en live quand les 3 modeles crevent).
+    //        Pendant la panne, l'alerte doit etre visible dans /stats et
+    //        dans /admin/data (banniere du dashboard), pas seulement dans
+    //        /admin/logs ; puis elle se resout d'elle-meme.
+    const lgQuota = await requete(PORT_APP, '/login', 'POST', 'pseudo=admin&mdp=%40clotaire%232012');
+    assert(lgQuota.json && lgQuota.json.ok, 'login admin (alertes): ' + lgQuota.texte.substring(0, 120));
+    const hQuota = { 'X-UID': lgQuota.json.uid, 'X-EGO': lgQuota.json.ego };
+
     quotaGeneralRestant = 6;
-    const gq = await envoyer('un long message pour tester le quota general sur tous les modeles');
+    const gqP = envoyer('un long message pour tester le quota general sur tous les modeles');
     await condition(() => journal.indexOf('tous les modeles en quota -> nouvelle passe') >= 0, 6000,
       'attente de la seconde passe apres le quota general');
+    const stAlerte = await requete(PORT_APP, '/stats', 'GET', null, hQuota);
+    assert(stAlerte.json && stAlerte.json.alertes && stAlerte.json.alertes.quota,
+      'alerte quota visible dans /stats: ' + JSON.stringify(stAlerte.json && stAlerte.json.alertes));
+    const dataAlerte = await requete(PORT_APP, '/admin/data', 'GET', null, hQuota);
+    assert(dataAlerte.json && dataAlerte.json.alertes && dataAlerte.json.alertes.quota,
+      'alerte quota visible dans /admin/data: ' + JSON.stringify(dataAlerte.json && dataAlerte.json.alertes));
+    const gq = await gqP;
     assert.strictEqual(gq.status, 200,
       'reponse malgre le quota general (HTTP ' + gq.status + ') ' + gq.texte.substring(0, 200));
     assert(gq.json.reponses && gq.json.reponses[0].indexOf('Reponse test') >= 0,
       'texte present apres la deuxieme passe: ' + gq.texte.substring(0, 200));
     assert.strictEqual(quotaGeneralRestant, 0, 'tous les 429 injectes ont ete consommes');
     ok.push('quota general : passe apres attente (pas de probleme technique)');
+    const stApres = await requete(PORT_APP, '/stats', 'GET', null, hQuota);
+    const alApres = (stApres.json && stApres.json.alertes) || {};
+    assert(!alApres.quota && alApres.derniereResolution &&
+      alApres.derniereResolution.type === 'quota',
+      'alerte resolue des que la reponse revient: ' + JSON.stringify(alApres));
+    ok.push('alerte quota visible pendant la panne puis resolue (/stats + /admin/data)');
 
     // 12. Les taches de fond attendent le rechargement de la fenetre de
     //        quota au lieu de crever le quota une seconde fois.
@@ -461,6 +482,27 @@ async function main() {
     assert.strictEqual(nbExtractions, avantExtQuota,
       'extraction en veille apres quota (recues=' + nbExtractions + ')');
     ok.push('taches de fond en veille apres un 429');
+
+    // 12bis. Le modele principal devient le DERNIER modele reussi : la
+    //        requete suivante part de lui au lieu de repartir du modele
+    //        mort/en quota et de gaspiller 2 appels inutiles.
+    const stAvant = await requete(PORT_APP, '/stats', 'GET', null, hQuota);
+    const actifAvant = stAvant.json.modele && stAvant.json.modele.actif;
+    assert(actifAvant, 'modele actif connu: ' + JSON.stringify(stAvant.json.modele));
+    failQuota = true;
+    const chg = await envoyer('une phrase pour changer de modele principal');
+    assert.strictEqual(chg.status, 200,
+      'reponse malgre le quota du premier modele (HTTP ' + chg.status + ') ' + chg.texte.substring(0, 200));
+    const stModele = await requete(PORT_APP, '/stats', 'GET', null, hQuota);
+    const reussi = stModele.json.modele && stModele.json.modele.reussi;
+    assert(reussi && reussi !== actifAvant,
+      'le modele reussi a remplace le modele actif: ' + JSON.stringify(stModele.json.modele));
+    modelesChat.length = 0;
+    const suit = await envoyer('une autre phrase au hasard');
+    assert.strictEqual(suit.status, 200, 'reponse du modele memorise');
+    assert.strictEqual(modelesChat[0], reussi,
+      'la requete part du modele reussi (vu: [' + modelesChat.join(',') + '] attendu: ' + reussi + ')');
+    ok.push('modele principal = dernier modele reussi (' + reussi + ')');
 
     // 13. Journal des erreurs : visible par l'admin
     const login = await requete(PORT_APP, '/login', 'POST', 'pseudo=admin&mdp=%40clotaire%232012');
@@ -670,6 +712,50 @@ async function main() {
       await new Promise(r => fauxJsonbin.close(r));
       try { fs.rmSync(dataA, { recursive: true, force: true }); } catch (e) {}
       try { fs.rmSync(dataB, { recursive: true, force: true }); } catch (e) {}
+    }
+
+    // 17. Mots de passe : scrypt pour les comptes neufs, et l'ancien format
+    //        sha256+sel est accepte une derniere fois PUIS migre automatique-
+    //        ment a la connexion (personne ne doit etre deconnecte).
+    const dataMdp = fs.mkdtempSync(path.join(os.tmpdir(), 'blamune-mdp-'));
+    const portMdp = librePort();
+    const selAncien = '0123456789abcdef';
+    const ancienHash = crypto.createHash('sha256')
+      .update('motdepasse-ancien' + selAncien).digest('hex');
+    fs.writeFileSync(path.join(dataMdp, 'comptes.json'), JSON.stringify({
+      theo: { pseudo: 'Theo', email: 'theo@test.fr', hash: ancienHash, sel: selAncien,
+        uid: 'u000000000001', ego: 'Curieux', cree: '2026-01-01' }
+    }, null, 2), 'utf8');
+    const serveurMdp = spawn(process.execPath, [path.join(RACINE, 'server.js')],
+      { cwd: RACINE, env: Object.assign({}, env, { PORT: String(portMdp), BLAMUNE_DATA_DIR: dataMdp }), stdio: 'pipe' });
+    let journalMdp = '';
+    serveurMdp.stdout.on('data', d => { journalMdp += d; });
+    serveurMdp.stderr.on('data', d => { journalMdp += d; });
+    try {
+      await attendreServeur(portMdp);
+      const l1 = await requete(portMdp, '/login', 'POST', 'pseudo=Theo&mdp=motdepasse-ancien');
+      assert.strictEqual(l1.status, 200,
+        'ancien hash sha256 accepte: HTTP ' + l1.status + ' ' + l1.texte.substring(0, 150));
+      const apresMigration = JSON.parse(fs.readFileSync(path.join(dataMdp, 'comptes.json'), 'utf8'));
+      assert.strictEqual(String(apresMigration.theo.hash).indexOf('scrypt$'), 0,
+        'hash migre en scrypt apres la connexion: ' + String(apresMigration.theo.hash).substring(0, 44));
+      const l2 = await requete(portMdp, '/login', 'POST', 'pseudo=Theo&mdp=motdepasse-ancien');
+      assert.strictEqual(l2.status, 200,
+        'reconnexion avec le hash scrypt: HTTP ' + l2.status + ' ' + l2.texte.substring(0, 150));
+      const l3 = await requete(portMdp, '/login', 'POST', 'pseudo=Theo&mdp=faux-mdp-ici');
+      assert.strictEqual(l3.status, 401, 'mauvais mot de passe refuse apres migration');
+      const r1 = await requete(portMdp, '/register', 'POST',
+        'pseudo=maria&mdp=secret123&email=maria@test.fr');
+      assert.strictEqual(r1.status, 200,
+        'inscription: HTTP ' + r1.status + ' ' + r1.texte.substring(0, 150));
+      const comptesNeufs = JSON.parse(fs.readFileSync(path.join(dataMdp, 'comptes.json'), 'utf8'));
+      assert.strictEqual(String(comptesNeufs.maria.hash).indexOf('scrypt$'), 0,
+        'nouveau compte cree directement en scrypt: ' + String(comptesNeufs.maria.hash).substring(0, 44));
+      ok.push('mots de passe scrypt + migration automatique legacy');
+    } finally {
+      await envoiFils(serveurMdp);
+      journal += '\n--- mots de passe ---\n' + journalMdp;
+      try { fs.rmSync(dataMdp, { recursive: true, force: true }); } catch (e) {}
     }
 
     console.log('\nOK  ' + ok.length + ' verifications :');

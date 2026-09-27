@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <title>Dashmin - Admin</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="/admin/admin.css?v=4">
+<link rel="stylesheet" href="/admin/admin.css?v=5">
 </head>
 <body>
 
@@ -42,6 +42,9 @@
   </header>
 
   <main>
+    <!-- ALERTE QUOTA / MODELE : visible sans ouvrir les logs -->
+    <div id="alerteBanniere" class="banniere-alerte" style="display:none"></div>
+
     <!-- STATS -->
     <section class="stats-grid">
       <div class="stat-card">
@@ -67,6 +70,10 @@
       <div class="stat-card">
         <div class="stat-chiffre" id="statEnLigne">0</div>
         <div class="stat-label">En ligne</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-chiffre" id="statModele" style="font-size:14px;word-break:break-all;">-</div>
+        <div class="stat-label">Modele actif</div>
       </div>
     </section>
 
@@ -155,7 +162,7 @@
   </main>
 </div>
 
-<script src="/admin/admin.js?v=5"></script>
+<script src="/admin/admin.js?v=6"></script>
 <noscript>
   <div style="max-width:400px;margin:80px auto;text-align:center;color:#e2e8f0;font-family:sans-serif;">
     <h2 style="color:#f87171;">JavaScript requis</h2>
