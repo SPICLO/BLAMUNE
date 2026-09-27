@@ -37,6 +37,8 @@ let dernierChat = null;       // message de conversation (prompt BLAMUNE)
 let dernierEgo = null;        // prompt du mode EGO (conversation intelligente)
 let derniereExtraction = null; // tache d'extraction de faits
 let dernierResume = null;      // pliage du resume de conversation
+let dernierOutillage = null;   // tools envoyes par le serveur (recherche web)
+let failOutils = false;        // 400 "outil non supporte" sur le prochain chat
 const journalExtractions = []; // debug : dernieres consignes d'extraction recues
 
 function librePort() {
@@ -107,6 +109,8 @@ const mock = http.createServer((req, res) => {
     const tacheDeFond = demande.indexOf('EXTRACTION-FACTS') >= 0 ||
       demande.indexOf('RESUME-CONVERSATION') >= 0;
     const modeleVu = ((req.url || '').match(/models\/([^/:]+)/) || [])[1] || '?';
+    // Recherche web : on note les tools reels envoyes par le serveur.
+    dernierOutillage = (corps && corps.tools) || null;
     if (failProchain && !tacheDeFond) {
       failProchain = false;
       res.writeHead(429, { 'Content-Type': 'application/json' });
@@ -127,6 +131,14 @@ const mock = http.createServer((req, res) => {
       quotaGeneralRestant--;
       res.writeHead(429, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: { message: 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. Please retry in 0.2s.' } }));
+      return;
+    }
+    // Le modele refuse l'outil de recherche : le serveur doit retenter SANS
+    // tools (et couper la recherche pour la suite, pas la conversation).
+    if (failOutils && corps && Array.isArray(corps.tools) && !tacheDeFond) {
+      failOutils = false;
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: { message: 'Tool google_search is not supported for this model.' } }));
       return;
     }
 
@@ -197,6 +209,10 @@ async function main() {
     API_MODEL: 'modele-test',
     API_URL: BASE_MOCK,
     BLAMUNE_DATA_DIR: dataDir,
+    // Les limites d'envoi (30/min/IP, 20/min/compte) sont le vrai comportement
+    // produit, mais la suite envoie beaucoup en peu de temps : on les leve ici.
+    RATE_SEND_IP: '1000',
+    RATE_SEND_UID: '1000',
     // L'attente avant la seconde passe est bornee : la suite ne doit pas
     // dormir 60 s le temps que la fenetre de quota se recharge.
     QUOTA_ATTENTE_MAX_MS: '1000'
@@ -757,6 +773,126 @@ async function main() {
       journal += '\n--- mots de passe ---\n' + journalMdp;
       try { fs.rmSync(dataMdp, { recursive: true, force: true }); } catch (e) {}
     }
+
+    // 18. Messages proactifs : BLAMUNE ecrit le premier quand un evenement
+    //        le merite (anniversaire J-1, absence, promesse), une seule fois
+    //        par type, avec 20 h de silence minimum entre deux ecrits.
+    const invP = await requete(PORT_APP, '/invite', 'POST', '');
+    assert(invP.json && invP.json.ok, 'invite proactif: ' + invP.texte.substring(0, 120));
+    const uidP = invP.json.uid;
+    const hP = { 'X-UID': uidP, 'X-Jeton': invP.json.jeton };
+    const dirP = path.join(dataDir, 'users', uidP);
+    fs.mkdirSync(dirP, { recursive: true });
+
+    const p0 = await requete(PORT_APP, '/proactif', 'GET', null, hP);
+    assert.strictEqual(p0.status, 200, 'sonde proactif: HTTP ' + p0.status);
+    assert(p0.json && p0.json.ok && !p0.json.message,
+      'aucun message sans premier contact: ' + JSON.stringify(p0.json));
+
+    // Anniversaire demain -> mot de la veille, ecrit dans l'historique.
+    const demain = new Date(Date.now() + 86400000);
+    const lignesMem = new Array(18).fill('');
+    lignesMem[0] = 'Theo';
+    lignesMem[16] = demain.getDate() + ' ' + MOIS[demain.getMonth()];
+    fs.writeFileSync(path.join(dirP, 'memoire.txt'), lignesMem.join('\n'), 'utf8');
+    ecrireEtat(dirP, { premierContact: Date.now() - 86400000,
+      dernierContact: Date.now() - 3600000, sessions: 2, messages: 12 });
+    const p1 = await requete(PORT_APP, '/proactif', 'GET', null, hP);
+    assert(p1.json && p1.json.message && p1.json.message.type === 'anniversaire-veille' &&
+      p1.json.message.texte.length > 10,
+      'anniversaire J-1 annonce: ' + JSON.stringify(p1.json));
+    const p2 = await requete(PORT_APP, '/proactif', 'GET', null, hP);
+    assert(p2.json && !p2.json.message,
+      'deuxieme sonde silencieuse (notice + cooldown): ' + JSON.stringify(p2.json));
+    const hPro = await requete(PORT_APP, '/historique', 'GET', null, hP);
+    const dernPro = hPro.json.historique[hPro.json.historique.length - 1];
+    assert(dernPro && dernPro.qui === 'bot' && dernPro.proactif === 'anniversaire-veille',
+      'message proactif ecrit dans l historique: ' + JSON.stringify(dernPro));
+
+    // Absence : 4 jours sans nouvelles -> "tu m'as manque".
+    fs.writeFileSync(path.join(dirP, 'proactif.json'),
+      JSON.stringify({ dernierEnvoi: 0, notices: {} }), 'utf8');
+    lignesMem[16] = ''; // plus d'anniversaire proche : l'absence prime
+    fs.writeFileSync(path.join(dirP, 'memoire.txt'), lignesMem.join('\n'), 'utf8');
+    ecrireEtat(dirP, { premierContact: Date.now() - 10 * 86400000,
+      // +1 h de marge : un micro-recul d'horloge (synchro NTP) ne doit pas
+      // faire tomber l'ecart sous 4 jours et changer le rendu du message.
+      dernierContact: Date.now() - (4 * 86400000 + 3600000), sessions: 3, messages: 40 });
+    const p3 = await requete(PORT_APP, '/proactif', 'GET', null, hP);
+    assert(p3.json && p3.json.message && p3.json.message.type === 'manque' &&
+      p3.json.message.texte.indexOf('4') >= 0,
+      'absence detectee: ' + JSON.stringify(p3.json));
+
+    // Promesse : rappel hebdo (aucun rappel encore enregistre).
+    fs.writeFileSync(path.join(dirP, 'proactif.json'),
+      JSON.stringify({ dernierEnvoi: 0, notices: {} }), 'utf8');
+    ecrireEtat(dirP, { premierContact: Date.now() - 10 * 86400000,
+      dernierContact: Date.now() - 3600000, sessions: 3, messages: 40 });
+    lignesMem[17] = 'envoyer sa photo';
+    fs.writeFileSync(path.join(dirP, 'memoire.txt'), lignesMem.join('\n'), 'utf8');
+    const p4 = await requete(PORT_APP, '/proactif', 'GET', null, hP);
+    assert(p4.json && p4.json.message && p4.json.message.type === 'promesse' &&
+      p4.json.message.texte.indexOf('photo') >= 0,
+      'rappel de promesse: ' + JSON.stringify(p4.json));
+    ok.push('proactif: anniversaire J-1, absence, promesse (+ cooldown et historique)');
+
+    // 19. Photos : le modele voit l'image (inline_data + consigne dans le
+    //        prompt), l'historique ne garde qu'un marqueur, les formats non
+    //        image sont refuses, et un message vide + photo passe.
+    const petitPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const avecPhoto = await requete(PORT_APP, '/send', 'POST',
+      'msg=' + encodeURIComponent('vois cette photo') +
+      '&mode=2&image=' + encodeURIComponent(petitPng), h);
+    assert.strictEqual(avecPhoto.status, 200,
+      'message avec photo: HTTP ' + avecPhoto.status + ' ' + avecPhoto.texte.substring(0, 150));
+    assert(promptTexte().indexOf('inline_data') >= 0, 'photo transmise au modele (inline_data)');
+    assert(promptTexte().indexOf('image/png') >= 0, 'mime type de la photo present');
+    assert(promptTexte().indexOf('IMAGE RECUE') >= 0, 'consigne image dans le prompt');
+    const hImg = await requete(PORT_APP, '/historique', 'GET', null, h);
+    const entreesImg = (hImg.json.historique || []).filter(x => x.image);
+    assert.strictEqual(entreesImg.length, 1, 'un seul marqueur image dans l historique');
+    assert(entreesImg[0].texte === 'vois cette photo', 'texte conserve a cote de la photo');
+    assert(hImg.texte.indexOf('iVBORw0KGgo') < 0, 'aucun base64 dans l historique rendu');
+    const imgFauss = await requete(PORT_APP, '/send', 'POST',
+      'msg=salut&image=' + encodeURIComponent('data:text/plain;base64,' + 'A'.repeat(200)), h);
+    assert.strictEqual(imgFauss.status, 400, 'image non-image refusee (HTTP ' + imgFauss.status + ')');
+    const imgSeule = await requete(PORT_APP, '/send', 'POST',
+      'mode=2&image=' + encodeURIComponent(petitPng), h);
+    assert.strictEqual(imgSeule.status, 200,
+      'photo seule acceptee: HTTP ' + imgSeule.status + ' ' + imgSeule.texte.substring(0, 120));
+    ok.push('photos: inline_data, marqueur historique, formats invalides refuses');
+
+    // 20. Recherche web : google_search envoye quand le message parle
+    //        d'actualite ; si le modele refuse l'outil, reprise SANS lui.
+    const actu = await envoyer("c'est quoi l'actualite du jour ?");
+    assert.strictEqual(actu.status, 200,
+      'question actualite: HTTP ' + actu.status + ' ' + actu.texte.substring(0, 150));
+    assert(dernierOutillage && dernierOutillage[0] &&
+      Object.prototype.hasOwnProperty.call(dernierOutillage[0], 'google_search'),
+      'outil google_search envoye: ' + JSON.stringify(dernierOutillage));
+    failOutils = true;
+    const actu2 = await envoyer('il se passe quoi en ce moment dans le monde ?');
+    assert.strictEqual(actu2.status, 200,
+      'reponse malgre le refus de l outil: HTTP ' + actu2.status + ' ' + actu2.texte.substring(0, 150));
+    assert(!dernierOutillage,
+      'outillage coupe apres le refus: ' + JSON.stringify(dernierOutillage));
+    ok.push('recherche web: outil envoye sur actualite, coupe propre sur 400');
+
+    // 21. Commandes perso cote serveur : /stats-perso (donnees propres, pas
+    //        les stats admin) et /oublie (DELETE historique).
+    const sp = await requete(PORT_APP, '/stats-perso', 'GET', null, h);
+    assert.strictEqual(sp.status, 200, 'stats perso: HTTP ' + sp.status);
+    assert(sp.json && sp.json.ok && typeof sp.json.messages === 'number' &&
+      typeof sp.json.sessions === 'number' && typeof sp.json.jours === 'number',
+      'stats perso completes: ' + JSON.stringify(sp.json));
+    const spSans = await requete(PORT_APP, '/stats-perso', 'GET', null, null);
+    assert.strictEqual(spSans.status, 401, 'stats perso reservees aux connectes');
+    const efface = await requete(PORT_APP, '/historique', 'DELETE', null, h);
+    assert.strictEqual(efface.status, 200, 'oublie (DELETE historique): HTTP ' + efface.status);
+    const apresEfface = await requete(PORT_APP, '/historique', 'GET', null, h);
+    assert(Array.isArray(apresEfface.json.historique) && apresEfface.json.historique.length === 0,
+      'historique vide apres /oublie');
+    ok.push('commandes serveur: /stats-perso et /oublie (effacement)');
 
     console.log('\nOK  ' + ok.length + ' verifications :');
     ok.forEach(l => console.log('  - ' + l));

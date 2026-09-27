@@ -108,7 +108,16 @@
 <main id="chat" aria-live="polite"><noscript><p style="text-align:center;padding:40px;color:#9fb3c8;">JavaScript est requis pour utiliser BLAMUNE.</p></noscript></main>
 
 <footer id="barre">
+  <div id="apercuPhoto" class="apercu-photo" style="display:none" aria-live="polite">
+    <img id="apercuPhotoImg" alt="Photo choisie">
+    <span id="apercuPhotoNom" class="apercu-photo-nom"></span>
+    <button id="apercuPhotoAnnuler" class="apercu-photo-x" type="button" title="Retirer la photo" aria-label="Retirer la photo">&times;</button>
+  </div>
   <input id="zone" type="text" placeholder="Écris un message..." autocomplete="off" autocapitalize="sentences" spellcheck="false" maxlength="2000" enterkeyhint="send" aria-label="Écris un message">
+  <input id="fichierImage" type="file" accept="image/*" style="display:none" aria-hidden="true" tabindex="-1">
+  <button id="btnImage" title="Envoyer une photo" type="button" aria-label="Envoyer une photo">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+  </button>
   <button id="btnVoix" title="Mode vocal : dicter tes messages et entendre les reponses" type="button" aria-label="Mode vocal" aria-pressed="false">
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>
   </button>

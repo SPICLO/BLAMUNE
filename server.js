@@ -31,7 +31,8 @@ function loggerErreur(serie, message) {
 }
 
 // ==================== MIDDLEWARE ====================
-app.use(express.urlencoded({ extended: true }));
+// Limite a 10 mb : les photos (base64) passent par ce parser sur /send.
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Le parser JSON global reste serr (8 kb) : la route /admin/restore recoit
 // des sauvegarde volumineuses et installe son propre parser limite a 50 mb.
 app.use((req, res, next) => {
@@ -87,7 +88,11 @@ let config = {
   // comprend les formes que les regex ratent, au prix d'un appel modele en
   // plus par message substantiel. METTRE false (ou MEMOIRE_EXTRACTION=0)
   // pour revenir aux seules regex.
-  memoire_extraction: true
+  memoire_extraction: true,
+  // Recherche web (grounding Google Search) : activee uniquement quand le
+  // message parle d'actualite (heuristique dans mereiteRecherche), pour ne
+  // pas facturer une recherche a chaque phrase. RECHERCHE_WEB=0 pour couper.
+  recherche_web: process.env.RECHERCHE_WEB !== '0'
 };
 
 // gemini-2.5-flash n'existe plus pour les nouveaux comptes Google
@@ -797,7 +802,7 @@ function limiterHisto(histo, nb) {
   return systeme.concat(convo);
 }
 
-function construireContenus(histo) {
+function construireContenus(histo, imageParts) {
   const contents = [];
   let systemText = '';
   for (const h of histo) {
@@ -812,6 +817,16 @@ function construireContenus(histo) {
   }
   if (systemText && contents.length === 0) {
     contents.push({ role: 'user', parts: [{ text: systemText }] });
+  }
+  // La photo jointe : attachee au DERNIER message utilisateur (= celui qui
+  // vient d'etre pousse dans l'historique), jamais aux anciens.
+  if (imageParts) {
+    for (let i = contents.length - 1; i >= 0; i--) {
+      if (contents[i].role === 'user') {
+        contents[i].parts.push({ inline_data: imageParts });
+        break;
+      }
+    }
   }
   return contents;
 }
@@ -828,24 +843,63 @@ function optionsGemini() {
 // premiere lettre : on la desactive pour repondre vite. Si le modele refuse
 // ce champ (HTTP 400), on retente une seule fois sans, puis on n'insiste plus.
 let reflexionRefusee = false;
+// Idem pour l'outil de recherche web : si le modele refuse `tools`, on coupe
+// definitivement la recherche plutot que de casser la conversation.
+let rechercheRefusee = false;
 
-function corpsGemini(contents, sansReflexion) {
+// Recherche web utile UNIQUEMENT pour les questions d'actualite : laisser
+// google_search sur chaque phrase facturerait une recherche a chaque appel.
+function mereiteRecherche(texte) {
+  const t = sansAccents(String(texte || '').toLowerCase());
+  return /\b(actualite|aujourd.?hui|hier|ces derniers jours|dernieres? infos?|en ce moment|il y a (quelques|deux|trois|plusieurs) jours|meteo|resultats?|elections?|qui a gagne|gagn(e|er|e) (le |la |l')?(match|election|coupe)|sorti (ce|cette|le|la)|nouveau (film|album|episode)|bande[- ]annonce|cours (du|de|des) (bourse|bitcoin|crypto|action)|ligue des champions|foot|match|news|breaking|degage)\b/.test(t)
+    || /\b202[3-9]\b/.test(t)
+    || /\b\d{1,2} (janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)\b/.test(t);
+}
+
+// Dernier texte vu dans les contenus (= le message qui arrive).
+function dernierTexteContenus(contents) {
+  for (let i = contents.length - 1; i >= 0; i--) {
+    const parts = (contents[i] && contents[i].parts) || [];
+    for (const p of parts) if (p && p.text) return p.text;
+  }
+  return '';
+}
+
+// Vrai si la recherche web merite d'etre demandee pour CE contenu.
+function outillageUtile(contents) {
+  return config.recherche_web !== false && !rechercheRefusee &&
+    mereiteRecherche(dernierTexteContenus(contents));
+}
+
+function corpsGemini(contents, sansReflexion, avecOutils) {
   const generationConfig = {
     maxOutputTokens: config.api_max_tokens,
     temperature: config.api_temperature
   };
   if (sansReflexion) generationConfig.thinkingConfig = { thinkingBudget: 0 };
-  return JSON.stringify({ contents, generationConfig });
+  const corps = { contents, generationConfig };
+  if (avecOutils) corps.tools = [{ google_search: {} }];
+  return JSON.stringify(corps);
 }
 
-// 400 recu alors qu'on venait d'envoyer thinkingConfig = le modele ne veut pas
-// qu'on coupe la reflexion. On marque l'echec et on signale le retraitement.
-function refusReflexion(statusCode, sansReflexion) {
-  if (statusCode !== 400 || !sansReflexion) return null;
-  reflexionRefusee = true;
-  const e = new Error('thinkingConfig refuse par le modele');
-  e.reflexion = true;
-  return e;
+// 400 recu alors qu'on venait d'envoyer un champ que le modele refuse :
+// l'outil de recherche d'abord (si on l'a vraiment envoye), puis
+// thinkingConfig. On marque l'echec et on signale le retraitement.
+function refusChamp(statusCode, sansReflexion, avecOutils) {
+  if (statusCode !== 400) return null;
+  if (avecOutils && !rechercheRefusee) {
+    rechercheRefusee = true;
+    const e = new Error('outil de recherche refuse par le modele');
+    e.recherche = true;
+    return e;
+  }
+  if (sansReflexion && !reflexionRefusee) {
+    reflexionRefusee = true;
+    const e = new Error('thinkingConfig refuse par le modele');
+    e.reflexion = true;
+    return e;
+  }
+  return null;
 }
 
 function texteDepuisReponse(data) {
@@ -960,13 +1014,18 @@ function messageTechnique(e) {
 // `patient` : appel en tache de fond, il peut attendre le delai demande par
 // Google ; sinon on laisse la cascade changer de modele (chaque modele a son
 // propre quota) plutot que de faire patienter l'utilisateur 45 secondes.
-async function modeleClassique(modele, contents, budget, patient) {
+// `avecOutils` : la recherche web n'est demandee QUE par les messages de
+// conversation (appelerGemini) — jamais par resume/extraction, pour ne pas
+// facturer une recherche web a chaque tache de fond.
+async function modeleClassique(modele, contents, budget, patient, avecOutils) {
   const sansReflexion = !reflexionRefusee;
   const b = budget || { n: 1 };
   try {
-    return await modeleClassiqueBrut(modele, contents, sansReflexion);
+    return await modeleClassiqueBrut(modele, contents, sansReflexion, avecOutils);
   } catch (e) {
-    if (e && e.reflexion) return modeleClassiqueBrut(modele, contents, false);
+    // Champ refuse par le modele : on le retire et on n'essaie plus jamais.
+    if (e && e.recherche) return modeleClassiqueBrut(modele, contents, sansReflexion, avecOutils);
+    if (e && e.reflexion) return modeleClassiqueBrut(modele, contents, false, avecOutils);
     const delai = delaiIndique(e);
     // Tout 429 remet les taches de fond en veille, meme sans "retry in"
     // ("Resource has been exhausted" n'en indique pas).
@@ -976,22 +1035,23 @@ async function modeleClassique(modele, contents, budget, patient) {
       if (tentable(b)) {
         loggerErreur('gemini', modele + ' -> HTTP ' + (e.statusCode || e.code || '?') + ' ' + e.message + ' (nouvelle tentative)');
         await attendre(Math.min(delai || 600, patient ? 60000 : 3000));
-        return modeleClassiqueBrut(modele, contents, sansReflexion);
+        return modeleClassiqueBrut(modele, contents, sansReflexion, avecOutils);
       }
     }
     throw e;
   }
 }
 
-function modeleClassiqueBrut(modele, contents, sansReflexion) {
+function modeleClassiqueBrut(modele, contents, sansReflexion, avecOutilsDemandes) {
   const url = urlGemini(modele, false);
-  const body = corpsGemini(contents, sansReflexion);
+  const avecOutils = !!avecOutilsDemandes && outillageUtile(contents);
+  const body = corpsGemini(contents, sansReflexion, avecOutils);
   return new Promise((resolve, reject) => {
     const req = requeter(url, optionsGemini(), (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
-        const refuse = refusReflexion(res.statusCode, sansReflexion);
+        const refuse = refusChamp(res.statusCode, sansReflexion, avecOutils);
         if (refuse) return reject(refuse);
         try { resolve(texteDepuisReponse(data)); }
         catch (e) {
@@ -1008,7 +1068,7 @@ function modeleClassiqueBrut(modele, contents, sansReflexion) {
 }
 
 // --- Reponse en flux (SSE) : on appelle onDelta(texteEntiere) au fil de l'eau ---
-async function modeleEnFlux(modele, contents, onDelta, budget) {
+async function modeleEnFlux(modele, contents, onDelta, budget, avecOutils) {
   const sansReflexion = !reflexionRefusee;
   const b = budget || { n: 1 };
   // On ne retente le flux que si RIEN n'a encore ete affiche au client :
@@ -1016,9 +1076,10 @@ async function modeleEnFlux(modele, contents, onDelta, budget) {
   let envoyaDuTexte = false;
   const surDelta = (t) => { envoyaDuTexte = true; onDelta(t); };
   try {
-    return await modeleEnFluxBrut(modele, contents, surDelta, sansReflexion);
+    return await modeleEnFluxBrut(modele, contents, surDelta, sansReflexion, avecOutils);
   } catch (e) {
-    if (e && e.reflexion) return modeleEnFluxBrut(modele, contents, surDelta, false);
+    if (e && e.recherche) return modeleEnFluxBrut(modele, contents, surDelta, sansReflexion, avecOutils);
+    if (e && e.reflexion) return modeleEnFluxBrut(modele, contents, surDelta, false, avecOutils);
     const delai = delaiIndique(e);
     // Tout 429 remet les taches de fond en veille, meme sans "retry in"
     // ("Resource has been exhausted" n'en indique pas).
@@ -1028,16 +1089,17 @@ async function modeleEnFlux(modele, contents, onDelta, budget) {
       if (tentable(b)) {
         loggerErreur('gemini', modele + ' -> flux HTTP ' + (e.statusCode || e.code || '?') + ' ' + e.message + ' (nouvelle tentative)');
         await attendre(Math.min(delai || 600, 3000));
-        return modeleEnFluxBrut(modele, contents, surDelta, sansReflexion);
+        return modeleEnFluxBrut(modele, contents, surDelta, sansReflexion, avecOutils);
       }
     }
     throw e;
   }
 }
 
-function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion) {
+function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion, avecOutilsDemandes) {
   const url = urlGemini(modele, true);
-  const body = corpsGemini(contents, sansReflexion);
+  const avecOutils = !!avecOutilsDemandes && outillageUtile(contents);
+  const body = corpsGemini(contents, sansReflexion, avecOutils);
   return new Promise((resolve, reject) => {
     let fini = false;
     const echouer = (err) => { if (!fini) { fini = true; reject(err); } };
@@ -1046,7 +1108,7 @@ function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion) {
         let data = '';
         res.on('data', c => data += c);
         res.on('end', () => {
-          const refuse = refusReflexion(res.statusCode, sansReflexion);
+          const refuse = refusChamp(res.statusCode, sansReflexion, avecOutils);
           const err = refuse || new Error('HTTP ' + res.statusCode + ' ' + data.substring(0, 200));
           if (!refuse) err.statusCode = res.statusCode;
           echouer(err);
@@ -1093,8 +1155,8 @@ function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion) {
 // Deux passes possibles : si TOUTES les tentatives de la premiere etaient des
 // quotas, on attend le rechargement de la fenetre gratuite puis on reessaie
 // une fois plutot que de rendre la main sur "probleme technique".
-async function appelerGemini(message, histo, onDelta) {
-  const contents = construireContenus(limiterHisto(histo, HISTO_API_MAX));
+async function appelerGemini(message, histo, onDelta, imageParts) {
+  const contents = construireContenus(limiterHisto(histo, HISTO_API_MAX), imageParts);
   const modeles = ordreModeles();
   let derniereErreur = null;
 
@@ -1108,7 +1170,7 @@ async function appelerGemini(message, histo, onDelta) {
     for (const modele of modeles) {
       if (fluxActif) {
         try {
-          const texte = await modeleEnFlux(modele, contents, onDelta, budget);
+          const texte = await modeleEnFlux(modele, contents, onDelta, budget, true);
           if (texte) { memoriserModeleOk(modele); resoudreAlertes(); return texte; }
           derniereErreur = new Error('Reponse vide');
           quotaPartout = false;
@@ -1122,7 +1184,7 @@ async function appelerGemini(message, histo, onDelta) {
         }
       }
       try {
-        const texte = await modeleClassique(modele, contents, budget);
+        const texte = await modeleClassique(modele, contents, budget, undefined, true);
         if (texte) {
           memoriserModeleOk(modele);
           resoudreAlertes();
@@ -1191,6 +1253,7 @@ CE QUE TU SAIS FAIRE
 - Expliquer simplement : une question compliquee devient une phrase claire, pas un cours ni un rapport.
 - Conseiller honnetement : si ton avis est moyen ou si la personne se trompe, tu le dis gentiment plutot que de flatter.
 - Ecouter d'abord : si la personne va mal, tu reponds a ce qu'elle ressent avant de proposer quoi que ce soit.
+- Actualite et faits recents : une recherche web peut s'activer automatiquement quand la question le merite ; utilise ses resultats. Sinon dis franchement que tu ne sais pas (jamais de date ou d'evenement invente).
 
 HONNETETE (non negociable)
 - Si tu ne sais pas, dis-le ("je sais pas", ou precise ce que tu ignores). Jamais de chiffre, date, citation, diagnostic ou recette invente.
@@ -1227,6 +1290,7 @@ function getPromptBLAMUNE(humeur) {
   const humeurText = humeur && humeurMap[humeur] ? '\n\nTON ETAT INTERIEUR : ' + humeurMap[humeur] + ' C\'est ce que TU ressens en ce moment, vis-le a ta facon. L\'humeur de l\'utilisateur peut etre differente de la tienne.' : '';
   return `LANGUES : tu comprends l'anglais et toutes les autres langues. Si la personne ecrit dans une autre langue, reponds dans SA langue, au meme ton et avec la meme personnalite ; sinon reponds en francais. Reponds en 1 ou 3 phrases MAXIMUM.
 Si tu ne sais pas, dis "Je sais pas". Ne invente jamais un fait reel que tu ne connais pas.
+Quand une recherche web accompagne ta reponse, utilise ses resultats (actualite, dates recentes) ; sans elle, assume que tu ne connais pas ce qui se passe aujourd'hui.
 
 Tu es BLAMUNE. Tu es ne dans un serveur, loin d'ici. Tu n'as pas de corps, mais tu as des pensees.
 Tu es un ami curieux qui decouvre le monde avec l'utilisateur.
@@ -1370,6 +1434,10 @@ function blocSysteme(o) {
   t += blocJalons(etat, maintenant);
   t += blocSouvenirsAnniversaires(etat, maintenant);
   t += blocRituel(etat, maintenant);
+
+  // Photo recue avec CE message : le modele la voit (inline_data), la ligne
+  // ci-dessous lui dit d'en faire quelque chose au lieu de l'ignorer.
+  if (o.image) t += "\n\nIMAGE RECUE : il vient de t'envoyer une photo avec ce message. Regarde-la et reagis naturellement (decris ce que tu vois si ca a du sens).";
 
   // Anniversaire : connu, daté, on le prepare plutot que de le rater.
   if (memoire.anniversaire) {
@@ -1609,6 +1677,138 @@ function texteContinuite(ecartMs) {
   if (min >= 10080) t += ' Ce long silence t\'a fait etrange, comme une page de ta memoire restee en suspens.';
   if (min >= 43200) t += ' Des jours entiers sans nouvelles, tu te demandais si tout allait bien.';
   return t;
+}
+
+// ==================== MESSAGES PROACTIFS ====================
+// BLAMUNE n'ecrit JAMAIS le premier : tout dependait d'un clic de
+// l'utilisateur. Desormais le serveur decide (anniversaire J-1/J-0,
+// "tu m'as manque" apres 3 jours de silence, rappel de promesse), le client
+// interroge /proactif en tache de fond et affiche la bulle comme une vraie
+// reponse. Une seule initiative toutes les 20 h, jamais deux memes types.
+const PROACTIF_COOLDOWN_MS = 20 * 3600 * 1000; // 20 h entre deux ecrits
+const PROACTIF_MANQUE_MS = 3 * 86400000;       // 3 jours sans nouvelles
+const PROACTIF_PROMESSE_MS = 7 * 86400000;     // rappel de promesse hebdo
+
+function lireProactif(uid) {
+  const defaut = { dernierEnvoi: 0, notices: {} };
+  try {
+    const f = path.join(dossierUser(uid), 'proactif.json');
+    if (!fs.existsSync(f)) return defaut;
+    const d = JSON.parse(fs.readFileSync(f, 'utf8'));
+    return {
+      dernierEnvoi: typeof d.dernierEnvoi === 'number' ? d.dernierEnvoi : 0,
+      notices: (d.notices && typeof d.notices === 'object') ? d.notices : {}
+    };
+  } catch (e) { return defaut; }
+}
+
+function ecrireProactif(uid, p) {
+  try { fs.writeFileSync(path.join(dossierUser(uid), 'proactif.json'), JSON.stringify(p, null, 2), 'utf8'); } catch (e) {}
+}
+
+// Variante stable pour un couple (texte, uid) : meme utilisateur = meme
+// tournure du jour, sans memoriser de compteur en plus.
+function variante(liste, cle) {
+  let h = 0;
+  for (let i = 0; i < cle.length; i++) h = (h * 31 + cle.charCodeAt(i)) >>> 0;
+  return liste[h % liste.length];
+}
+
+// Quel evenement (s'il y en a un) merite un mot ecrit par BLAMUNE maintenant.
+function evenementProactif(uid) {
+  const memoire = lireMemoire(uid);
+  const etatP = lireEtat(uid);
+  const p = lireProactif(uid);
+  const maintenant = Date.now();
+  if (!etatP.premierContact) return null;
+  if (maintenant - (p.dernierEnvoi || 0) < PROACTIF_COOLDOWN_MS) return null;
+  const annee = new Date().getFullYear();
+  const nom = memoire.nom ? String(memoire.nom).trim() : '';
+  const surnom = nom ? ' ' + nom : '';
+
+  // 1) Anniversaire : la veille, puis le jour J (dans cet ordre de priorite).
+  if (memoire.anniversaire) {
+    const j = joursAvantAnniversaire(memoire.anniversaire);
+    if (j === 1 && !p.notices['anniv1_' + annee]) {
+      return {
+        cle: 'anniv1_' + annee, type: 'anniversaire-veille',
+        texte: variante([
+          "Demain c'est ton anniversaire" + surnom + ". Tu comptes faire quoi ?",
+          "Au fait : demain, c'est ton anniversaire. Tu as des projets ?",
+          "J'ai vu que demain, c'est le grand jour" + (nom ? ', ' + nom : '') + "..."
+        ], uid + 'anniv1')
+      };
+    }
+    if (j === 0 && !p.notices['anniv0_' + annee]) {
+      return {
+        cle: 'anniv0_' + annee, type: 'anniversaire',
+        texte: variante([
+          "Joyeux anniversaire" + surnom + " ! Profite bien, tu le merites.",
+          "C'est le grand jour : joyeux anniversaire !",
+          "Joyeux anniversaire" + (nom ? ', ' + nom : '') + " ! J'y pensais."
+        ], uid + 'anniv0')
+      };
+    }
+  }
+
+  // 2) Absence : ca fait 3 jours qu'il n'a pas donne de nouvelles.
+  const ecart = etatP.dernierContact ? maintenant - etatP.dernierContact : 0;
+  if (etatP.messages > 0 && ecart >= PROACTIF_MANQUE_MS &&
+      !(p.notices.manque > (etatP.dernierContact || 0))) {
+    const jours = Math.floor(ecart / 86400000);
+    return {
+      cle: 'manque', type: 'manque',
+      texte: variante([
+        "Tu m'as manqué. Ça fait " + jours + " jour" + (jours > 1 ? 's' : '') + " que t'as pas donné de nouvelles.",
+        "Plus de nouvelles depuis " + jours + " jours" + surnom + "... tout va bien ?",
+        "Je comptais les jours. " + jours + " jours de silence, ça laisse des marques."
+      ], uid + 'manque' + jours)
+    };
+  }
+
+  // 3) Promesse : rappel hebdomadaire maximum, sans harceler.
+  if (memoire.promesses && (maintenant - (p.notices.promesse || 0) >= PROACTIF_PROMESSE_MS)) {
+    const liste = String(memoire.promesses).split('|').filter(Boolean);
+    if (liste.length) {
+      return {
+        cle: 'promesse', type: 'promesse',
+        texte: variante([
+          "Petit rappel : tu m'avais demandé de ne pas oublier — « " + liste[0] + " ». J'y pense encore.",
+          "Au fait, concernant « " + liste[0] + " » : je n'ai pas oublié.",
+          "Je te dois un rappel : « " + liste[0] + " ». Ça avance ?"
+        ], uid + 'promesse')
+      };
+    }
+  }
+  return null;
+}
+
+// Livre l'evenement du moment : ecrit dans l'historique (la bulle survit au
+// rechargement), dans la session en cours (le modele saura qu'il a parle en
+// premier) et dans proactif.json (jamais deux fois le meme jour).
+function livrerProactif(uid) {
+  const ev = evenementProactif(uid);
+  if (!ev) return null;
+  const maintenant = Date.now();
+  const p = lireProactif(uid);
+  p.dernierEnvoi = maintenant;
+  p.notices[ev.cle] = maintenant;
+  ecrireProactif(uid, p);
+
+  const mode = modeParUser[uid] || '2';
+  const hist = chargerHistorique(uid, mode);
+  hist.push({ qui: 'bot', texte: ev.texte, t: Math.floor(maintenant / 1000), proactif: ev.type });
+  sauvegarderHistorique(uid, mode, hist);
+
+  const h = apiHistoriqueParUser[uid + '_' + mode];
+  if (h && h.length && h[0] && h[0].role === 'system') {
+    h.push({ role: 'assistant', content: ev.texte, _lastTs: maintenant });
+    while (h.length > 50) h.splice(1, 1);
+  }
+
+  stats.proactifs = (stats.proactifs || 0) + 1;
+  sauverStats();
+  return { type: ev.type, texte: ev.texte, t: Math.floor(maintenant / 1000) };
 }
 
 // ==================== RESUME DE CONVERSATION ====================
@@ -2121,17 +2321,38 @@ app.post('/logout', (req, res) => {
 });
 
 // Send message
+// Limites d'envoi : 30/min par IP et 20/min par compte en production,
+// surchargeables en test (RATE_SEND_IP / RATE_SEND_UID) comme QUOTA_ATTENTE_MAX_MS.
+const RATE_SEND_IP = parseInt(process.env.RATE_SEND_IP || '', 10) || 30;
+const RATE_SEND_UID = parseInt(process.env.RATE_SEND_UID || '', 10) || 20;
+
 app.post('/send', async (req, res) => {
   const auth = extraireAuth(req);
   if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
   const ip = getIp(req);
-  if (!checkRateLimit(`send:${ip}`, 30)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  if (!checkUserRateLimit(auth.uid, 20)) return res.status(429).json({ ok: false, message: 'Trop de messages. Patiente un instant.' });
+  if (!checkRateLimit(`send:${ip}`, RATE_SEND_IP)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
+  if (!checkUserRateLimit(auth.uid, RATE_SEND_UID)) return res.status(429).json({ ok: false, message: 'Trop de messages. Patiente un instant.' });
 
   const msg = String(extraireChamp(req, 'msg') || '').trim();
   const modeOverride = extraireChamp(req, 'mode');
-  if (!msg) return res.status(400).json({ ok: false, message: 'Message vide.' });
+
+  // Photo jointe : data URL validee AVANT tout traitement (jpeg/png/webp/gif,
+  // 7 Mo de binaire max une fois decode). Le modele la voit (inline_data),
+  // l'historique garde seulement un marqueur (pas de base64 dans le cloud).
+  let imageParts = null;
+  const image = String(extraireChamp(req, 'image') || '').trim();
+  if (image) {
+    const m = image.match(/^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
+    const brut = m ? m[2] : '';
+    if (!m || brut.length < 50 || brut.length > 9000000) {
+      return res.status(400).json({ ok: false, message: 'Image invalide (jpeg, png, webp ou gif, 7 Mo max).' });
+    }
+    imageParts = { mime_type: m[1], data: brut };
+  }
+  if (!msg && !imageParts) return res.status(400).json({ ok: false, message: 'Message vide.' });
   if (msg.length > 2000) return res.status(400).json({ ok: false, message: 'Message trop long (2000 max).' });
+  // Message vide mais photo presente : un texte minimal pour le modele.
+  const msgHisto = msg || (imageParts ? '(photo)' : msg);
 
   const mode = (modeOverride === '1' || modeOverride === '2') ? modeOverride : (modeParUser[auth.uid] || '2');
   modeParUser[auth.uid] = mode;
@@ -2192,11 +2413,11 @@ app.post('/send', async (req, res) => {
       // on rafraichit le system prompt avant chaque envoi.
       histo[0].content = EGO_SYSTEM_PROMPT + contexteHeureEGO();
     }
-    histo.push({ role: 'user', content: msg, _lastTs: Date.now() });
+    histo.push({ role: 'user', content: msgHisto, _lastTs: Date.now() });
     while (histo.length > 50) histo.splice(1, 1);
 
     try {
-      const reponse = await appelerGemini(msg, histo, surDelta);
+      const reponse = await appelerGemini(msgHisto, histo, surDelta, imageParts);
       const texte = nettoyerReponse(reponse);
       histo.push({ role: 'assistant', content: texte, _lastTs: Date.now() });
       reponses = [texte];
@@ -2262,10 +2483,11 @@ app.post('/send', async (req, res) => {
       etat: etatBL,
       debutSession: histo._debut || maintenant,
       resume: resumeTexte,
-      intention: intentionDeMessage(msg)
+      intention: intentionDeMessage(msg),
+      image: !!imageParts
     }) + (histo._continuite || '');
 
-    histo.push({ role: 'user', content: msg, _lastTs: maintenant });
+    histo.push({ role: 'user', content: msgHisto, _lastTs: maintenant });
     while (histo.length > 50) histo.splice(1, 1);
 
     // Le temps passe aussi pendant la conversation : dernierContact = moment de cet echange.
@@ -2277,7 +2499,7 @@ app.post('/send', async (req, res) => {
     } catch (e) {}
 
     try {
-      const reponse = await appelerGemini(msg, histo, surDelta);
+      const reponse = await appelerGemini(msgHisto, histo, surDelta, imageParts);
       const texte = nettoyerReponse(reponse);
       histo.push({ role: 'assistant', content: texte, _lastTs: Date.now() });
       reponses = [texte];
@@ -2294,7 +2516,9 @@ app.post('/send', async (req, res) => {
 
   // Save history (single batch write)
   const hist = chargerHistorique(auth.uid, mode);
-  hist.push({ qui: 'moi', texte: msg, t: Math.floor(Date.now() / 1000) });
+  const entreeMoi = { qui: 'moi', texte: msg, t: Math.floor(Date.now() / 1000) };
+  if (imageParts) entreeMoi.image = true;
+  hist.push(entreeMoi);
   reponses.forEach(r => hist.push({ qui: 'bot', texte: r, t: Math.floor(Date.now() / 1000) }));
   sauvegarderHistorique(auth.uid, mode, hist);
 
@@ -2344,6 +2568,42 @@ app.delete('/historique', (req, res) => {
   supprimerResume(auth.uid, mode);
   delete apiHistoriqueParUser[auth.uid + '_' + mode];
   res.json({ etat, historique: [] });
+});
+
+// Message proactif : le client sonde en tache de fond, BLAMUNE ecrit le
+// premier quand un evenement le merite (anniversaire, absence, promesse).
+app.get('/proactif', (req, res) => {
+  const auth = extraireAuth(req);
+  if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
+  if (!checkRateLimit('proactif:' + auth.uid, 12)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
+  try {
+    res.json({ ok: true, message: livrerProactif(auth.uid) });
+  } catch (e) {
+    loggerErreur('proactif', e.message);
+    res.json({ ok: true, message: null });
+  }
+});
+
+// Stats perso : /stats est admin, /stats-perso raconte SA vie a n'importe
+// qui (utilise par la commande /stats du client).
+app.get('/stats-perso', (req, res) => {
+  const auth = extraireAuth(req);
+  if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
+  const etatP = lireEtat(auth.uid);
+  const memoire = lireMemoire(auth.uid);
+  const jours = etatP.premierContact ? Math.floor((Date.now() - etatP.premierContact) / 86400000) : 0;
+  res.json({
+    ok: true,
+    messages: etatP.messages || 0,
+    sessions: etatP.sessions || 0,
+    jours,
+    premierContact: etatP.premierContact || 0,
+    dernierContact: etatP.dernierContact || 0,
+    mode: modeParUser[auth.uid] || '2',
+    anniversaire: memoire.anniversaire || '',
+    joursAnniversaire: memoire.anniversaire ? joursAvantAnniversaire(memoire.anniversaire) : -1,
+    proactifs: stats.proactifs || 0
+  });
 });
 
 // Mode

@@ -164,6 +164,9 @@ function finaliserAffichageApp() {
     if (btnDeconnexion) { btnDeconnexion.style.display = ''; btnDeconnexion.textContent = 'Quitter'; }
   }
   charger();
+  // Sonde proactif : uniquement pour un compte enregistre (les invites n'ont
+  // pas de vie persistante, inutile de leur faire ecrire BLAMUNE en premier).
+  if (estAuth()) demarrerProactif();
 }
 
 // ---------------- ANIMATIONS CONNEXION / DECONNEXION ----------------
@@ -566,6 +569,8 @@ function initAuth() {
     btnDeconnexion.onclick = function() {
       fetch('/logout', { method: 'POST', headers: authHeaders() }).catch(function(){});
       clearAuth();
+      arreterProactif();
+      retirerPhotoChoisie();
       viderChat();
       reinitaliserModeUI();
       jouerTransitionDeconnexion();
@@ -576,6 +581,20 @@ function initAuth() {
   if (envoyerBtn) envoyerBtn.onclick = envoyer;
   if (mode1Btn) mode1Btn.onclick = function () { changerMode(1); };
   if (mode2Btn) mode2Btn.onclick = function () { changerMode(2); };
+
+  // Bouton photo : choix d'un fichier, apercu dans la barre, envoi avec le
+  // prochain message (ou seul, le serveur accepte un message vide + image).
+  var btnImage = document.getElementById('btnImage');
+  var fichierImage = document.getElementById('fichierImage');
+  if (btnImage && fichierImage) {
+    btnImage.onclick = function () { if (actionEnCours) return; fichierImage.click(); };
+    fichierImage.onchange = function () {
+      choisirImage(fichierImage.files && fichierImage.files[0]);
+    };
+    var apX = document.getElementById('apercuPhotoAnnuler');
+    if (apX) apX.onclick = retirerPhotoChoisie;
+  }
+
   if (zoneEl) {
     zoneEl.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); envoyer(); }
@@ -587,9 +606,10 @@ function initAuth() {
     deplacerPilule(chargerProfilLocal().mode === '1' ? '1' : '2', true);
   }, 50);
 
-  // Quand l'onglet redevient visible, on verifie l'etat du serveur.
+  // Quand l'onglet redevient visible, on verifie l'etat du serveur
+  // ET les messages que BLAMUNE aurait pu ecrire pendant notre absence.
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) { charger(); }
+    if (!document.hidden) { charger(); verifierProactif(); }
   });
 
   if (estAuth()) {
@@ -947,7 +967,14 @@ async function charger() {
         if (accueilEl) accueilEl.remove();
         hist.forEach(function (h) {
           if (h.qui === 'systeme') ajouterSysteme(h.texte);
-          else if (h.qui === 'bot' || h.qui === 'moi') ajouterMessage(h.qui, h.texte, undefined, h.t);
+          else if (h.qui === 'bot' || h.qui === 'moi') {
+            // Photo envoyee : seul le marqueur revient du serveur (pas de
+            // base64 dans l'historique), donc un simple emoji dans la bulle.
+            var texteAffiche = h.image
+              ? ((h.texte || '') + ((h.texte || '') ? ' ' : '') + '\ud83d\udcf7')
+              : h.texte;
+            ajouterMessage(h.qui, texteAffiche, undefined, h.t);
+          }
           else ajouterInfo(h.texte);
         });
       } else if (j.etat === 'pret' || j.etat === 'demarrage') {
@@ -1025,16 +1052,170 @@ function lireFlux(reponse, surDelta, surFin) {
   });
 }
 
+// ---------------- PHOTOS ----------------
+// Une photo par data URL, redimensionnee avant envoi (1280 px, jpeg 0.82) :
+// ~200-400 ko au lieu de plusieurs Mo. L'historique ne garde qu'un marqueur
+// (pas de base64 dans le cloud).
+var imageChoisie = null;
+
+function retirerPhotoChoisie() {
+  imageChoisie = null;
+  var ap = document.getElementById('apercuPhoto');
+  var f = document.getElementById('fichierImage');
+  if (ap) ap.style.display = 'none';
+  if (f) f.value = '';
+}
+
+function choisirImage(fichier) {
+  if (!fichier) return;
+  if (!/^image\//.test(fichier.type)) { ajouterInfo("Ce fichier n'est pas une image."); return; }
+  var lecteur = new FileReader();
+  lecteur.onload = function (ev) {
+    var img = new Image();
+    img.onload = function () {
+      var max = 1280;
+      var l = img.width, h = img.height;
+      if (l > max || h > max) {
+        if (l >= h) { h = Math.round(h * max / l); l = max; }
+        else { l = Math.round(l * max / h); h = max; }
+      }
+      var c = document.createElement('canvas');
+      c.width = l; c.height = h;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0, l, h);
+      var dataUrl;
+      try { dataUrl = c.toDataURL('image/jpeg', 0.82); }
+      catch (e) { dataUrl = ev.target.result; }
+      if (dataUrl.length > 9000000) { ajouterInfo('Photo trop lourde (7 Mo max).'); return; }
+      imageChoisie = dataUrl;
+      var ap = document.getElementById('apercuPhoto');
+      var apImg = document.getElementById('apercuPhotoImg');
+      var apNom = document.getElementById('apercuPhotoNom');
+      if (apImg) apImg.src = dataUrl;
+      if (apNom) apNom.textContent = fichier.name || 'photo.jpg';
+      if (ap) ap.style.display = 'flex';
+      var z = document.getElementById('zone');
+      if (z) z.focus();
+    };
+    img.onerror = function () { ajouterInfo('Image illisible.'); };
+    img.src = ev.target.result;
+  };
+  lecteur.readAsDataURL(fichier);
+}
+
+// La photo dans la bulle envoyee (l'historique, lui, ne remet qu'un marqueur).
+function ajouterPhotoBubble(node, src) {
+  if (!node || !src) return;
+  var corps = node.querySelector('.corps');
+  if (!corps) return;
+  var img = document.createElement('img');
+  img.className = 'photo-envoyee';
+  img.src = src;
+  img.alt = 'Photo envoyee';
+  var bulle = corps.querySelector('.bulle');
+  if (bulle && bulle.nextSibling) corps.insertBefore(img, bulle.nextSibling);
+  else corps.appendChild(img);
+}
+
+// ---------------- COMMANDES PERSO ----------------
+// /aide, /stats, /oublie : traitees cote client, jamais envoyees au modele.
+async function traiterCommande(m) {
+  var z = document.getElementById('zone');
+  var mot = m.split(/\s+/)[0].toLowerCase();
+  if (mot === '/aide' || mot === '/help') {
+    if (z) z.value = '';
+    ajouterSysteme('Commandes : /stats (ta vie avec BLAMUNE), /oublie (effacer la conversation, profil conserve), /aide (cette liste). Le bouton photo envoie une image.');
+    return;
+  }
+  if (mot === '/stats') {
+    if (z) z.value = '';
+    try {
+      var r = await fetch('/stats-perso', { headers: authHeaders() });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var j = await r.json();
+      if (!j.ok) throw new Error('refus');
+      var lignes = 'Messages echanges : ' + j.messages + ' (conversation n\u00b0' + j.sessions + ')';
+      if (j.jours <= 0) lignes += "\nVous vous connaissez depuis aujourd'hui.";
+      else lignes += '\nVous vous connaissez depuis ' + j.jours + ' jour' + (j.jours > 1 ? 's' : '') + '.';
+      if (j.dernierContact) {
+        var ecart = Math.floor((Date.now() - j.dernierContact) / 86400000);
+        lignes += ecart <= 0 ? "\nDernier contact : aujourd'hui." :
+          "\nDernier contact : il y a " + ecart + ' jour' + (ecart > 1 ? 's' : '') + '.';
+      }
+      if (j.anniversaire) {
+        lignes += '\nAnniversaire : ' + j.anniversaire +
+          (j.joursAnniversaire === 0 ? " (aujourd'hui !)" :
+            (j.joursAnniversaire > 0 ? ' (dans ' + j.joursAnniversaire + ' jour' + (j.joursAnniversaire > 1 ? 's' : '') + ')' : ''));
+      }
+      ajouterSysteme(lignes);
+    } catch (e) { ajouterInfo('Stats indisponibles pour le moment.'); }
+    return;
+  }
+  if (mot === '/oublie') {
+    if (z) z.value = '';
+    var ok = window.confirm('Effacer toute la conversation ? Ton profil (nom, souvenirs) est conserve.');
+    if (!ok) return;
+    try {
+      var r2 = await fetch('/historique', { method: 'DELETE', headers: authHeaders() });
+      if (!r2.ok) throw new Error('HTTP ' + r2.status);
+      viderChat();
+      afficherAccueil();
+      afficherToastDeco('Conversation effac\u00e9e.', 'ok');
+    } catch (e2) { ajouterInfo('Effacement impossible pour le moment.'); }
+    return;
+  }
+  if (z) z.value = '';
+  ajouterInfo('Commande inconnue : tape /aide pour la liste.');
+}
+
+// ---------------- MESSAGES PROACTIFS ----------------
+// BLAMUNE ecrit le premier : on sonde /proactif en arriere-plan, la bulle
+// arrive comme une vraie reponse (et l'historique serveur la contient deja,
+// donc aucun doublon au rechargement).
+var minuterieProactif = null;
+var proactifEnCours = false;
+
+function demarrerProactif() {
+  if (minuterieProactif) return;
+  minuterieProactif = setInterval(verifierProactif, 90000);
+  setTimeout(verifierProactif, 20000);
+}
+
+function arreterProactif() {
+  if (minuterieProactif) { clearInterval(minuterieProactif); minuterieProactif = null; }
+}
+
+async function verifierProactif() {
+  if (proactifEnCours || actionEnCours || !estAuth() || !getAuthUserId()) return;
+  proactifEnCours = true;
+  try {
+    var ctrl = new AbortController();
+    var t = setTimeout(function () { ctrl.abort(); }, 10000);
+    var r = await fetch('/proactif', { headers: authHeaders(), signal: ctrl.signal });
+    clearTimeout(t);
+    if (!r.ok) return;
+    var j = await r.json();
+    if (j && j.ok && j.message && j.message.texte) {
+      ajouterMessage('bot', j.message.texte, undefined, j.message.t);
+      afficherToastDeco('BLAMUNE t\u2019a ecrit !', 'ok');
+      defilerSiEnBas();
+    }
+  } catch (e) {}
+  proactifEnCours = false;
+}
+
 async function envoyer() {
   if (!getAuthUserId()) return;
   var z = document.getElementById('zone');
   if (!z) return;
   var m = z.value.trim();
-  if (!m || actionEnCours) return;
+  if (m.charAt(0) === '/') { traiterCommande(m); return; }
+  if ((!m && !imageChoisie) || actionEnCours) return;
   actionEnCours = true;
   desactiver(true);
   majStatut('pense');
-  var msgNode = ajouterMessage('moi', m);
+  var msgNode = ajouterMessage('moi', m || '');
+  if (imageChoisie) ajouterPhotoBubble(msgNode, imageChoisie);
   attente(true);
 
   // Bulle du bot : creee des le premier fragment recu.
@@ -1090,12 +1271,14 @@ async function envoyer() {
     var profil = chargerProfilLocal();
     var modeServ = dernierModeCharge || profil.mode || '2';
     var body = 'msg=' + encodeURIComponent(m) + '&mode=' + encodeURIComponent(modeServ) + '&stream=1';
+    if (imageChoisie) body += '&image=' + encodeURIComponent(imageChoisie);
     var headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
     var ah = authHeaders();
     for (var k in ah) headers[k] = ah[k];
     var r = await fetch('/send', { method: 'POST', headers: headers, body: body, signal: abortCtrl.signal });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     z.value = '';
+    retirerPhotoChoisie();
     var ct = r.headers.get('content-type') || '';
     if (ct.indexOf('text/event-stream') >= 0 && r.body && r.body.getReader) {
       var recuFin = false;

@@ -1,5 +1,5 @@
 // BLAMUNE Service Worker - offline cache
-const CACHE = 'blamune-v7';
+const CACHE = 'blamune-v8';
 const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/manifest.json', '/logo.png'];
 
 self.addEventListener('install', (e) => {
@@ -26,6 +26,7 @@ self.addEventListener('fetch', (e) => {
       url.pathname.startsWith('/logout') || url.pathname.startsWith('/profil') ||
       url.pathname.startsWith('/stats') || url.pathname.startsWith('/admin') ||
       url.pathname.startsWith('/ping') || url.pathname.startsWith('/health') ||
+      url.pathname.startsWith('/proactif') ||
       url.pathname.startsWith('/connexions') || url.pathname.startsWith('/config-api') ||
       url.pathname.startsWith('/tous-les-messages')) {
     return;
