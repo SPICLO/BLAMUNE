@@ -566,21 +566,22 @@ async function main() {
           res.end(JSON.stringify(obj));
         };
         const url = (req.url || '').split('?')[0];
-        const estListe = req.method === 'GET' && (url === '/v3/b' || url === '/v3/bins');
+        const estListe = req.method === 'GET' && url === '/v3/b';
         if (estListe) {
           return rep(200, binFaux ? [{ id: binFaux.id, createdAt: new Date().toISOString() }] : []);
         }
-        if (req.method === 'POST' && url === '/v3') {
+        if (req.method === 'POST' && url === '/v3/b') {
           binFaux = { id: 'bin-test', record: {} };
           return rep(200, { id: binFaux.id });
         }
-        if (req.method === 'PUT' && /^\/v3\/[^/]+$/.test(url)) {
-          if (!binFaux || url !== '/v3/' + binFaux.id) return rep(404, { message: 'bin inconnu' });
+        const cheminBin = /^\/v3\/b\/([^/]+)$/.exec(url);
+        if (cheminBin && req.method === 'PUT') {
+          if (!binFaux || cheminBin[1] !== binFaux.id) return rep(404, { message: 'bin inconnu' });
           try { binFaux.record = JSON.parse(d || '{}'); } catch (e) { return rep(400, { message: 'json invalide' }); }
           return rep(200, { id: binFaux.id, success: true });
         }
-        if (req.method === 'GET' && /^\/v3\/[^/]+$/.test(url)) {
-          if (!binFaux || url !== '/v3/' + binFaux.id) return rep(404, { message: 'bin inconnu' });
+        if (cheminBin && req.method === 'GET') {
+          if (!binFaux || cheminBin[1] !== binFaux.id) return rep(404, { message: 'bin inconnu' });
           return rep(200, { record: binFaux.record });
         }
         rep(404, { message: 'route inconnue ' + req.method + ' ' + url });
