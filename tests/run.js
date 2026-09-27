@@ -552,6 +552,109 @@ async function main() {
       await envoiFils(serveur2);
     }
 
+    // 16. Instance perdue + JSONBin : la nouvelle instance (disque vierge)
+    //        se reconstitue toute seule depuis le cloud. C'est exactement la
+    //        nuit ou Render remplace l'instance : rien ne doit se perdre.
+    const PORT_JSONBIN = librePort();
+    let binFaux = null; // { id, record }
+    const fauxJsonbin = http.createServer((req, res) => {
+      let d = '';
+      req.on('data', c => d += c);
+      req.on('end', () => {
+        const rep = (code, obj) => {
+          res.writeHead(code, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(obj));
+        };
+        const url = (req.url || '').split('?')[0];
+        const estListe = req.method === 'GET' && (url === '/v3/b' || url === '/v3/bins');
+        if (estListe) {
+          return rep(200, binFaux ? [{ id: binFaux.id, createdAt: new Date().toISOString() }] : []);
+        }
+        if (req.method === 'POST' && url === '/v3') {
+          binFaux = { id: 'bin-test', record: {} };
+          return rep(200, { id: binFaux.id });
+        }
+        if (req.method === 'PUT' && /^\/v3\/[^/]+$/.test(url)) {
+          if (!binFaux || url !== '/v3/' + binFaux.id) return rep(404, { message: 'bin inconnu' });
+          try { binFaux.record = JSON.parse(d || '{}'); } catch (e) { return rep(400, { message: 'json invalide' }); }
+          return rep(200, { id: binFaux.id, success: true });
+        }
+        if (req.method === 'GET' && /^\/v3\/[^/]+$/.test(url)) {
+          if (!binFaux || url !== '/v3/' + binFaux.id) return rep(404, { message: 'bin inconnu' });
+          return rep(200, { record: binFaux.record });
+        }
+        rep(404, { message: 'route inconnue ' + req.method + ' ' + url });
+      });
+    });
+    await new Promise(r => fauxJsonbin.listen(PORT_JSONBIN, '127.0.0.1', r));
+
+    const envCloud = Object.assign({}, env, {
+      JSONBIN_API_KEY: 'cle-de-test',
+      JSONBIN_API_URL: 'http://127.0.0.1:' + PORT_JSONBIN,
+      // Chaque sauvegarde reconstruit le snapshot : le test ne dort pas 60 s.
+      JSONBIN_SNAP_MIN_MS: '0'
+    });
+    const dataA = fs.mkdtempSync(path.join(os.tmpdir(), 'blamune-cloud-a-'));
+    const dataB = fs.mkdtempSync(path.join(os.tmpdir(), 'blamune-cloud-b-'));
+    const portA = librePort();
+    const portB = librePort();
+    let journalA = '', journalB = '';
+    const serveurA = spawn(process.execPath, [path.join(RACINE, 'server.js')],
+      { cwd: RACINE, env: Object.assign({}, envCloud, { PORT: String(portA), BLAMUNE_DATA_DIR: dataA }), stdio: 'pipe' });
+    serveurA.stdout.on('data', d => { journalA += d; });
+    serveurA.stderr.on('data', d => { journalA += d; });
+    try {
+      await attendreServeur(portA);
+      const invCloud = await requete(portA, '/invite', 'POST', '');
+      const envoye = await requete(portA, '/send', 'POST',
+        'msg=' + encodeURIComponent('ce souvenir doit survivre a la perte du disque') + '&mode=2',
+        { 'X-UID': invCloud.json.uid, 'X-Jeton': invCloud.json.jeton });
+      assert.strictEqual(envoye.status, 200, 'message envoye sur l instance A');
+      await condition(() => binFaux && binFaux.record && binFaux.record.sauvegarde, 25000,
+        'sauvegarde complete poussee dans le cloud');
+      assert(binFaux.record.comptes && Object.keys(binFaux.record.comptes).length > 0,
+        'comptes presents dans le cloud');
+      const etatLogin = await requete(portA, '/login', 'POST', 'pseudo=admin&mdp=%40clotaire%232012');
+      const etatCloud = await requete(portA, '/stats', 'GET', null,
+        { 'X-UID': etatLogin.json.uid, 'X-EGO': etatLogin.json.ego });
+      assert(etatCloud.json && etatCloud.json.sauvegarde && etatCloud.json.sauvegarde.configure === true,
+        'etat de la sauvegarde visible dans /stats: ' + JSON.stringify(etatCloud.json).substring(0, 200));
+      assert(etatCloud.json.sauvegarde.derniereSauvegarde, 'date de derniere sauvegarde cloud renseignee');
+      ok.push('cloud: sauvegarde complete poussee automatiquement');
+
+      await envoiFils(serveurA);
+      journal += '\n--- instance A (perdue) ---\n' + journalA;
+
+      // Instance B : disque vierge, meme cloud -> tout revient.
+      const serveurB = spawn(process.execPath, [path.join(RACINE, 'server.js')],
+        { cwd: RACINE, env: Object.assign({}, envCloud, { PORT: String(portB), BLAMUNE_DATA_DIR: dataB }), stdio: 'pipe' });
+      serveurB.stdout.on('data', d => { journalB += d; });
+      serveurB.stderr.on('data', d => { journalB += d; });
+      try {
+        await attendreServeur(portB);
+        assert(fs.existsSync(path.join(dataB, 'users', invCloud.json.uid, 'historique_mode2.json')),
+          'historique reconstitue sur le disque vierge');
+        const loginB = await requete(portB, '/login', 'POST', 'pseudo=admin&mdp=%40clotaire%232012');
+        assert(loginB.json && loginB.json.ok,
+          'compte admin reconstitue: ' + loginB.texte.substring(0, 120));
+        const histoB = await requete(portB, '/historique', 'GET', null,
+          { 'X-UID': invCloud.json.uid, 'X-Jeton': invCloud.json.jeton });
+        assert.strictEqual(histoB.status, 200,
+          'invite encore validee apres reconstitution: HTTP ' + histoB.status);
+        assert(JSON.stringify(histoB.json.historique || []).indexOf('survivre') >= 0,
+          'le souvenir est revenu du cloud');
+        ok.push('cloud: instance perdue reconstituee automatiquement');
+      } finally {
+        await envoiFils(serveurB);
+        journal += '\n--- instance B (reconstituee) ---\n' + journalB;
+      }
+    } finally {
+      await envoiFils(serveurA);
+      await new Promise(r => fauxJsonbin.close(r));
+      try { fs.rmSync(dataA, { recursive: true, force: true }); } catch (e) {}
+      try { fs.rmSync(dataB, { recursive: true, force: true }); } catch (e) {}
+    }
+
     console.log('\nOK  ' + ok.length + ' verifications :');
     ok.forEach(l => console.log('  - ' + l));
     console.log('');

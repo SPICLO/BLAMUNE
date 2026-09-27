@@ -2275,7 +2275,8 @@ app.get('/stats', (req, res) => {
   res.json({
     ...stats,
     apiProvider: config.api_provider,
-    apiConfigured: !!config.api_key && config.api_key !== 'ego'
+    apiConfigured: !!config.api_key && config.api_key !== 'ego',
+    sauvegarde: storage.etatSauvegarde()
   });
 });
 

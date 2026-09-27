@@ -1,14 +1,34 @@
 // BLAMUNE - Cloud Storage Module (JSONBin.io)
-// Stockage cloud persistant - un seul bin pour toutes les données
+// Stockage cloud persistant : comptes, memoires, historiques et la
+// sauvegarde complete (tous les fichiers) reconstruite par server.js.
+//
+// Une instance Render perdue doit pouvoir se reconstituer seule :
+//   JSONBIN_API_KEY  (obligatoire)  -> active le cloud
+//   JSONBIN_BIN_ID   (recommande)   -> fige le bin utilise (sinon il est
+//                                      retrouve automatiquement a chaque
+//                                      demarrage en fouillant les bins du
+//                                      compte, valide par leur contenu)
 
 const https = require('https');
+const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
 const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY || '';
-const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID || '';
+// Surchageable pour les tests (faux JSONBin local).
+const JSONBIN_API_URL = process.env.JSONBIN_API_URL || 'https://api.jsonbin.io';
+const JSONBIN_BIN_ID = (process.env.JSONBIN_BIN_ID || '').trim();
+// .bin-id vit avec les donnees : sur Render il est ephemere, d'ou l'importance
+// de JSONBIN_BIN_ID, mais en local il evite de creer un bin a chaque run.
+const RACINE_DATA = process.env.BLAMUNE_DATA_DIR ? path.resolve(process.env.BLAMUNE_DATA_DIR) : __dirname;
+const FICHIER_BIN_ID = path.join(RACINE_DATA, '.bin-id');
 
-// Données en mémoire (cache)
+let binIdFichier = '';
+try { binIdFichier = fs.readFileSync(FICHIER_BIN_ID, 'utf8').trim(); } catch (e) {}
+let binIdCourant = JSONBIN_BIN_ID;
+let _binPromise = null;
+
+// Donnees en memoire (cache)
 let data = {
   comptes: {},
   historiques: {},
@@ -16,18 +36,19 @@ let data = {
   sauvegarde: null
 };
 
-// Fabrique de la sauvegarde complète (fournie par server.js) : comptes,
-// jetons, savoir, stats et tous les fichiers users/.
+// Fabrique de la sauvegarde complete (fournie par server.js).
 let fabriqueSauvegarde = null;
 let _snapDate = 0;
-const SNAP_MIN_INTERVAL = 60000; // au plus une reconstruction par minute
+// Reconstruction du snapshot au plus une fois par minute (surchargeable
+// en test via JSONBIN_SNAP_MIN_MS).
+const SNAP_MIN_INTERVAL = Number(process.env.JSONBIN_SNAP_MIN_MS || 60000);
+
+// Observation pour /admin (sait-on si les donnees partent vraiment au cloud ?)
+let derniereSauvegarde = null;
+let derniereErreur = null;
 
 function enregistrerFabrique(fn) { fabriqueSauvegarde = fn; }
 function getSauvegarde() { return data.sauvegarde; }
-
-// Debouncing pour la sauvegarde cloud
-let _saveTimer = null;
-const SAVE_DELAY = 3000; // 3 secondes
 
 function planifierSauvegarde() {
   if (_saveTimer) clearTimeout(_saveTimer);
@@ -37,14 +58,20 @@ function planifierSauvegarde() {
   }, SAVE_DELAY);
 }
 
-// Requête HTTP vers JSONBin
-function jsonbinRequest(method, urlPath, body) {
+// Debouncing pour la sauvegarde cloud
+let _saveTimer = null;
+const SAVE_DELAY = 3000; // 3 secondes
+
+// Requete HTTP vers JSONBin (API_URL surchargeable pour les tests)
+function jsonbinRequest(method, chemin, corps) {
   return new Promise((resolve, reject) => {
-    const bodyStr = body ? JSON.stringify(body) : null;
+    const url = new URL(JSONBIN_API_URL + chemin);
+    const bodyStr = corps !== undefined && corps !== null ? JSON.stringify(corps) : null;
     const options = {
-      hostname: 'api.jsonbin.io',
-      path: urlPath,
-      method: method,
+      hostname: url.hostname,
+      port: url.port || (url.protocol === 'https:' ? 443 : 80),
+      path: url.pathname + url.search,
+      method,
       headers: {
         'Content-Type': 'application/json',
         'X-Master-Key': JSONBIN_API_KEY
@@ -53,7 +80,8 @@ function jsonbinRequest(method, urlPath, body) {
     };
     if (bodyStr) options.headers['Content-Length'] = Buffer.byteLength(bodyStr);
 
-    const req = https.request(options, (res) => {
+    const transport = url.protocol === 'https:' ? https : http;
+    const req = transport.request(options, (res) => {
       let chunks = [];
       res.on('data', c => chunks.push(c));
       res.on('end', () => {
@@ -74,47 +102,100 @@ function jsonbinRequest(method, urlPath, body) {
   });
 }
 
+// Un bin "a nous" : objet non vide portant l'une de nos marques.
+async function binSemblable(id) {
+  try {
+    const r = await jsonbinRequest('GET', `/v3/${id}`);
+    const rec = r && r.record !== undefined ? r.record : r;
+    return !!(rec && typeof rec === 'object' && !Array.isArray(rec) &&
+      (rec.comptes || rec.memories || rec.historiques || rec.sauvegarde));
+  } catch (e) { return false; }
+}
+
+// Trouve le bin existant, ou en cree un. Jamais de bin cree a chaque sauvegarde.
+async function trouverOuCreerBin() {
+  if (JSONBIN_BIN_ID) { binIdCourant = JSONBIN_BIN_ID; return binIdCourant; }
+  let listeOk = false;
+  for (const chemin of ['/v3/b?limit=50', '/v3/bins?limit=50']) {
+    try {
+      const l = await jsonbinRequest('GET', chemin);
+      const bins = Array.isArray(l) ? l : (l && (l.bins || l.data)) || [];
+      listeOk = true;
+      const tries = bins.slice().sort((a, b) =>
+        new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0));
+      for (const b of tries) {
+        if (b && b.id && (await binSemblable(b.id))) {
+          binIdCourant = b.id;
+          console.log(`[storage] Bin retrouve: ${b.id}`);
+          return binIdCourant;
+        }
+      }
+      break;
+    } catch (e) { console.log(`[storage] liste bins KO (${chemin}): ${e.message}`); }
+  }
+  if (!listeOk && binIdFichier) { binIdCourant = binIdFichier; return binIdCourant; }
+  const r = await jsonbinRequest('POST', '/v3', {});
+  const id = (r && r.id) || (r && r.metadata && r.metadata.id);
+  if (!id) throw new Error('creation du bin impossible');
+  binIdCourant = id;
+  try { fs.writeFileSync(FICHIER_BIN_ID, id, 'utf8'); } catch (e) {}
+  console.log(`[storage] Bin cree: ${id}`);
+  console.log(`[storage] Pour figer ce bin: ajoute JSONBIN_BIN_ID=${id} (Render > Environment)`);
+  return binIdCourant;
+}
+
+function binId() {
+  if (binIdCourant) return Promise.resolve(binIdCourant);
+  if (!_binPromise) {
+    _binPromise = trouverOuCreerBin().catch(e => { _binPromise = null; throw e; });
+  }
+  return _binPromise;
+}
+
 // Sauvegarder tout le data dans le cloud
 async function sauvegarderTout() {
   if (!JSONBIN_API_KEY) return;
   try {
+    const id = await binId();
+    if (!id) return;
     if (fabriqueSauvegarde && Date.now() - _snapDate > SNAP_MIN_INTERVAL) {
       try {
         const s = fabriqueSauvegarde();
-        // Jamais d'écrasement du cloud par un disque vide : une instance
+        // Jamais d'ecrasement du cloud par un disque vide : une instance
         // perdue avant restauration ne doit pas effacer la sauvegarde.
         const utile = s && s.fichiers &&
           (s.fichiers['comptes.json'] || Object.keys(s.fichiers).some(k => k.indexOf('users/') === 0));
         if (utile) { data.sauvegarde = s; _snapDate = Date.now(); }
       } catch (e) { console.log('[storage] Snapshot impossible:', e.message); }
     }
-    if (!JSONBIN_BIN_ID) {
-      // Créer un nouveau bin
-      const r = await jsonbinRequest('POST', '/v3', data);
-      const newId = r.id || r.metadata?.id;
-      console.log(`[storage] Bin créé: ${newId}`);
-      // Sauvegarder l'ID dans un fichier local
-      fs.writeFileSync(path.join(__dirname, '.bin-id'), newId, 'utf8');
-      process.env.JSONBIN_BIN_ID = newId;
-    } else {
-      await jsonbinRequest('PUT', `/v3/${JSONBIN_BIN_ID}`, data);
-    }
+    await jsonbinRequest('PUT', `/v3/${id}`, data);
+    derniereSauvegarde = new Date().toISOString();
+    derniereErreur = null;
   } catch (e) {
+    derniereErreur = e.message;
     console.log('[storage] Erreur sauvegarde:', e.message);
   }
 }
 
 // Charger depuis le cloud
 async function chargerDuCloud() {
-  const binId = JSONBIN_BIN_ID || (() => {
-    try { return fs.readFileSync(path.join(__dirname, '.bin-id'), 'utf8').trim(); } catch (e) { return ''; }
-  })();
-  if (!binId || !JSONBIN_API_KEY) return false;
+  if (!JSONBIN_API_KEY) return false;
+  let id;
+  try { id = await binId(); } catch (e) {
+    console.log('[storage] Pas de bin accessible:', e.message);
+    return false;
+  }
+  if (!id) return false;
   try {
-    const r = await jsonbinRequest('GET', `/v3/${binId}`);
-    data = r.record || r;
-    console.log(`[storage] Chargé depuis cloud: ${Object.keys(data.comptes || {}).length} comptes`);
-    return true;
+    const r = await jsonbinRequest('GET', `/v3/${id}`);
+    const rec = r && r.record !== undefined ? r.record : r;
+    if (rec && typeof rec === 'object' && !Array.isArray(rec)) {
+      data = Object.assign({ comptes: {}, historiques: {}, memories: {}, sauvegarde: null }, rec);
+      console.log(`[storage] Charge depuis le cloud: ${Object.keys(data.comptes || {}).length} comptes`
+        + (data.sauvegarde ? `, sauvegarde du ${data.sauvegarde.date}` : ''));
+      return true;
+    }
+    return false;
   } catch (e) {
     console.log('[storage] Erreur chargement cloud:', e.message);
     return false;
@@ -142,12 +223,21 @@ function setHistorique(uid, mode, hist) {
   planifierSauvegarde();
 }
 
-function getMemoire(uid) {
-  return data.memories[uid] || null;
-}
+function getMemoire(uid) { return data.memories[uid] || null; }
 function setMemoire(uid, memo) {
   data.memories[uid] = memo;
   planifierSauvegarde();
+}
+
+// Etat de la sauvegarde cloud, expose par /stats (admin).
+function etatSauvegarde() {
+  return {
+    configure: !!JSONBIN_API_KEY,
+    bin: binIdCourant || null,
+    derniereSauvegarde,
+    derniereErreur,
+    chargee: !!(data && data.sauvegarde)
+  };
 }
 
 module.exports = {
@@ -156,7 +246,7 @@ module.exports = {
   getHistorique, setHistorique,
   getMemoire, setMemoire,
   sauvegarderTout,
-  enregistrerFabrique, getSauvegarde,
+  enregistrerFabrique, getSauvegarde, etatSauvegarde,
   declencherSauvegarde: planifierSauvegarde,
   estConfigure: () => !!JSONBIN_API_KEY
 };
