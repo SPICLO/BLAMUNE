@@ -566,9 +566,14 @@ async function main() {
           res.end(JSON.stringify(obj));
         };
         const url = (req.url || '').split('?')[0];
-        const estListe = req.method === 'GET' && url === '/v3/b';
+        // Vraie route de l API : liste paginee des bins non classes.
+        const estListe = req.method === 'GET' && url.indexOf('/v3/c/uncategorized/bins') === 0;
         if (estListe) {
-          return rep(200, binFaux ? [{ id: binFaux.id, createdAt: new Date().toISOString() }] : []);
+          const aCurseur = /^\/v3\/c\/uncategorized\/bins\/[^/]+$/.test(url);
+          if (binFaux && !aCurseur) {
+            return rep(200, { bins: [{ id: binFaux.id, createdAt: new Date().toISOString() }] });
+          }
+          return rep(200, { bins: [] });
         }
         if (req.method === 'POST' && url === '/v3/b') {
           if (!d || d === '{}') return rep(400, { message: 'Bin cannot be blank' });

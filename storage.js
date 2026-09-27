@@ -115,6 +115,29 @@ async function binSemblable(id) {
   } catch (e) { return false; }
 }
 
+// Liste les ids des bins non classes : c'est la vraie route de l'API v3
+// (GET /v3/b n'existe pas, elle rend 404). Paginee, du plus recent au plus
+// ancien : on s'arrete au premier bin a nous.
+async function listerNosBins() {
+  const ids = [];
+  let curseur = '';
+  for (let page = 0; page < 5; page++) {
+    const chemin = '/v3/c/uncategorized/bins' + (curseur ? '/' + curseur : '');
+    const l = await jsonbinRequest('GET', chemin, null, { 'X-Sort-Order': 'Desc' });
+    const bins = Array.isArray(l) ? l : (l && (l.bins || l.data || l.records)) || [];
+    if (!bins.length) break;
+    for (const b of bins) {
+      const id = b && (b.id || b.binId || b._id);
+      if (id && ids.indexOf(id) < 0) ids.push(id);
+    }
+    const dernier = bins[bins.length - 1];
+    const idDernier = dernier && (dernier.id || dernier.binId || dernier._id);
+    if (!idDernier || idDernier === curseur || bins.length < 10) break;
+    curseur = idDernier;
+  }
+  return ids;
+}
+
 // Trouve le bin existant, ou en cree un. Jamais de bin cree a chaque sauvegarde.
 async function trouverOuCreerBin() {
   if (JSONBIN_BIN_ID) { binIdCourant = JSONBIN_BIN_ID; return binIdCourant; }
@@ -126,15 +149,12 @@ async function trouverOuCreerBin() {
   }
   let listeOk = false;
   try {
-    const l = await jsonbinRequest('GET', '/v3/b?limit=50');
-    const bins = Array.isArray(l) ? l : (l && (l.bins || l.data)) || [];
+    const ids = await listerNosBins();
     listeOk = true;
-    const tries = bins.slice().sort((a, b) =>
-      new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0));
-    for (const b of tries) {
-      if (b && b.id && (await binSemblable(b.id))) {
-        binIdCourant = b.id;
-        console.log(`[storage] Bin retrouve: ${b.id}`);
+    for (const id of ids) {
+      if (await binSemblable(id)) {
+        binIdCourant = id;
+        console.log(`[storage] Bin retrouve: ${id}`);
         return binIdCourant;
       }
     }
