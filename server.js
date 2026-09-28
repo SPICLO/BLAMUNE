@@ -1170,6 +1170,17 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
   const modeles = ordreModeles();
   let derniereErreur = null;
 
+  // Fenetre de quota deja crevee sur tout le parcours (alerte encore possee) :
+  // chaque tentative va 429, inutile de gaspiller ~8 requetes par message. On
+  // repond tout de suite "quota sature" ; au bout d'une minute dernierQuota
+  // devient ancien, la porte se rouvre et la cascade retente toute seule.
+  if (alertes.quota && dernierQuota && Date.now() - dernierQuota < QUOTA_FENETRE) {
+    loggerErreur('gemini', 'quota actif depuis ' +
+      Math.round((Date.now() - dernierQuota) / 1000) + ' s -> reponse immediate sans cascade');
+    alerter('quota', 'reponse immediate sans cascade (fenetre en cours)');
+    throw new Error('quota satur\u00e9 : fenetre de quota en cours');
+  }
+
   for (let passe = 0; passe < 2; passe++) {
     let fluxActif = typeof onDelta === 'function';
     let quotaPartout = true;
@@ -1910,16 +1921,29 @@ async function majResume(uid, mode) {
 const CHAMPS_EXTRACTION = ['nom', 'age', 'genre', 'ville', 'travail', 'plat', 'hobby',
   'sport', 'musique', 'serie', 'reve', 'aime', 'aimePas', 'motsFavoris', 'anniversaire'];
 const extractionEnCours = {};
-const extractionEnAttente = {}; // uid -> dernier message mis en attente
+const extractionFile = {};     // uid -> messages en attente d'etre envoyes
+const extractionMinuteur = {}; // uid -> id du minuteur en cours
+// Free tier : 1 chat + 1 extraction par message = 2 requetes alors que la
+// fenetre gratuite n'autorise qu'une poignee de requetes par minute. On
+// attend EXTRACT_PAUSE_MS que les messages suivants arrivent, puis on envoie
+// TOUS les messages en un seul appel : rafale de 6 = 1 requete facturee au
+// lieu de 6, et aucun fait perdu.
+const EXTRACT_PAUSE_MS = parseInt(process.env.EXTRACT_PAUSE_MS || '8000', 10);
 
 async function extraireAvecModele(uid, msg) {
-  if (extractionEnCours[uid]) {
-    // Une extraction est deja en vol : on ne la coupe pas, on garde le
-    // dernier message pour le traiter juste apres (sinon un fait dit une
-    // seule fois serait perdu).
-    extractionEnAttente[uid] = msg;
-    return;
-  }
+  if (msg) (extractionFile[uid] = extractionFile[uid] || []).push(msg);
+  if (extractionEnCours[uid] || extractionMinuteur[uid]) return;
+  extractionMinuteur[uid] = setTimeout(() => {
+    delete extractionMinuteur[uid];
+    extraireFileExtraction(uid).catch(e => loggerErreur('extraction', e.message));
+  }, EXTRACT_PAUSE_MS);
+}
+
+async function extraireFileExtraction(uid) {
+  if (extractionEnCours[uid]) return;
+  const lot = extractionFile[uid] || [];
+  if (!lot.length) return;
+  extractionFile[uid] = [];
   extractionEnCours[uid] = true;
   try {
     const mem = lireMemoire(uid);
@@ -1929,12 +1953,12 @@ async function extraireAvecModele(uid, msg) {
       if (v) connu.push(c + ' = ' + v);
     });
     const consigne = 'EXTRACTION-FACTS\n' +
-      'Tu extrais des faits sur une personne a partir d\'un de ses messages. ' +
+      'Tu extrais des faits sur une personne a partir de ses messages. ' +
       'Reponds UNIQUEMENT par un objet JSON (aucun texte avant ni apres), et uniquement pour les champs qui apportent du neuf.\n' +
       'Champs autorises : ' + CHAMPS_EXTRACTION.join(', ') + '.\n' +
       'Regles : valeur courte (30 caracteres max), sans ponctuation finale ; motsFavoris est un tableau de mots ; ' +
       'si une information est deja connue et identique, ne la repets pas ; si le message ne contient aucun fait, reponds {}.\n' +
-      'Deja connu :\n' + (connu.length ? connu.join('\n') : '(rien)') + '\n\nMessage :\n' + msg;
+      'Deja connu :\n' + (connu.length ? connu.join('\n') : '(rien)') + '\n\nMessage :\n' + lot.join('\n');
     const brut = await modeleClassique(modeleActif(),
       [{ role: 'user', parts: [{ text: consigne }] }], { n: 1 }, true);
     const texte = String(brut || '').trim();
@@ -1977,10 +2001,10 @@ async function extraireAvecModele(uid, msg) {
     loggerErreur('extraction', e.message);
   } finally {
     extractionEnCours[uid] = false;
-    const repousser = extractionEnAttente[uid];
-    if (repousser) {
-      delete extractionEnAttente[uid];
-      setImmediate(() => extraireAvecModele(uid, repousser));
+    if ((extractionFile[uid] || []).length) {
+      // Des messages sont arrives pendant l'appel : nouveau minuteur pour
+      // les regrouper tous dans le tour suivant.
+      extraireAvecModele(uid).catch(e => loggerErreur('extraction', e.message));
     }
   }
 }

@@ -213,6 +213,9 @@ async function main() {
     // produit, mais la suite envoie beaucoup en peu de temps : on les leve ici.
     RATE_SEND_IP: '1000',
     RATE_SEND_UID: '1000',
+    // Regroupement des extractions (8 s en prod) : desactive pour que chaque
+    // message soit extrait immediatement comme avant, sans rallonger la suite.
+    EXTRACT_PAUSE_MS: '0',
     // L'attente avant la seconde passe est bornee : la suite ne doit pas
     // dormir 60 s le temps que la fenetre de quota se recharge.
     QUOTA_ATTENTE_MAX_MS: '1000'
