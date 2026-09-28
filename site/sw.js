@@ -1,5 +1,5 @@
 // BLAMUNE Service Worker - offline cache
-const CACHE = 'blamune-v8';
+const CACHE = 'blamune-v9';
 const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/manifest.json', '/logo.png'];
 
 self.addEventListener('install', (e) => {
@@ -31,13 +31,29 @@ self.addEventListener('fetch', (e) => {
       url.pathname.startsWith('/tous-les-messages')) {
     return;
   }
-  e.respondWith(
-    fetch(e.request)
-      .then((r) => {
-        const clone = r.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, clone));
-        return r;
-      })
-      .catch(() => caches.match(e.request))
-  );
+  // Page (HTML) : network d'abord pour avoir toujours la derniere version,
+  // cache en secours si le reseau tombe.
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request)
+        .then((r) => {
+          const clone = r.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, clone));
+          return r;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+  // Assets (css/js/logo) : cache d'abord -> chargement instantane a chaque
+  // visite, revalidation en arriere-plan pour recuperer une nouvelle version.
+  e.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    const cached = await cache.match(e.request);
+    const reval = fetch(e.request).then((r) => {
+      if (r && r.ok) cache.put(e.request, r.clone());
+      return r;
+    }).catch(() => null);
+    return cached || (await reval) || new Response('', { status: 504 });
+  })());
 });

@@ -793,6 +793,7 @@ function sauvegarderHistorique(uid, mode, historique) {
 //     s'ecrire au lieu d'attendre la fin de la generation.
 
 const HISTO_API_MAX = 16; // derniers echanges envoyes a l'API
+const HISTO_AFFICHAGE_MAX = 100; // dernieres bulles rendues par /historique
 
 function limiterHisto(histo, nb) {
   if (!Array.isArray(histo) || histo.length <= nb + 1) return histo;
@@ -851,9 +852,13 @@ let rechercheRefusee = false;
 // google_search sur chaque phrase facturerait une recherche a chaque appel.
 function mereiteRecherche(texte) {
   const t = sansAccents(String(texte || '').toLowerCase());
-  return /\b(actualite|aujourd.?hui|hier|ces derniers jours|dernieres? infos?|en ce moment|il y a (quelques|deux|trois|plusieurs) jours|meteo|resultats?|elections?|qui a gagne|gagn(e|er|e) (le |la |l')?(match|election|coupe)|sorti (ce|cette|le|la)|nouveau (film|album|episode)|bande[- ]annonce|cours (du|de|des) (bourse|bitcoin|crypto|action)|ligue des champions|foot|match|news|breaking|degage)\b/.test(t)
-    || /\b202[3-9]\b/.test(t)
-    || /\b\d{1,2} (janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)\b/.test(t);
+  // Volontairement strict : chaque declenchement facture une recherche
+  // Google et retarde le premier caractere affiche. On garde les demandes
+  // explicites d'infos en direct (actu, meteo, resultats sportifs ou
+  // electoraux, sorties culturelles, cours) et on laisse tomber les pieges
+  // du quotidien : "hier", "aujourd'hui", "match", "resultats" (scolaires
+  // !), une date d'anniversaire, une annee... qui ne demandent pas le web.
+  return /\b(actualite|dernieres? infos?|en ce moment|breaking|meteo|elections?|resultats? des elections|qui a gagne|gagn(e|er) (le |la |l')?(match|election|coupe)|nouveau (film|album|episode)|bande[- ]annonce|cours (du|de|des) (bourse|bitcoin|crypto|action)|ligue des champions|coupe du monde)\b/.test(t);
 }
 
 // Dernier texte vu dans les contenus (= le message qui arrive).
@@ -987,6 +992,11 @@ function attendre(ms) { return new Promise(resolve => setTimeout(resolve, ms)); 
 // rechargement de la fenetre gratuite puis repasser la cascade UNE fois.
 // Cap d'attente (ms) : surchargeable en test pour ne pas rallonger la suite.
 const QUOTA_ATTENTE_MAX = parseInt(process.env.QUOTA_ATTENTE_MAX_MS || '', 10) || 70000;
+// Par contre un MESSAGE ne doit jamais figer l'utilisateur : si Google
+// demande d'attendre bien plus longtemps que ce seuil, on rend la main
+// tout de suite avec le message "quota sature" (les taches de fond, elles,
+// gardent la longue attente de QUOTA_ATTENTE_MAX).
+const QUOTA_ATTENTE_MSG_MAX = parseInt(process.env.QUOTA_ATTENTE_MSG_MS || '', 10) || 10000;
 
 function estQuota(e) {
   if (!e) return false;
@@ -1203,6 +1213,13 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
     // Tout le parcours etait du quota : on attend puis on repasse une fois.
     if (passe === 0 && quotaPartout && estQuota(derniereErreur)) {
       const attenteMs = delaiAvantNouvellePasse(derniereErreur);
+      if (attenteMs > QUOTA_ATTENTE_MSG_MAX) {
+        // Google demande 45 s ou plus : ca figerait la conversation, on
+        // prefere repondre tout de suite "reessaie dans une minute".
+        loggerErreur('gemini', 'quota: attente de ' + Math.round(attenteMs / 1000) +
+          ' s trop longue pour un message, on rend la main');
+        break;
+      }
       const info = 'tous les modeles en quota -> nouvelle passe dans ' +
         Math.round(attenteMs / 1000) + ' s';
       loggerErreur('gemini', info);
@@ -2554,7 +2571,9 @@ app.get('/historique', (req, res) => {
   if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
   const mode = modeParUser[auth.uid] || '2';
   const hist = chargerHistorique(auth.uid, mode);
-  res.json({ ok: true, etat, mode, historique: hist, provider: config.api_provider });
+  // Seules les dernieres bulles voyagent : au-dela de 100, le rendu DOM
+  // fige la page au chargement (le fichier complet reste intact sur disque).
+  res.json({ ok: true, etat, mode, historique: hist.slice(-HISTO_AFFICHAGE_MAX), provider: config.api_provider });
 });
 
 // Delete history
