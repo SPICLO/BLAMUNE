@@ -15,6 +15,8 @@
 #include <limits>
 #ifdef _WIN32
 #include <windows.h>
+#include <wininet.h>
+#pragma comment(lib, "wininet.lib")
 #endif
 
 // Tirage aleatoire : choisit un index au hasard dans [0, nb).
@@ -2193,7 +2195,7 @@ int detecterStress(const std::string& p) {
 bool demandeReformulation(const std::string& p) {
     static const char* markers[] = {
         "j'ai pas compris", "j'ai pas bien compris", "je n'ai pas compris",
-        "j'ai rien compris", "je n'ai rien compris", "c'est quoi",
+        "j'ai rien compris", "je n'ai rien compris",
         "tu peux expliquer", "reformule", "explique autrement",
         "en plus simple", "plus simple", "je comprends pas",
         "j pas compris", "pas compris",
@@ -2201,6 +2203,21 @@ bool demandeReformulation(const std::string& p) {
     };
     for (int i = 0; markers[i] != 0; i++) {
         if (p.find(markers[i]) != std::string::npos) return true;
+    }
+    // "c'est quoi" suivi d'un sujet = demande de definition (savoir.txt puis
+    // version en ligne, plus bas). Seule la phrase nue ("c'est quoi ?")
+    // exprime un malentendu a reformuler.
+    std::size_t pos = p.find("c'est quoi");
+    if (pos != std::string::npos) {
+        std::string reste = p.substr(pos + 10);
+        std::string propre;
+        for (unsigned int i = 0; i < reste.size(); i++) {
+            char c = reste[i];
+            if (c == '?' || c == '!' || c == '.' || c == ',' || c == '\'' ||
+                c == ' ' || c == '\t') continue;
+            propre += c;
+        }
+        if (propre.empty()) return true;
     }
     return false;
 }
@@ -3272,6 +3289,274 @@ void enregistrerVocabulairePartage(const std::string& mot, const std::string& de
         f.close();
     }
 }
+
+// ============ EN LIGNE : BLAMUNE SUR ONRENDER (GEMINI) ============
+// Le bot peut repondre via la version en ligne (blamune.onrender.com) :
+// meme Gemini, meme memoire, meme historique que le site. Le flux d'une
+// phrase : savoir.txt d'abord (reponse connue = immediate et gratuit),
+// ensuite l'appel au serveur ; si le reseau, le quota ou le serveur tombe,
+// la fonction renvoie "" et la phrase continue vers le moteur local.
+// Fichier "hors_ligne" a la racine : aucun appel reseau.
+#define HOTE_BLAMUNE "blamune.onrender.com"
+#define CHEMIN_SESSION ".blamune_session"
+
+#ifdef _WIN32
+
+std::string encoderUrl(const std::string& s) {
+    static const char* hex = "0123456789ABCDEF";
+    std::string out;
+    for (unsigned int i = 0; i < s.size(); i++) {
+        unsigned char c = (unsigned char)s[i];
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+            (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~') {
+            out += (char)c;
+        } else {
+            out += '%';
+            out += hex[c >> 4];
+            out += hex[c & 15];
+        }
+    }
+    return out;
+}
+
+bool horsLigneActive() {
+    std::ifstream f("hors_ligne");
+    return f.good();
+}
+
+// Session invite locale : uid + jeton recuperes une seule fois sur le
+// serveur (fichier .blamune_session a la racine, jamais commite).
+static std::string ligneUid = "", ligneJeton = "";
+static bool ligneSessionTestee = false;
+
+void nettoyerFinLigne(std::string& s) {
+    while (!s.empty() && (s[s.size() - 1] == '\r' || s[s.size() - 1] == '\n' || s[s.size() - 1] == ' '))
+        s.erase(s.size() - 1);
+}
+
+bool chargerSessionLigne() {
+    if (ligneSessionTestee) return !ligneUid.empty();
+    ligneSessionTestee = true;
+    std::ifstream f(CHEMIN_SESSION, std::ios::binary);
+    if (!f.is_open()) return false;
+    std::getline(f, ligneUid);
+    std::getline(f, ligneJeton);
+    nettoyerFinLigne(ligneUid);
+    nettoyerFinLigne(ligneJeton);
+    if (ligneUid.empty() || ligneJeton.empty()) {
+        ligneUid.clear();
+        ligneJeton.clear();
+        return false;
+    }
+    return true;
+}
+
+void sauverSessionLigne(const std::string& uid, const std::string& jeton) {
+    std::ofstream f(CHEMIN_SESSION, std::ios::binary | std::ios::trunc);
+    if (f.is_open()) f << uid << "\r\n" << jeton << "\r\n";
+    ligneUid = uid;
+    ligneJeton = jeton;
+    ligneSessionTestee = true;
+}
+
+// POST HTTPS vers blamune.onrender.com (WinINet). Retourne vrai si la
+// reponse HTTP a ete lue ; statut et corps sont renseignes en sortie.
+bool posterBlamune(const char* chemin, const std::string& entetes,
+                   const std::string& corps, std::string& reponse,
+                   DWORD& statut, int delaiMs) {
+    bool ok = false;
+    statut = 0;
+    reponse.clear();
+    HINTERNET hInet = InternetOpenA("BlamuneBot/1.0", INTERNET_OPEN_TYPE_PRECONFIG, 0, 0, 0);
+    if (!hInet) return false;
+    DWORD delai = (DWORD)delaiMs;
+    InternetSetOptionA(hInet, INTERNET_OPTION_CONNECT_TIMEOUT, &delai, sizeof(delai));
+    InternetSetOptionA(hInet, INTERNET_OPTION_SEND_TIMEOUT, &delai, sizeof(delai));
+    InternetSetOptionA(hInet, INTERNET_OPTION_RECEIVE_TIMEOUT, &delai, sizeof(delai));
+    HINTERNET hConn = InternetConnectA(hInet, HOTE_BLAMUNE, INTERNET_DEFAULT_HTTPS_PORT, 0, 0,
+                                       INTERNET_SERVICE_HTTP, 0, 0);
+    if (hConn) {
+        DWORD flags = INTERNET_FLAG_SECURE | INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_KEEP_CONNECTION;
+        HINTERNET hReq = HttpOpenRequestA(hConn, "POST", chemin, 0, 0, 0, flags, 0);
+        if (hReq) {
+            bool entetesOk = entetes.empty() ||
+                HttpAddRequestHeadersA(hReq, entetes.c_str(), (DWORD)-1L,
+                                       HTTP_ADDREQ_FLAG_ADD | HTTP_ADDREQ_FLAG_REPLACE);
+            const char* type = "Content-Type: application/x-www-form-urlencoded\r\n";
+            if (entetesOk &&
+                HttpSendRequestA(hReq, type, (DWORD)strlen(type),
+                                 (void*)corps.data(), (DWORD)corps.size())) {
+                char tampon[4096];
+                DWORD lu = 0;
+                while (InternetReadFile(hReq, tampon, sizeof(tampon), &lu) && lu > 0)
+                    reponse.append(tampon, lu);
+                DWORD code = 0, taille = sizeof(code);
+                HttpQueryInfoA(hReq, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER,
+                               &code, &taille, 0);
+                statut = code;
+                ok = true;
+            }
+            InternetCloseHandle(hReq);
+        }
+        InternetCloseHandle(hConn);
+    }
+    InternetCloseHandle(hInet);
+    return ok;
+}
+
+// Chaine JSON decodee a partir d'une guillemet ouvrante (echappements,
+// sequences \uXXXX y compris les paires de germe, converties en UTF-8).
+std::string chaineJson(const std::string& json, std::size_t p) {
+    std::string out;
+    if (p >= json.size() || json[p] != '"') return out;
+    p++;
+    while (p < json.size()) {
+        char c = json[p];
+        if (c == '\\' && p + 1 < json.size()) {
+            char e = json[p + 1];
+            if (e == 'n') { out += '\n'; p += 2; }
+            else if (e == 't') { out += '\t'; p += 2; }
+            else if (e == 'r') { out += '\r'; p += 2; }
+            else if (e == 'u' && p + 5 < json.size()) {
+                unsigned int cp = 0;
+                bool valide = true;
+                for (int k = 0; k < 4 && valide; k++) {
+                    char h = json[p + 2 + k];
+                    cp <<= 4;
+                    if (h >= '0' && h <= '9') cp |= (unsigned int)(h - '0');
+                    else if (h >= 'a' && h <= 'f') cp |= (unsigned int)(h - 'a' + 10);
+                    else if (h >= 'A' && h <= 'F') cp |= (unsigned int)(h - 'A' + 10);
+                    else valide = false;
+                }
+                if (!valide) { out += 'u'; p += 2; continue; }
+                p += 6;
+                if (cp >= 0xD800 && cp <= 0xDBFF && p + 6 < json.size() &&
+                    json[p] == '\\' && json[p + 1] == 'u') {
+                    unsigned int bas = 0;
+                    bool v2 = true;
+                    for (int k = 0; k < 4 && v2; k++) {
+                        char h = json[p + 2 + k];
+                        bas <<= 4;
+                        if (h >= '0' && h <= '9') bas |= (unsigned int)(h - '0');
+                        else if (h >= 'a' && h <= 'f') bas |= (unsigned int)(h - 'a' + 10);
+                        else if (h >= 'A' && h <= 'F') bas |= (unsigned int)(h - 'A' + 10);
+                        else v2 = false;
+                    }
+                    if (v2 && bas >= 0xDC00 && bas <= 0xDFFF) {
+                        cp = 0x10000 + ((cp - 0xD800) << 10) + (bas - 0xDC00);
+                        p += 6;
+                    }
+                }
+                if (cp < 0x80) out += (char)cp;
+                else if (cp < 0x800) {
+                    out += (char)(0xC0 | (cp >> 6));
+                    out += (char)(0x80 | (cp & 0x3F));
+                } else if (cp < 0x10000) {
+                    out += (char)(0xE0 | (cp >> 12));
+                    out += (char)(0x80 | ((cp >> 6) & 0x3F));
+                    out += (char)(0x80 | (cp & 0x3F));
+                } else {
+                    out += (char)(0xF0 | (cp >> 18));
+                    out += (char)(0x80 | ((cp >> 12) & 0x3F));
+                    out += (char)(0x80 | ((cp >> 6) & 0x3F));
+                    out += (char)(0x80 | (cp & 0x3F));
+                }
+            } else { out += e; p += 2; }
+            continue;
+        }
+        if (c == '"') break;
+        out += c;
+        p++;
+    }
+    return out;
+}
+
+// Valeur d'un champ "cle": "valeur" (chaine simple).
+std::string champJson(const std::string& json, const std::string& cle) {
+    std::string cible = "\"" + cle + "\"";
+    std::size_t p = json.find(cible);
+    if (p == std::string::npos) return "";
+    p = json.find(':', p + cible.size());
+    if (p == std::string::npos) return "";
+    p++;
+    while (p < json.size() && (json[p] == ' ' || json[p] == '\t')) p++;
+    if (p >= json.size() || json[p] != '"') return "";
+    return chaineJson(json, p);
+}
+
+// Premiere chaine du tableau "reponses":[...] + champ "confiance".
+std::string premiereReponseJson(const std::string& json, std::string& confiance) {
+    confiance = champJson(json, "confiance");
+    if (confiance != "haute" && confiance != "moyenne" && confiance != "basse") confiance = "haute";
+    std::size_t p = json.find("\"reponses\"");
+    if (p == std::string::npos) return "";
+    p = json.find('[', p);
+    if (p == std::string::npos) return "";
+    std::size_t q = json.find('"', p);
+    if (q == std::string::npos) return "";
+    return chaineJson(json, q);
+}
+
+// Demande une reponse a la version en ligne. "" = echec : le moteur local
+// repondra. Correspondance des modes : bot mode 1 (classique BLAMUNE) ->
+// mode 2 du serveur (BLAMUNE), bot mode 2 (IA humaine) -> mode 1 (EGO).
+std::string appelerEnLigne(const std::string& phrase, int modeLocal) {
+    if (horsLigneActive()) return "";
+    if (phrase.empty() || phrase.size() > 2000) return "";
+    std::string modeEnLigne = (modeLocal == 2) ? "1" : "2";
+    std::string rep;
+    DWORD statut = 0;
+    if (!chargerSessionLigne()) {
+        if (!posterBlamune("/invite", "", "", rep, statut, 8000) || statut != 200) return "";
+        std::string uid = champJson(rep, "uid");
+        std::string jeton = champJson(rep, "jeton");
+        if (uid.empty() || jeton.empty()) return "";
+        sauverSessionLigne(uid, jeton);
+    }
+    std::string corps = "msg=" + encoderUrl(phrase) + "&mode=" + modeEnLigne;
+    std::string entetes = "X-UID: " + ligneUid + "\r\nX-Jeton: " + ligneJeton + "\r\n";
+    if (!posterBlamune("/send", entetes, corps, rep, statut, 15000)) return "";
+    if (statut == 401) {
+        // Session perdue (redemarrage du serveur) : on reinvite une fois.
+        ligneUid.clear();
+        ligneJeton.clear();
+        ligneSessionTestee = false;
+        if (!posterBlamune("/invite", "", "", rep, statut, 8000) || statut != 200) return "";
+        std::string uid = champJson(rep, "uid");
+        std::string jeton = champJson(rep, "jeton");
+        if (uid.empty() || jeton.empty()) return "";
+        sauverSessionLigne(uid, jeton);
+        entetes = "X-UID: " + ligneUid + "\r\nX-Jeton: " + ligneJeton + "\r\n";
+        if (!posterBlamune("/send", entetes, corps, rep, statut, 15000) || statut != 200) return "";
+    }
+    if (statut != 200) return "";
+    std::string confiance;
+    std::string texte = premiereReponseJson(rep, confiance);
+    if (texte.empty()) return "";
+    // Messages d'erreur du serveur (quota, panne, limite) : le moteur
+    // local reprend la main plutot que d'afficher une erreur au lieu d'une
+    // reponse. Une reponse savoir.txt venant du secours serveur, elle, est
+    // validee et affichee telle quelle.
+    if (texte.find("Beaucoup de monde") != std::string::npos ||
+        texte.find("probleme technique") != std::string::npos ||
+        texte.find("Trop de") != std::string::npos ||
+        texte.find("Non autorise") != std::string::npos ||
+        texte.find("Connecte-toi") != std::string::npos ||
+        texte.find("Message vide") != std::string::npos ||
+        texte.find("Message trop long") != std::string::npos)
+        return "";
+    return texte + " [confiance:" + confiance + "]";
+}
+
+#else
+
+std::string appelerEnLigne(const std::string& phrase, int modeLocal) {
+    (void)phrase;
+    (void)modeLocal;
+    return "";
+}
+
+#endif
 
 int main() {
     // Sortie non bufferisee : indispensable quand le bot est pilote par un
@@ -8710,6 +8995,53 @@ int main() {
             std::cout << botNom + " : " << r[prochainIndice(5)] << "\n";
             dernierSujet = p;
             continue;
+        }
+
+        // ============ EN LIGNE : GEMINI VIA LE SERVEUR BLAMUNE ============
+        // Une question factuelle deja connue de savoir.txt est repondue sur
+        // place (immediate, gratuite, meme hors ligne) ; tout le reste part
+        // vers la version en ligne (blamune.onrender.com), qui partage le
+        // meme Gemini, la meme memoire et le meme historique que le site.
+        // Si le reseau, le quota ou le serveur tombe, on retombe sur les
+        // blocs locaux ci-dessous (connaissances partagees, definitions,
+        // regles, moteur de conversation) sans rien laisser paraitre.
+        {
+            bool reponduIci = false;
+            if (estQuestionFactuelle(p)) {
+                std::vector<std::string> choix;
+                std::size_t meilleureTaille = 0;
+                int meilleurChoix = 0;
+                bool meilleurExact = false;
+                for (unsigned int i = 0; i < cles.size(); i++) {
+                    if (phraseContientCle(p, cles[i])) {
+                        bool exact = phraseContientCleExact(p, cles[i]);
+                        if (cles[i].size() > meilleureTaille ||
+                            (cles[i].size() == meilleureTaille && exact && !meilleurExact)) {
+                            meilleureTaille = cles[i].size();
+                            meilleurChoix = (int)choix.size();
+                            meilleurExact = exact;
+                        }
+                        choix.push_back(reponses[i]);
+                    }
+                }
+                if (!choix.empty()) {
+                    std::string rep = choix[meilleurChoix];
+                    derniereRep = rep;
+                    for (int c = 0; c < 14; c++) derniereQuestionQuiz[c] = -1;
+                    std::cout << botNom + " : " << rep << "\n";
+                    dernierSujet = p;
+                    reponduIci = true;
+                }
+            }
+            if (!reponduIci) {
+                std::string repLigne = appelerEnLigne(phrase, mode);
+                if (!repLigne.empty()) {
+                    std::cout << botNom + " : " << repLigne << "\n";
+                    dernierSujet = p;
+                    reponduIci = true;
+                }
+            }
+            if (reponduIci) continue;
         }
 
             // ============ CONNAISSANCES PARTAGEES (les deux modes) ============

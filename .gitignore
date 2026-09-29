@@ -24,3 +24,5 @@ stats.json
 bins.json
 logs/
 invites.json
+.blamune_session
+hors_ligne

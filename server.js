@@ -1020,6 +1020,92 @@ function messageTechnique(e) {
   return 'Desole, j\'ai eu un probleme technique. Reessaie.';
 }
 
+// ==================== SAVOIR.TXT : SECOURS QUAND GEMINI EST EN PANNE ========
+// savoir.txt ("cle|reponse" par ligne) est partage avec le bot local bot.exe.
+// Quand le modele est inaccessible (quota sature, coupure, erreur), on cherche
+// la cle dans le message et on repond avec le fichier plutot qu'avec un
+// message d'erreur. Les deux exemplaires possibles sont FUSIONNES (le depot
+// du code d'abord, la copie du dossier de donnees par-dessus : elle gagne),
+// et le fichier est relu automatiquement s'il change pendant la session.
+let savoirSecours = null;
+let savoirSecoursCache = '';
+
+function chargerSavoirSecours() {
+  try {
+    const vus = [];
+    const fichiers = [];
+    const candidats = [path.join(__dirname, 'savoir.txt'), path.join(RACINE, 'savoir.txt')];
+    for (const f of candidats) {
+      try {
+        const abs = path.resolve(f);
+        if (vus.indexOf(abs) >= 0) continue;
+        const st = fs.statSync(abs);
+        if (!st.isFile()) continue;
+        vus.push(abs);
+        fichiers.push({ f: abs, mtime: st.mtimeMs });
+      } catch (e) {}
+    }
+    const cleCache = fichiers.map(x => x.f + '@' + x.mtime).join('|');
+    if (savoirSecours && cleCache === savoirSecoursCache) return;
+    const carte = new Map();
+    for (const info of fichiers) {
+      for (const l of fs.readFileSync(info.f, 'utf8').split('\n')) {
+        const pos = l.indexOf('|');
+        if (pos <= 0) continue;
+        const cle = sansAccents(l.substring(0, pos).trim().toLowerCase());
+        const rep = l.substring(pos + 1).trim();
+        if (cle && rep) carte.set(cle, rep);
+      }
+    }
+    savoirSecours = carte;
+    savoirSecoursCache = cleCache;
+  } catch (e) {
+    if (!savoirSecours) savoirSecours = new Map();
+  }
+}
+chargerSavoirSecours();
+
+// La cle est-elle presente comme mot entier ? "un ordi" est dans "c est quoi
+// un ordi", mais "ordi" n'est pas dans "ordinateur" ni "match" dans "matche".
+// Meme regle que le bot local (contientMot).
+function savoirContientEntier(texte, cle) {
+  let i = texte.indexOf(cle);
+  while (i >= 0) {
+    const avant = i > 0 ? texte[i - 1] : ' ';
+    const apres = i + cle.length < texte.length ? texte[i + cle.length] : ' ';
+    const lettre = c => (c >= 'a' && c <= 'z') || c === '\'';
+    if (!lettre(avant) && !lettre(apres)) return true;
+    i = texte.indexOf(cle, i + 1);
+  }
+  return false;
+}
+
+// Plus longue cle connue presente dans le message : la plus precise gagne
+// (comme le bot local : "course" cede la place a "courses").
+function chercherSavoir(msg) {
+  try { chargerSavoirSecours(); } catch (e) {}
+  if (!savoirSecours || savoirSecours.size === 0) return '';
+  const texte = sansAccents(String(msg || '').toLowerCase());
+  if (!texte) return '';
+  let meilleureCle = '';
+  let meilleureRep = '';
+  for (const [cle, rep] of savoirSecours) {
+    if (cle.length <= meilleureCle.length) continue;
+    if (savoirContientEntier(texte, cle)) {
+      meilleureCle = cle;
+      meilleureRep = rep;
+    }
+  }
+  return meilleureRep;
+}
+
+// Ce que l'utilisateur voit quand Gemini echoue : la reponse connue de
+// savoir.txt d'abord, sinon le message d'erreur habituel.
+function reponseSecours(msg, e) {
+  const rep = chercherSavoir(msg);
+  return rep || messageTechnique(e);
+}
+
 // --- Reponse classique : tout d'un coup (repli si le flux echoue) ---
 // `patient` : appel en tache de fond, il peut attendre le delai demande par
 // Google ; sinon on laisse la cascade changer de modele (chaque modele a son
@@ -2464,7 +2550,7 @@ app.post('/send', async (req, res) => {
       reponses = [texte];
     } catch (e) {
       loggerErreur('EGO', e.message);
-      reponses = [messageTechnique(e)];
+      reponses = [reponseSecours(msg, e)];
     }
   } else {
     // BLAMUNE mode - Gemini with different personality
@@ -2546,7 +2632,7 @@ app.post('/send', async (req, res) => {
       reponses = [texte];
     } catch (e) {
       loggerErreur('BLAMUNE', e.message);
-      reponses = [messageTechnique(e)];
+      reponses = [reponseSecours(msg, e)];
     }
   }
 

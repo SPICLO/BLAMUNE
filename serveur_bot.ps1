@@ -1530,7 +1530,7 @@ function Extraire-Param([string]$body, [string]$cle) {
 # ---------------- DEMARRAGE ----------------
 if (-not (Test-Path -LiteralPath $ExeBot) -and $Mode -eq "2") {
     Write-Host "ERREUR : bot.exe introuvable dans" $Racine
-    Write-Host "Recompile le bot (g++ -std=c++17 bot.cpp -o bot.exe) puis relance."
+    Write-Host "Recompile le bot (g++ -std=c++17 bot.cpp -o bot.exe -lwininet) puis relance."
     Read-Host "Appuie sur Entree pour fermer"
     exit 1
 }

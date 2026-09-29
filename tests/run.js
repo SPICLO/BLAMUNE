@@ -897,6 +897,22 @@ async function main() {
       'historique vide apres /oublie');
     ok.push('commandes serveur: /stats-perso et /oublie (effacement)');
 
+    // 22. savoir.txt en secours quand tout le quota est sature : plutot que
+    //     "Beaucoup de monde", la question connue du fichier est repondue.
+    //     On termine par la : l'etat de quota reste ferme ensuite (plus
+    //     aucun envoi dans la suite).
+    quotaGeneralRestant = 999;
+    const secours = await envoyer("c'est quoi tokyo ?");
+    assert.strictEqual(secours.status, 200,
+      'secours savoir: HTTP ' + secours.status + ' ' + String(secours.texte).substring(0, 150));
+    const texteS = ((secours.json && secours.json.reponses) || []).join(' ');
+    assert(/capitale du japon/i.test(texteS),
+      'savoir.txt repondu pendant le quota: ' + texteS.substring(0, 150));
+    assert(!/Beaucoup de monde/i.test(texteS),
+      'message quota evite quand savoir connait la question: ' + texteS.substring(0, 150));
+    quotaGeneralRestant = 0;
+    ok.push('savoir.txt en secours pendant la panne quota (question connue repondue)');
+
     console.log('\nOK  ' + ok.length + ' verifications :');
     ok.forEach(l => console.log('  - ' + l));
     console.log('');
