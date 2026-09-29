@@ -1885,6 +1885,7 @@ std::string construirePhraseBloc(const std::string& p,
 // quand on partage le dossier). Retourne false si la cle etait deja connue.
 // detection amelioree : verifie les doublons par distance de mots (pas juste
 // l'egalite exacte) pour eviter les redondances ("foot" vs "football").
+void pousserSavoir(const std::string& cle, const std::string& rep);
 bool enregistrerSavoir(std::string cle, std::string rep, int categorie,
                        std::vector<std::string>& cles, std::vector<std::string>& reponses,
                        std::map<std::string, int>& motsClesAppris) {
@@ -1924,6 +1925,11 @@ bool enregistrerSavoir(std::string cle, std::string rep, int categorie,
         f.close();
     }
     if (avecCategorie) motsClesAppris[cle] = categorie;
+    // Synchronisation : la nouvelle connaissance part vers le site en ligne
+    // (le serveur l'utilise comme secours pendant les pannes de Gemini).
+    // Silencieux : sans reseau ou en hors_ligne, le fichier local reste la
+    // source unique. Le placeholder d'apprentissage ne sert pas de secours.
+    if (rep != "Je ne sais pas encore...") pousserSavoir(cle, rep);
     return true;
 }
 
@@ -3548,12 +3554,31 @@ std::string appelerEnLigne(const std::string& phrase, int modeLocal) {
     return texte + " [confiance:" + confiance + "]";
 }
 
+// Pousse une connaissance apprise en local vers savoir.txt du site : le
+// serveur l'ecrit immediatement (aucun commit ni deploy) et l'utilise des le
+// prochain message comme secours pendant les pannes de Gemini. Best effort :
+// echec reseau = silence, savoir.txt local reste la source de verite.
+void pousserSavoir(const std::string& cle, const std::string& rep) {
+    if (horsLigneActive()) return;
+    if (!chargerSessionLigne()) return;
+    std::string corps = "cle=" + encoderUrl(cle) + "&reponse=" + encoderUrl(rep);
+    std::string entetes = "X-UID: " + ligneUid + "\r\nX-Jeton: " + ligneJeton + "\r\n";
+    std::string corpsReponse;
+    DWORD statut = 0;
+    posterBlamune("/savoir", entetes, corps, corpsReponse, statut, 6000);
+}
+
 #else
 
 std::string appelerEnLigne(const std::string& phrase, int modeLocal) {
     (void)phrase;
     (void)modeLocal;
     return "";
+}
+
+void pousserSavoir(const std::string& cle, const std::string& rep) {
+    (void)cle;
+    (void)rep;
 }
 
 #endif

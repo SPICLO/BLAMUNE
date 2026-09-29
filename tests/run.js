@@ -913,6 +913,50 @@ async function main() {
     quotaGeneralRestant = 0;
     ok.push('savoir.txt en secours pendant la panne quota (question connue repondue)');
 
+    // 23. Savoir AUTO : le bot local (POST /savoir) pousse ses
+    //     apprentissages : ecriture immediate dans savoir.txt (aucun commit
+    //     ni deploy) puis utilisation comme secours des le message suivant.
+    //     Ecriture stricte : invite avec jeton ou admin, jamais legacy.
+    const invSav = await requete(PORT_APP, '/invite', 'POST', '');
+    assert(invSav.json && invSav.json.ok, 'invite savoir: ok');
+    const hSav = { 'X-UID': invSav.json.uid, 'X-Jeton': invSav.json.jeton };
+    const savSansAuth = await requete(PORT_APP, '/savoir', 'POST',
+      'cle=kangourou+de+test&reponse=il+saute+tres+haut');
+    assert.strictEqual(savSansAuth.status, 401,
+      'savoir sans auth refuse: HTTP ' + savSansAuth.status);
+    const uidSansJeton = 'inv_' + crypto.randomBytes(12).toString('hex');
+    const savLegacy = await requete(PORT_APP, '/savoir', 'POST',
+      'cle=kangourou+de+test&reponse=il+saute+tres+haut', { 'X-UID': uidSansJeton });
+    assert.strictEqual(savLegacy.status, 401,
+      'savoir invite legacy refuse (ecriture stricte): HTTP ' + savLegacy.status);
+    const savPousse = await requete(PORT_APP, '/savoir', 'POST',
+      'cle=' + encodeURIComponent('girafe de test') +
+      '&reponse=' + encodeURIComponent('un animal a long cou qui mange des feuilles'), hSav);
+    assert.strictEqual(savPousse.status, 200,
+      'poussee savoir: HTTP ' + savPousse.status + ' ' + String(savPousse.texte).substring(0, 120));
+    assert(savPousse.json && savPousse.json.ok,
+      'poussee savoir corps: ' + String(savPousse.texte).substring(0, 120));
+    // Le quota est referme (22) : la connaissance poussee repondue aussitot,
+    // preuve que savoir.txt est relu sans redemarrage du serveur.
+    quotaGeneralRestant = 999;
+    const secoursSav = await envoyer("c'est quoi une girafe de test ?");
+    assert.strictEqual(secoursSav.status, 200,
+      'secours savoir pousse: HTTP ' + secoursSav.status);
+    const texteSav = ((secoursSav.json && secoursSav.json.reponses) || []).join(' ');
+    assert(/animal a long cou/i.test(texteSav),
+      'savoir pousse repondu sans deploy: ' + texteSav.substring(0, 150));
+    assert(!/Beaucoup de monde/i.test(texteSav),
+      'savoir pousse evite le message quota: ' + texteSav.substring(0, 150));
+    // Meme cle : la reponse existante est remplacee (pas de doublon).
+    const savRemplace = await requete(PORT_APP, '/savoir', 'POST',
+      'cle=' + encodeURIComponent('girafe de test') +
+      '&reponse=' + encodeURIComponent('un animal encore plus long'), hSav);
+    assert.strictEqual(savRemplace.status, 200, 'remplacement savoir: HTTP ' + savRemplace.status);
+    assert(savRemplace.json && savRemplace.json.remplace === true,
+      'remplacement savoir: entree remplacee, pas dupliquee: ' + String(savRemplace.texte).substring(0, 120));
+    quotaGeneralRestant = 0;
+    ok.push('savoir pousse par le bot: ecriture immediate utilisee comme secours (sans deploy)');
+
     console.log('\nOK  ' + ok.length + ' verifications :');
     ok.forEach(l => console.log('  - ' + l));
     console.log('');

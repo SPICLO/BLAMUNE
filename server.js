@@ -2436,6 +2436,52 @@ app.post('/invite/jeton', (req, res) => {
   res.json({ ok: true, jeton });
 });
 
+// Le bot local (bot.exe) pousse ses apprentissages ici : la connaissance
+// rejoint savoir.txt IMMERDIATEMENT (aucun commit ni deploy) et sert de
+// secours des le prochain message quand Gemini est en panne. Ecriture
+// protegee : authentification stricte (invite muni de son jeton ou compte
+// admin — pas d'invite legacy sans enregistrement) + debit limite.
+app.post('/savoir', (req, res) => {
+  const auth = extraireAuth(req);
+  if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
+  if (auth.uid.startsWith('inv_') && !lireJetonInvite(auth.uid))
+    return res.status(401).json({ ok: false, message: 'Non autorise' });
+  if (!checkRateLimit('savoir:' + auth.uid, 20))
+    return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
+  let cle = String(extraireChamp(req, 'cle') || '');
+  let reponse = String(extraireChamp(req, 'reponse') || '');
+  // "|", retours ligne : structure de savoir.txt, jamais dans les donnees.
+  cle = cle.replace(/[\r\n|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  reponse = reponse.replace(/[\r\n|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!cle || !reponse) return res.status(400).json({ ok: false, message: 'Entree invalide.' });
+  if (cle.length > 100 || reponse.length > 500)
+    return res.status(400).json({ ok: false, message: 'Entree trop longue.' });
+  try {
+    const f = path.join(RACINE, 'savoir.txt');
+    let contenu = '';
+    try { contenu = fs.readFileSync(f, 'utf8'); } catch (e) {}
+    const cleNorm = sansAccents(cle.toLowerCase());
+    const lignes = contenu ? contenu.split('\n') : [];
+    let remplace = false;
+    for (let i = 0; i < lignes.length; i++) {
+      const pos = lignes[i].indexOf('|');
+      if (pos <= 0) continue;
+      if (sansAccents(lignes[i].substring(0, pos).trim().toLowerCase()) === cleNorm) {
+        lignes[i] = cle + '|' + reponse;
+        remplace = true;
+      }
+    }
+    if (!remplace) lignes.push(cle + '|' + reponse);
+    let sortie = lignes.join('\n');
+    if (sortie.charAt(sortie.length - 1) !== '\n') sortie += '\n';
+    fs.writeFileSync(f, sortie, 'utf8');
+    storage.declencherSauvegarde();
+    res.json({ ok: true, remplace });
+  } catch (e) {
+    res.status(500).json({ ok: false, message: 'Ecriture impossible.' });
+  }
+});
+
 // Logout
 app.post('/logout', (req, res) => {
   const auth = extraireAuth(req);
