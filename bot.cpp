@@ -3583,6 +3583,187 @@ void pousserSavoir(const std::string& cle, const std::string& rep) {
 
 #endif
 
+// ============ PERSONNALITE (Big Five / OCEAN) ============
+// personnalite.txt : trait|facette|phrase (questionnaire Big Five recu,
+// phrases uniques apres doublons retires). Le bot s'en sert pour repondre
+// DE LUI-MEME : "qui es tu ?", "tu es sociable ?", "c'est quoi ton
+// caractere ?" — 100% local, immediat, sans Gemini ni reseau. Les questions
+// factuelles restent reservees au savoir / a l'en ligne.
+struct Perso {
+    std::string trait;
+    std::string facette;
+    std::string phrase;
+};
+std::vector<Perso> personnalite;
+std::string dernierePhrasePerso;
+
+void chargerPersonnalite() {
+    std::ifstream f("personnalite.txt");
+    if (!f.is_open()) return;
+    std::string ligne;
+    while (std::getline(f, ligne)) {
+        ligne = nettoyerLigne(ligne);
+        std::size_t p1 = ligne.find('|');
+        if (p1 == std::string::npos) continue;
+        std::size_t p2 = ligne.find('|', p1 + 1);
+        if (p2 == std::string::npos) continue;
+        Perso pe;
+        pe.trait = ligne.substr(0, p1);
+        pe.facette = ligne.substr(p1 + 1, p2 - p1 - 1);
+        pe.phrase = ligne.substr(p2 + 1);
+        if (pe.phrase.empty()) continue;
+        bool deja = false;
+        for (unsigned int i = 0; i < personnalite.size(); i++)
+            if (personnalite[i].phrase == pe.phrase) { deja = true; break; }
+        if (!deja) personnalite.push_back(pe);
+    }
+    f.close();
+}
+
+// Mot entier pour les regles courtes : "photo" ne doit pas attraper
+// "photosynthese", mais "decouvr" (long) garde la souplesse d'un radical.
+bool fragmentTrouve(const std::string& texte, const std::string& frag) {
+    if (frag.size() >= 6) return texte.find(frag) != std::string::npos;
+    bool lettre = false;
+    std::size_t i = texte.find(frag);
+    while (i != std::string::npos) {
+        bool avantOk = (i == 0);
+        if (!avantOk) {
+            char c = texte[i - 1];
+            lettre = (c >= 'a' && c <= 'z');
+            avantOk = !lettre;
+        }
+        bool apresOk = (i + frag.size() >= texte.size());
+        if (!apresOk) {
+            char c = texte[i + frag.size()];
+            lettre = (c >= 'a' && c <= 'z');
+            apresOk = !lettre;
+        }
+        if (avantOk && apresOk) return true;
+        i = texte.find(frag, i + 1);
+    }
+    return false;
+}
+
+// Mot-cle du message -> facette visee (sans accents, minuscules).
+std::string facetteVisee(const std::string& p) {
+    static const char* regles[][2] = {
+        { "sociab", "sociabilite" }, { "fete", "sociabilite" }, { "groupe", "sociabilite" },
+        { "solitaire", "sociabilite" }, { "rencontr", "sociabilite" }, { "inconnu", "sociabilite" },
+        { "initiative", "assertivite" }, { "assertiv", "assertivite" }, { "opinion", "assertivite" },
+        { "convainc", "assertivite" }, { "direction", "assertivite" }, { "desaccord", "assertivite" },
+        { "organis", "organisation" }, { "planif", "organisation" }, { "liste", "organisation" },
+        { "ranger", "organisation" }, { "structur", "organisation" }, { "carnet", "organisation" },
+        { "ponctu", "ponctualite" }, { "retard", "ponctualite" },
+        { "discipline", "discipline" }, { "routine", "discipline" }, { "objectif", "discipline" },
+        { "procrastin", "discipline" }, { "delai", "discipline" }, { "productif", "discipline" },
+        { "fiable", "fiabilite" }, { "engagement", "fiabilite" }, { "promesse", "fiabilite" },
+        { "compter sur", "fiabilite" }, { "echeance", "fiabilite" }, { "confie", "fiabilite" },
+        { "curieux", "curiosite" }, { "curiosite", "curiosite" }, { "apprend", "curiosite" },
+        { "decouvr", "curiosite" }, { "nouveau", "curiosite" }, { "culture", "curiosite" },
+        { "science", "curiosite" }, { "lecture", "curiosite" }, { "lire", "curiosite" },
+        { "podcast", "curiosite" }, { "atelier", "curiosite" }, { "cours", "curiosite" },
+        { "imagination", "imagination" }, { "histoire", "imagination" }, { "scenario", "imagination" },
+        { "creatif", "imagination" }, { "invent", "imagination" }, { "reve", "imagination" },
+        { "personnage", "imagination" }, { "prototype", "imagination" }, { "recit", "imagination" },
+        { "art", "esthetique" }, { "musique", "esthetique" }, { "beaut", "esthetique" },
+        { "design", "esthetique" }, { "photo", "esthetique" }, { "paysage", "esthetique" },
+        { "poesie", "esthetique" }, { "exposition", "esthetique" }, { "couleur", "esthetique" },
+        { "galerie", "esthetique" }, { "archi", "esthetique" }, { "mode", "esthetique" },
+        { "aide", "altruisme" }, { "aider", "altruisme" }, { "benevol", "altruisme" },
+        { "solidaire", "altruisme" }, { "partage", "altruisme" }, { "collecte", "altruisme" },
+        { "entraide", "altruisme" },
+        { "empathie", "compassion" }, { "ecoute", "compassion" }, { "console", "compassion" },
+        { "souffr", "compassion" }, { "reconfort", "compassion" }, { "soutien", "compassion" },
+        { "bienveillance", "compassion" }, { "oreille", "compassion" },
+        { "tolerance", "tolerance" }, { "difference", "tolerance" }, { "croyance", "tolerance" },
+        { "juger", "tolerance" }, { "compromis", "tolerance" }, { "divergent", "tolerance" },
+        { "calme", "patience" }, { "patien", "patience" }, { "contrari", "patience" },
+        { "embouteill", "patience" },
+        { "inquiet", "anxiete" }, { "souci", "anxiete" }, { "anxio", "anxiete" },
+        { "nerveux", "anxiete" }, { "tendu", "anxiete" }, { "peur", "anxiete" },
+        { "stress", "anxiete" }, { "aprehens", "anxiete" }, { "rumin", "anxiete" },
+        { "nervosite", "anxiete" },
+        { "humeur", "instabilite emotionnelle" }, { "emotion", "instabilite emotionnelle" },
+        { "tristesse", "instabilite emotionnelle" }, { "colere", "instabilite emotionnelle" },
+        { "contradictoire", "instabilite emotionnelle" },
+        { "fragile", "vulnerabilite" }, { "doute", "vulnerabilite" }, { "submerg", "vulnerabilite" },
+        { "depasse", "vulnerabilite" }, { "echec", "vulnerabilite" }, { "critiqu", "vulnerabilite" },
+        { "incertain", "vulnerabilite" }, { "destabilis", "vulnerabilite" },
+        { "energie", "energie" }, { "enthousiasme", "energie" }, { "vitalite", "energie" },
+        { "matin", "energie" }, { "dynamis", "energie" }, { "sport", "energie" },
+        { "entrain", "energie" }, { "motiv", "energie" },
+        { 0, 0 }
+    };
+    for (int i = 0; regles[i][0] != 0; i++)
+        if (fragmentTrouve(p, regles[i][0])) return regles[i][1];
+    return "";
+}
+
+// Reponse de personnalite pour ce message, ou "" si le sujet ne le concerne
+// pas (auquel cas l'en ligne ou les blocs locaux prennent la main).
+std::string reponsePersonnalite(const std::string& brut) {
+    if (personnalite.empty()) return "";
+    std::string p = sansAccents(minuscules(brut));
+    // Tirets et apostrophes : "parle-moi de toi" = "parle moi de toi".
+    for (unsigned int i = 0; i < p.size(); i++)
+        if (p[i] == '-' || p[i] == '\'') p[i] = ' ';
+    // L'heure ne releve pas de la personnalite.
+    if (p.find("quelle heure") != std::string::npos ||
+        p.find("il est quelle") != std::string::npos) return "";
+    // Questions sur soi : la personnalite repond meme si la phrase est
+    // factuelle ("c'est quoi ton caractere ?").
+    bool surSoi =
+        p.find("parle moi de toi") != std::string::npos ||
+        p.find("parle de toi") != std::string::npos ||
+        p.find("tu es comment") != std::string::npos ||
+        p.find("comment tu es") != std::string::npos ||
+        p.find("ton caractere") != std::string::npos ||
+        p.find("ta personnalite") != std::string::npos ||
+        p.find("qui es tu") != std::string::npos ||
+        p.find("tu es fait") != std::string::npos ||
+        p.find("dis moi un truc") != std::string::npos ||
+        p.find("raconte toi") != std::string::npos ||
+        p.find("c est quoi toi") != std::string::npos ||
+        p.find("tu ressens") != std::string::npos ||
+        p.find("comment tu te sens") != std::string::npos;
+    // Une vraie question factuelle ("c'est quoi la capitale") reste reservee
+    // au savoir / a l'en ligne : la personnalite n'intervient que si le sujet
+    // parle de lui ou d'un theme de facette adresse au bot.
+    if (!surSoi && estQuestionFactuelle(brut)) return "";
+    std::string facette = facetteVisee(p);
+    if (!surSoi) {
+        if (facette.empty()) return "";
+        // Facette seulement si le message s'adresse au bot (tu / ton / ta /
+        // tes / toi) : "raconte une histoire" n'est pas "tu aimes les histoires".
+        bool adresseAuBot = contientMot(brut, "tu") || contientMot(brut, "ton") ||
+                            contientMot(brut, "ta") || contientMot(brut, "tes") ||
+                            contientMot(brut, "toi");
+        if (!adresseAuBot) return "";
+    }
+    std::vector<int> candidates;
+    for (unsigned int i = 0; i < personnalite.size(); i++) {
+        bool garder = false;
+        if (!facette.empty()) {
+            std::string f = sansAccents(minuscules(personnalite[i].facette));
+            garder = (f.find(facette) != std::string::npos);
+        } else garder = true;
+        if (garder) candidates.push_back((int)i);
+    }
+    if (candidates.empty()) return "";
+    // Au hasard, sans repeter la phrase precedente.
+    int pos = rand() % (int)candidates.size();
+    int essais = 0;
+    while (personnalite[candidates[pos]].phrase == dernierePhrasePerso &&
+           essais < 6 && candidates.size() > 1) {
+        pos = rand() % (int)candidates.size();
+        essais++;
+    }
+    std::string rep = personnalite[candidates[pos]].phrase;
+    dernierePhrasePerso = rep;
+    return rep;
+}
+
 int main() {
     // Sortie non bufferisee : indispensable quand le bot est pilote par un
     // serveur (les reponses et invites doivent arriver immediatement, sans
@@ -3655,6 +3836,11 @@ int main() {
         }
         savoir.close();
     }
+
+    // Charger la personnalite (personnalite.txt : trait|facette|phrase) :
+    // le bot repond "de lui-meme" avec ces phrases, en local, avant tout
+    // reseau. Le site web partage le meme fichier.
+    chargerPersonnalite();
 
     // Charger les mots de vocabulaire (vocabulaire.txt) : un mot par ligne, sans
     // ponctuation ni numero. Ces mots aident l'IA a composer des phrases variees
@@ -9022,17 +9208,35 @@ int main() {
             continue;
         }
 
-        // ============ EN LIGNE : GEMINI VIA LE SERVEUR BLAMUNE ============
-        // Une question factuelle deja connue de savoir.txt est repondue sur
-        // place (immediate, gratuite, meme hors ligne) ; tout le reste part
-        // vers la version en ligne (blamune.onrender.com), qui partage le
-        // meme Gemini, la meme memoire et le meme historique que le site.
-        // Si le reseau, le quota ou le serveur tombe, on retombe sur les
-        // blocs locaux ci-dessous (connaissances partagees, definitions,
-        // regles, moteur de conversation) sans rien laisser paraitre.
+        // ============ PRIORITE AU BOT : PERSONNALITE, SAVOIR, PUIS EN LIGNE ============
+        // 1) La personnalite (personnalite.txt, Big Five) repond EN LOCAL :
+        //    "qui es tu", "tu es sociable", "c'est quoi ton caractere"... Le
+        //    bot est d'abord lui-meme, sans Gemini ni reseau.
+        // 2) Une question factuelle deja connue de savoir.txt est repondue sur
+        //    place (immediate, gratuite, meme hors ligne).
+        // 3) Tout le reste part vers la version en ligne (blamune.onrender.com)
+        //    si le local n'a rien dit ; si le reseau, le quota ou le serveur
+        //    tombe, on retombe sur les blocs locaux ci-dessous (connaissances
+        //    partagees, definitions, regles, moteur de conversation) sans rien
+        //    laisser paraitre.
         {
             bool reponduIci = false;
-            if (estQuestionFactuelle(p)) {
+            // 1) La personnalite d'abord : les questions sur soi et les
+            //    facettes adressees au bot ("tu es sociable ?", "parle-moi de
+            //    toi", "c'est quoi ton caractere") repondent EN LOCAL, avant
+            //    meme savoir.txt. Les vraies questions factuelles reviennent
+            //    vides d'ici et tombent sur savoir juste apres.
+            if (!reponduIci) {
+                std::string repPerso = reponsePersonnalite(p);
+                if (!repPerso.empty()) {
+                    std::cout << botNom + " : " << repPerso << "\n";
+                    dernierSujet = p;
+                    reponduIci = true;
+                }
+            }
+            // 2) Question factuelle deja connue de savoir.txt : immediate,
+            //    gratuite, meme hors ligne.
+            if (!reponduIci && estQuestionFactuelle(p)) {
                 std::vector<std::string> choix;
                 std::size_t meilleureTaille = 0;
                 int meilleurChoix = 0;
@@ -9058,6 +9262,9 @@ int main() {
                     reponduIci = true;
                 }
             }
+            // 3) Le reste part en ligne seulement si le local n'a rien dit ;
+            //    si le reseau, le quota ou le serveur tombe, les blocs locaux
+            //    ci-dessous reprennent sans rien laisser paraitre.
             if (!reponduIci) {
                 std::string repLigne = appelerEnLigne(phrase, mode);
                 if (!repLigne.empty()) {
