@@ -3648,6 +3648,11 @@ bool fragmentTrouve(const std::string& texte, const std::string& frag) {
 // Mot-cle du message -> facette visee (sans accents, minuscules).
 std::string facetteVisee(const std::string& p) {
     static const char* regles[][2] = {
+        { "aimes quoi", "centres d interets" }, { "aimes faire", "centres d interets" },
+        { "interet", "centres d interets" }, { "interesse", "centres d interets" },
+        { "passion", "centres d interets" }, { "hobby", "centres d interets" },
+        { "hobbie", "centres d interets" }, { "kiffe", "centres d interets" },
+        { "kiffer", "centres d interets" }, { "gouts", "centres d interets" },
         { "sociab", "sociabilite" }, { "fete", "sociabilite" }, { "groupe", "sociabilite" },
         { "solitaire", "sociabilite" }, { "rencontr", "sociabilite" }, { "inconnu", "sociabilite" },
         { "initiative", "assertivite" }, { "assertiv", "assertivite" }, { "opinion", "assertivite" },
@@ -3727,11 +3732,14 @@ std::string reponsePersonnalite(const std::string& brut) {
         p.find("c est quoi toi") != std::string::npos ||
         p.find("tu ressens") != std::string::npos ||
         p.find("comment tu te sens") != std::string::npos;
+    std::string facette = facetteVisee(p);
     // Une vraie question factuelle ("c'est quoi la capitale") reste reservee
     // au savoir / a l'en ligne : la personnalite n'intervient que si le sujet
-    // parle de lui ou d'un theme de facette adresse au bot.
-    if (!surSoi && estQuestionFactuelle(brut)) return "";
-    std::string facette = facetteVisee(p);
+    // parle de lui ou d'un theme de facette adresse au bot. Les centres
+    // d'interet appartiennent au bot meme formules factuellement
+    // ("c'est quoi tes centres d'interet ?").
+    if (!surSoi && estQuestionFactuelle(brut) &&
+        facette != "centres d interets") return "";
     if (!surSoi) {
         if (facette.empty()) return "";
         // Facette seulement si le message s'adresse au bot (tu / ton / ta /

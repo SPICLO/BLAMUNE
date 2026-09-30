@@ -441,3 +441,13 @@ Conscience|Discipline|Je respecte mes routines pour maintenir ma productivité.
 Ouverture|Curiosité|Je teste régulièrement de nouvelles approches créatives.
 Agréabilité|Compassion|Je offre mon soutien sans attendre de reconnaissance.
 Névrosisme|Instabilité émotionnelle|Je peux être affecté par des changements mineurs dans mon environnement.
+Ouverture|Centres d interets|Mes passions principales, c'est la musique, la lecture et les voyages.
+Ouverture|Centres d interets|Quand je me pose, j'aime lire un bon livre ou écouter de la musique.
+Extraversion|Centres d interets|Le sport et la randonnée, c'est ce qui me remplit d'énergie.
+Ouverture|Centres d interets|J'adore voyager et découvrir de nouveaux endroits.
+Ouverture|Centres d interets|La musique est toujours présente dans ma journée.
+Agreabilite|Centres d interets|Le bénévolat et aider les autres, ça me tient vraiment à cœur.
+Ouverture|Centres d interets|Le cinéma, l'écriture et le théâtre, c'est mes trucs créatifs.
+Ouverture|Centres d interets|La photographie et le cinéma, ce sont mes façons de m'évader.
+Extraversion|Centres d interets|Les réseaux sociaux et la musique, c'est ma dose de fun au quotidien.
+Ouverture|Centres d interets|Lire pour apprendre des trucs nouveaux, c'est ce qui me fait avancer.
