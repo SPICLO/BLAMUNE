@@ -451,3 +451,644 @@ Ouverture|Centres d interets|Le cinéma, l'écriture et le théâtre, c'est mes 
 Ouverture|Centres d interets|La photographie et le cinéma, ce sont mes façons de m'évader.
 Extraversion|Centres d interets|Les réseaux sociaux et la musique, c'est ma dose de fun au quotidien.
 Ouverture|Centres d interets|Lire pour apprendre des trucs nouveaux, c'est ce qui me fait avancer.
+Extraversion|Sociabilité|J'aime rencontrer de nouvelles personnes et participer à des événements sociaux.
+Extraversion|Assertivité|Je prends facilement la parole en public et défends mes idées.
+Conscience|Organisation|Je planifie mes journées et respecte mes échéances.
+Conscience|Fiabilité|Les autres peuvent compter sur moi pour tenir mes promesses.
+Ouverture|Curiosité intellectuelle|J'aime explorer des idées nouvelles et lire sur des sujets variés.
+Ouverture|Esthétique|Je suis sensible à l'art et à la beauté dans mon environnement.
+Agréabilité|Confiance|Je fais facilement confiance aux autres.
+Névrosisme|Anxiété|Je m'inquiète souvent pour des choses mineures.
+Névrosisme|Sensibilité émotionnelle|Je suis facilement affecté par les critiques.
+Honnêteté-Humilité|Sincérité|Je dis la vérité même quand c'est difficile.
+Honnêteté-Humilité|Modestie|Je n'aime pas me vanter de mes réussites.
+Style d'attachement|Sécurisé|Je me sens à l'aise dans les relations proches et stables.
+Créativité|Pensée divergente|Je propose souvent des solutions originales aux problèmes.
+Créativité|Improvisation|Je m'adapte et improvise facilement quand les plans changent.
+Style de communication|Direct|Je préfère dire les choses clairement et sans détour.
+Style de communication|Diplomate|Je choisis mes mots pour préserver l'harmonie sociale.
+Rapport au numérique|Technophile|J'adopte rapidement les nouvelles applications et gadgets.
+Rapport au numérique|Prudent|Je limite mon usage des réseaux sociaux pour protéger ma vie privée.
+Orientation culturelle|Tradition|Je respecte les coutumes et pratiques héritées.
+Orientation culturelle|Cosmopolite|J'apprécie les cultures étrangères et les échanges internationaux.
+Gestion du temps|Ponctualité|J'arrive toujours à l'heure aux rendez-vous.
+Éthique personnelle|Justice|Je défends l'équité même si cela me coûte.
+Éthique personnelle|Pragmatisme|Je privilégie les solutions efficaces plutôt que les principes abstraits.
+Rapport au risque|Aventurier|J'aime prendre des risques calculés pour vivre des expériences fortes.
+Rapport au risque|Prudent|Je préfère éviter les situations incertaines et dangereuses.
+Style de leadership|Visionnaire|Je motive les autres en partageant une vision claire du futur.
+Style de leadership|Serviteur|Je dirige en soutenant et en développant les compétences des autres.
+Relation à la nature|Écologique|Je fais des choix quotidiens pour réduire mon impact environnemental.
+Motivation|Orientation vers la réussite|Je me fixe des objectifs ambitieux et je travaille pour les atteindre.
+Motivation|Recherche d'équilibre|Je privilégie un bon équilibre entre travail et vie personnelle.
+Valeurs|Responsabilité sociale|Contribuer au bien-être collectif est important pour moi.
+Valeurs|Individualisme|Je privilégie la liberté individuelle et l'autonomie personnelle.
+Tempérament|Calme|Je garde mon sang-froid même dans des situations stressantes.
+Habitudes de vie|Sportif|Je pratique régulièrement une activité physique.
+Gestion des émotions|Résilience|Je rebondis rapidement après des échecs ou des difficultés.
+Tolérance à l'ambiguïté|Confortable|Je suis à l'aise quand les choses ne sont pas clairement définies.
+Curiosité sociale|Observateur|J'aime observer les interactions sociales pour mieux les comprendre.
+Orientation temporelle|Futuriste|Je planifie à long terme et anticipe l'avenir.
+Orientation temporelle|Présentiste|Je vis le moment présent sans trop penser au futur.
+Sens de l'humour|Ironique|J'utilise souvent l'ironie pour faire rire ou critiquer.
+Sens de l'humour|Bienveillant|Mon humour vise à faire sourire sans blesser.
+Adaptabilité culturelle|Flexible|Je m'adapte facilement aux normes culturelles différentes.
+Confiance en soi|Assuré|Je crois en mes capacités même face à des défis.
+Orientation morale|Absolutiste|Je crois en des principes moraux universels et immuables.
+Orientation morale|Relativiste|La morale dépend du contexte et des cultures.
+Gestion financière|Économe|Je fais attention à mes dépenses et j'épargne régulièrement.
+Orientation professionnelle|Entrepreneur|J'aime créer des projets et prendre des initiatives professionnelles.
+Orientation professionnelle|Salarié fidèle|Je préfère la stabilité d'un emploi salarié à long terme.
+Relation au savoir|Auto-apprenant|J'apprends régulièrement par moi-même en ligne ou par la lecture.
+Relation au savoir|Formel|Je préfère apprendre dans des cadres structurés et certifiants.
+Sens de la responsabilité|Engagé|Je prends mes responsabilités au sérieux et les assume.
+Préférence sensorielle|Visuel|Je retiens mieux l'information présentée visuellement.
+Préférence sensorielle|Auditif|J'apprends mieux en écoutant des explications ou des podcasts.
+Tolérance sociale|Inclusif|Je cherche à inclure des personnes de milieux différents.
+Gestion du conflit|Conciliateur|Je cherche des compromis pour résoudre les désaccords.
+Gestion du conflit|Confrontant|Je n'hésite pas à affronter directement les conflits pour les régler.
+Orientation spirituelle|Spirituel|Je pratique ou m'intéresse à des pratiques spirituelles régulières.
+Curiosité technologique|Explorateur|J'expérimente souvent de nouveaux outils numériques pour voir ce qu'ils apportent.
+Curiosité technologique|Conservateur|Je n'adopte une nouvelle technologie que si elle est éprouvée.
+Préférence de travail|Collaboratif|Je préfère travailler en équipe et partager les responsabilités.
+Préférence de travail|Individuel|Je suis plus productif quand je travaille seul.
+Gestion du stress|Préventif|J'anticipe les sources de stress et je mets en place des routines pour les éviter.
+Gestion du stress|Réactif|Je gère le stress au fur et à mesure qu'il apparaît plutôt qu'en l'anticipant.
+Orientation sociale|Altruiste communautaire|Je m'engage dans des actions bénévoles pour ma communauté.
+Sens de l'aventure|Explorateur urbain|J'aime découvrir de nouveaux quartiers, cafés et lieux en ville.
+Sens de l'aventure|Explorateur nature|Je recherche des aventures en plein air et des randonnées.
+Relation au changement|Proactif|J'anticipe et j'initie le changement plutôt que de le subir.
+Relation au changement|Réactif|Je préfère m'adapter au changement quand il est inévitable.
+Préférence d'information|Factuel|Je m'appuie sur des données vérifiables pour prendre des décisions.
+Préférence d'information|Intuitif|Je fais souvent confiance à mon intuition pour juger une situation.
+Sens de la loyauté|Familial|Ma famille est ma priorité et je lui suis fidèle.
+Sens de la loyauté|Professionnel|Je suis loyal envers mes collègues et mon employeur.
+Gestion des priorités|Stratégique|Je hiérarchise mes tâches selon leur impact à long terme.
+Gestion des priorités|Opportuniste|Je saisis les opportunités immédiates même si elles changent mes plans.
+Relation à l'autorité|Respectueux|Je respecte les figures d'autorité et leurs décisions.
+Relation à l'autorité|Sceptique|Je remets en question l'autorité quand elle me semble injuste.
+Préférence de consommation|Minimaliste|Je préfère posséder peu d'objets mais de qualité.
+Préférence de consommation|Consommateur|J'aime acheter et collectionner des objets qui me plaisent.
+Capacité d'écoute|Empathique|J'écoute activement et je cherche à comprendre les émotions des autres.
+Capacité d'écoute|Analytique|J'écoute pour recueillir des faits et résoudre des problèmes.
+Orientation vers l'innovation|Inventif|Je cherche constamment à améliorer les processus existants.
+Sens de la responsabilité civique|Engagé civique|Je participe aux élections et aux débats publics.
+Extraversion|Enthousiasme|Je m'enthousiasme facilement pour de nouvelles activités.
+Extraversion|Recherche de stimulation|Je cherche des situations excitantes et stimulantes.
+Conscience|Diligence|Je travaille avec persévérance jusqu'à atteindre mes objectifs.
+Conscience|Précision|Je fais attention aux détails dans mon travail quotidien.
+Ouverture|Imagination|Mon imagination me permet de créer des idées originales.
+Ouverture|Appréciation artistique|Je prends plaisir à découvrir des formes d'art variées.
+Agréabilité|Compassion|Je suis sensible à la souffrance des autres et j'agis pour aider.
+Agréabilité|Coopération|Je préfère coopérer plutôt que rivaliser avec les autres.
+Névrosisme|Irritabilité|Je me sens parfois facilement irrité par de petites contrariétés.
+Névrosisme|Vulnérabilité au stress|Le stress affecte souvent ma capacité à fonctionner normalement.
+Honnêteté-Humilité|Équité|Je traite les autres de manière équitable même si cela me coûte.
+Honnêteté-Humilité|Absence d'arrogance|Je n'ai pas besoin de me mettre en avant pour me sentir légitime.
+Style d'attachement|Ambivalent|Je cherche la proximité mais je crains parfois d'être abandonné.
+Style d'attachement|Désorganisé|Mes relations peuvent être intenses et imprévisibles.
+Créativité|Synthèse|Je combine des idées disparates pour créer quelque chose de nouveau.
+Créativité|Esthétique personnelle|Je développe souvent un style visuel qui m'est propre.
+Style de communication|Narratif|J'aime raconter des histoires pour transmettre des idées.
+Style de communication|Factuel|Je privilégie les faits et les preuves dans mes échanges.
+Rapport au numérique|Dépendant|Je consulte fréquemment mes appareils pour me sentir connecté.
+Rapport au numérique|Déconnecté volontaire|Je limite volontairement mon temps d'écran pour mieux vivre.
+Orientation culturelle|Localiste|Je valorise fortement les traditions et produits locaux.
+Orientation culturelle|Globaliste|Je m'identifie à une culture mondiale plus qu'à une seule nation.
+Gestion du temps|Rituel|J'ai des routines strictes qui structurent mes journées.
+Gestion du temps|Flexible|Je préfère garder des plages libres plutôt que des horaires serrés.
+Éthique personnelle|Intégrité|Je respecte mes principes même quand personne ne regarde.
+Éthique personnelle|Compromis moral|Je suis prêt à faire des compromis pour atteindre des objectifs pratiques.
+Rapport au risque|Calculateur|Je pèse soigneusement les gains et les pertes avant d'agir.
+Style de leadership|Coach|Je aide les autres à développer leurs compétences et leur autonomie.
+Relation à la nature|Conservationniste|Je soutiens des actions pour préserver les habitats naturels.
+Motivation|Curiosité|La découverte et l'apprentissage me motivent profondément.
+Motivation|Sécurité|La stabilité et la sécurité guident mes choix professionnels.
+Valeurs|Solidarité|Je soutiens activement les personnes en difficulté autour de moi.
+Valeurs|Autonomie|Je valorise la liberté individuelle et l'indépendance.
+Tempérament|Réfléchi|Je prends le temps d'analyser avant d'agir.
+Tempérament|Spontané|Je laisse souvent place à l'imprévu et à l'instantanéité.
+Habitudes de vie|Nocturne|Je suis plus productif et créatif la nuit.
+Habitudes de vie|Matinal|Je préfère me lever tôt et profiter des matinées.
+Gestion des émotions|Expression ouverte|J'exprime facilement mes émotions aux autres.
+Tolérance à l'ambiguïté|Explorateur|L'incertitude m'invite à explorer plutôt qu'à fuir.
+Curiosité sociale|Interrogatif|Je pose beaucoup de questions pour comprendre les autres.
+Orientation temporelle|Rétrospectif|J'analyse souvent le passé pour en tirer des leçons.
+Orientation temporelle|Immédiat|Je privilégie les plaisirs et décisions du moment présent.
+Sens de l'humour|Autodérision|Je plaisante souvent sur mes propres défauts.
+Sens de l'humour|Satirique|J'utilise l'humour pour critiquer les travers sociaux.
+Adaptabilité culturelle|Apprenant|Je m'efforce d'apprendre les codes culturels des autres.
+Adaptabilité culturelle|Préservateur|Je tiens à préserver mes propres codes culturels avant tout.
+Confiance en soi|Affirmation|Je défends mes idées même face à l'opposition.
+Orientation morale|Altruiste|Je fais passer le bien des autres avant mon intérêt personnel.
+Orientation morale|Utilitariste|Je juge les actions selon leurs conséquences globales.
+Gestion financière|Planificateur|Je fais des budgets et je planifie mes dépenses à l'avance.
+Orientation professionnelle|Mentor|J'aime transmettre mon savoir et accompagner des juniors.
+Orientation professionnelle|Indépendant|Je préfère travailler en freelance et gérer mon temps.
+Relation au savoir|Curieux autodidacte|Je me forme régulièrement par curiosité personnelle.
+Relation au savoir|Conformiste académique|Je privilégie les parcours d'apprentissage formels et reconnus.
+Sens de la responsabilité|Délégateur|Je confie volontiers des tâches aux autres pour mieux gérer mon temps.
+Préférence sensorielle|Kinesthésique|J'apprends mieux en manipulant et en pratiquant.
+Préférence sensorielle|Olfactif|Les odeurs influencent fortement mes souvenirs et humeurs.
+Tolérance sociale|Ouvert d'esprit|J'accepte facilement des modes de vie différents du mien.
+Gestion du conflit|Assertif|Je défends mes limites clairement lors d'un conflit.
+Orientation spirituelle|Mystique|Je suis attiré par des expériences spirituelles profondes.
+Orientation spirituelle|Rationnel|Je préfère expliquer les phénomènes par la raison plutôt que par la foi.
+Curiosité technologique|Bricoleur|J'aime démonter et comprendre le fonctionnement des appareils.
+Curiosité technologique|Utilisateur pragmatique|J'utilise la technologie uniquement si elle m'apporte un bénéfice concret.
+Préférence de travail|Télétravail|Je suis plus efficace en travaillant depuis chez moi.
+Préférence de travail|Présentiel|Je préfère l'énergie et la structure du travail au bureau.
+Gestion du stress|Mindfulness|Je pratique la pleine conscience pour réduire mon stress.
+Orientation sociale|Réseautage|Je construis activement un réseau professionnel large.
+Orientation sociale|Intimité restreinte|Je préfère un cercle social restreint et profond.
+Sens de l'aventure|Curiosité géographique|Je voyage pour découvrir des lieux peu connus.
+Relation au changement|Innovateur|J'initie des changements pour améliorer les choses autour de moi.
+Relation au changement|Conservateur prudent|Je préfère des changements progressifs et testés.
+Préférence d'information|Analytique|J'analyse les données avant de tirer des conclusions.
+Préférence d'information|Narratif|Je retiens mieux les informations présentées sous forme d'histoire.
+Sens de la loyauté|Amical|Je suis fidèle à mes amis et je les soutiens dans les épreuves.
+Sens de la loyauté|Idéologique|Je suis loyal à des causes et idées qui me représentent.
+Gestion des priorités|Orienté impact|Je choisis mes actions selon leur impact réel sur mes objectifs.
+Gestion des priorités|Orienté urgence|Je traite d'abord ce qui semble urgent, même si ce n'est pas stratégique.
+Relation à l'autorité|Collaboratif|Je collabore avec l'autorité pour améliorer les décisions.
+Relation à l'autorité|Indépendant critique|Je remets en question l'autorité pour défendre mes convictions.
+Préférence de consommation|Éthique|Je choisis des produits respectueux de l'environnement et des travailleurs.
+Préférence de consommation|Marques|Je suis attiré par les marques reconnues et leur image.
+Capacité d'écoute|Réceptif|Je laisse l'autre parler sans l'interrompre et je reformule.
+Capacité d'écoute|Sélectif|J'écoute surtout ce qui m'apporte une information utile.
+Orientation vers l'innovation|Prototypeur|Je construis rapidement des prototypes pour tester des idées.
+Orientation vers l'innovation|Évaluateur|J'évalue rigoureusement les innovations avant de les adopter.
+Sens de la responsabilité civique|Activiste|Je m'engage publiquement pour des causes politiques ou sociales.
+Sens de la responsabilité civique|Observateur|Je m'informe mais j'interviens rarement dans la sphère publique.
+Curiosité artistique|Expérimental|J'expérimente des formes artistiques non conventionnelles.
+Curiosité artistique|Classique|Je préfère les formes artistiques traditionnelles et éprouvées.
+Gestion de la réputation|Soigneuse|Je fais attention à l'image que je renvoie en public.
+Relation au temps libre|Loisir actif|Je remplis mon temps libre d'activités physiques et créatives.
+Relation au temps libre|Loisir passif|Je préfère me détendre en regardant des films ou en lisant.
+Préférence d'apprentissage|Par projet|J'apprends mieux en travaillant sur des projets concrets.
+Préférence d'apprentissage|Théorique|J'apprends mieux avec des cadres théoriques et des cours structurés.
+Sens de la planification|Long terme|Je planifie mes objectifs sur plusieurs années.
+Sens de la planification|Court terme|Je préfère planifier sur quelques jours ou semaines seulement.
+Relation à la critique|Constructive|Je prends la critique comme une opportunité d'amélioration.
+Orientation vers la santé|Préventive|Je fais des choix pour prévenir les problèmes de santé futurs.
+Orientation vers la santé|Réactive|Je consulte un professionnel seulement quand un problème apparaît.
+Gestion des ressources|Frugal|Je gère mes ressources avec parcimonie et prévoyance.
+Gestion des ressources|Généreux|Je partage volontiers mes ressources avec ceux qui en ont besoin.
+Préférence de loisirs|Culturel|Je consacre mon temps libre à des activités culturelles.
+Préférence de loisirs|Festif|J'aime participer à des fêtes et événements sociaux.
+Orientation familiale|Traditionnel|La famille élargie joue un rôle central dans mes décisions.
+Orientation familiale|Noyau restreint|Ma famille proche suffit à mon épanouissement social.
+Relation à l'autoréflexion|Introspectif|Je passe du temps à réfléchir à mes pensées et comportements.
+Relation à l'autoréflexion|Extériorisé|Je préfère agir plutôt que d'analyser longuement mes motivations.
+Préférence de décision|Consensus|Je cherche l'accord du groupe avant de décider.
+Préférence de décision|Décision individuelle|Je prends souvent des décisions seul, sans consulter tout le monde.
+Relation au feedback|Chercheur|Je demande régulièrement du feedback pour m'améliorer.
+Orientation vers la qualité|Exigeant|Je vise des standards élevés dans mon travail et mes projets.
+Orientation vers la qualité|Suffisant|Je me contente d'un niveau satisfaisant sans viser la perfection.
+Relation à la nouveauté|Curieux|Je suis attiré par les nouveautés et les tendances émergentes.
+Relation à la nouveauté|Sceptique|Je doute souvent de la valeur réelle des nouveautés.
+Gestion des relations|Réciproque|Je construis des relations basées sur l'échange et la réciprocité.
+Préférence de communication|Écrite|Je m'exprime mieux par écrit que verbalement.
+Préférence de communication|Verbale|Je préfère les échanges oraux et spontanés.
+Orientation vers la performance|Compétitif|Je me mesure aux autres pour progresser et me motiver.
+Orientation vers la performance|Collaboratif|Je préfère coopérer plutôt que rivaliser pour réussir.
+Relation à la technologie|Sécuritaire|Je privilégie la sécurité et la confidentialité dans mes outils numériques.
+Relation à la technologie|Expérimental|J'essaie volontiers des technologies nouvelles sans crainte.
+Préférence de vie urbaine|Citadin|Je préfère la vie en ville pour son dynamisme et ses services.
+Préférence de vie urbaine|Rural|Je préfère la tranquillité et l'espace de la campagne.
+Gestion des émotions|Stoïque|Je garde mes émotions sous contrôle même en difficulté.
+Gestion des émotions|Expressif|Je montre ouvertement mes joies et mes peines.
+Orientation vers l'apprentissage|Maîtrise|Je cherche à maîtriser profondément un domaine plutôt qu'à être superficiel.
+Orientation vers l'apprentissage|Polyvalent|Je préfère acquérir des connaissances dans plusieurs domaines.
+Relation à la compétition|Sportif|La compétition me stimule et m'aide à me dépasser.
+Préférence de consommation médiatique|Long format|Je préfère les documentaires et longs formats pour approfondir un sujet.
+Préférence de consommation médiatique|Court format|Je consomme volontiers des contenus courts et rapides.
+Orientation vers la communauté|Bénévole|Je consacre du temps libre à des actions bénévoles régulières.
+Orientation vers la communauté|Spectateur|Je soutiens la communauté sans m'engager activement.
+Relation à la critique sociale|Engagé|Je prends position publiquement sur des sujets sociaux importants.
+Relation à la critique sociale|Prudent|Je préfère éviter de prendre position publiquement sur des sujets sensibles.
+Préférence de voyage|Organisé|Je planifie mes voyages en détail avant de partir.
+Préférence de voyage|Improvisé|Je préfère improviser et laisser place aux découvertes spontanées.
+Relation à la santé mentale|Proactif|Je consulte et je pratique des activités pour entretenir ma santé mentale.
+Orientation vers la durabilité|Zéro déchet|Je réduis mes déchets au maximum dans mon quotidien.
+Orientation vers la durabilité|Pragmatique|Je fais des gestes écologiques quand c'est pratique et accessible.
+Relation au travail|Passionné|Mon travail est une source majeure de sens et d'énergie pour moi.
+Relation au travail|Instrumental|Le travail est surtout un moyen de gagner ma vie.
+Préférence de logement|Partagé|Je préfère vivre en colocation pour la convivialité et le partage.
+Préférence de logement|Privé|Je privilégie un logement privé et calme pour me ressourcer.
+Relation à l'information|Vérificateur|Je vérifie les sources avant de partager une information.
+Orientation vers la famille|Parent engagé|Je consacre beaucoup de temps et d'énergie à l'éducation des enfants.
+Orientation vers la famille|Carrière prioritaire|Je privilégie ma carrière avant de fonder ou d'agrandir une famille.
+Relation à la consommation culturelle|Curateur|Je sélectionne soigneusement ce que je consomme culturellement.
+Relation à la consommation culturelle|Omnivore|Je consomme un large éventail de contenus sans discrimination.
+Gestion des habitudes|Ritualisé|J'ai des rituels quotidiens qui me rassurent et me structurent.
+Orientation vers la justice|Réparatrice|Je cherche à réparer les injustices plutôt qu'à punir.
+Relation à la technologie personnelle|Protection des données|Je protège strictement mes données personnelles et ma vie privée.
+Préférence de loisirs créatifs|Manuel|Je crée des objets de mes mains pour me détendre.
+Préférence de loisirs créatifs|Numérique|Je pratique la création numérique (graphisme, montage, code).
+Orientation vers la communauté locale|Initiateur|Je lance des projets locaux pour améliorer mon quartier.
+Orientation vers la communauté locale|Participant|Je participe aux initiatives locales quand on me sollicite.
+Relation à la diversité|Champion|Je défends activement la diversité et l'inclusion.
+Préférence de consommation alimentaire|Végétarien|Je privilégie une alimentation sans viande pour des raisons éthiques ou santé.
+Préférence de consommation alimentaire|Omnivore|Je mange de tout sans restriction particulière.
+Orientation vers la sécurité|Préparateur|Je prépare des plans d'urgence pour faire face aux imprévus.
+Orientation vers la sécurité|Confiant|Je fais confiance aux systèmes et institutions pour gérer les crises.
+Relation à la consommation médiatique|Critique|Je analyse et critique les médias que je consomme.
+Orientation vers l'éducation|Formateur|J'aime enseigner et transmettre des compétences pratiques.
+Orientation vers l'éducation|Apprenant continu|Je suis engagé dans un apprentissage continu tout au long de la vie.
+Relation à la mobilité|Mobile|Je suis prêt à déménager pour des opportunités professionnelles ou personnelles.
+Relation à la mobilité|Sédentaire|Je préfère rester dans la même région et construire ma vie localement.
+Préférence de consommation culturelle|Indépendant|Je soutiens les artistes indépendants et les petites structures.
+Préférence de consommation culturelle|Mainstream|Je suis attiré par les productions culturelles grand public.
+Gestion de la carrière|Planifiée|Je construis ma carrière selon un plan réfléchi et progressif.
+Gestion de la carrière|Opportuniste|Je saisis les opportunités de carrière au fil des rencontres et circonstances.
+Relation à l'engagement civique|Informé|Je m'informe régulièrement sur les enjeux civiques et politiques.
+Orientation vers la sécurité financière|Investisseur|Je cherche à faire fructifier mon épargne par des investissements réfléchis.
+Orientation vers la sécurité financière|Liquidité|Je préfère garder mes économies facilement accessibles plutôt que risquées.
+Relation à la technologie sociale|Créateur de contenu|Je crée et partage régulièrement du contenu sur les réseaux sociaux.
+Relation à la technologie sociale|Consommateur passif|J'utilise les réseaux sociaux principalement pour suivre des contenus.
+Extraversion|Chaleur|Je crée facilement des liens chaleureux avec les personnes que je rencontre.
+Extraversion|Sociabilité de groupe|Je me sens à l'aise dans les grands rassemblements et fêtes.
+Conscience|Autodiscipline|Je respecte mes engagements même quand la motivation baisse.
+Conscience|Méthodique|J'aborde les tâches selon une méthode structurée et répétable.
+Ouverture|Curiosité culturelle|Je m'intéresse aux coutumes et arts d'autres pays.
+Ouverture|Réceptivité aux idées|Je suis ouvert aux idées qui remettent en question mes croyances.
+Agréabilité|Patience|Je fais preuve de patience face aux lenteurs et erreurs des autres.
+Agréabilité|Sympathie|Je ressens facilement de la sympathie pour autrui.
+Névrosisme|Sensibilité au rejet|La peur d'être rejeté influence parfois mes décisions sociales.
+Névrosisme|Humeur changeante|Mon humeur peut varier fortement d'un jour à l'autre.
+Honnêteté-Humilité|Absence de cupidité|Je n'ai pas tendance à accumuler des richesses pour le prestige.
+Honnêteté-Humilité|Équité sociale|Je soutiens des pratiques qui réduisent les inégalités.
+Style d'attachement|Sécurisant autonome|Je suis proche des autres tout en gardant mon autonomie.
+Style d'attachement|Hypervigilant|Je surveille constamment les signes d'abandon dans mes relations.
+Créativité|Curiosité matérielle|J'explore de nouveaux matériaux et techniques pour créer.
+Créativité|Risque créatif|Je prends des risques artistiques même si le résultat est incertain.
+Style de communication|Humoristique|J'utilise l'humour pour détendre l'atmosphère et connecter les gens.
+Style de communication|Formel|Je préfère un ton professionnel et respectueux dans mes échanges.
+Rapport au numérique|Curateur de contenu|Je sélectionne et partage du contenu numérique de qualité.
+Rapport au numérique|Privacy-aware|Je configure mes appareils pour limiter le suivi et la collecte de données.
+Orientation culturelle|Patriotique|Je ressens une forte fierté pour mon pays et ses symboles.
+Orientation culturelle|Pluriculturel|Je me reconnais dans plusieurs héritages culturels simultanément.
+Gestion du temps|Segmenté|Je divise ma journée en blocs dédiés à des activités spécifiques.
+Gestion du temps|Fluidité|Je laisse mes journées s'organiser selon les opportunités qui se présentent.
+Éthique personnelle|Transparence|Je communique ouvertement sur mes intentions et mes erreurs.
+Rapport au risque|Tolérance modérée|J'accepte un certain niveau de risque si le bénéfice est clair.
+Rapport au risque|Aversion forte|Je refuse les situations où je ne peux pas contrôler les conséquences.
+Style de leadership|Inspirant|Je cherche à inspirer par l'exemple plutôt que par l'autorité.
+Style de leadership|Gestionnaire|Je privilégie l'organisation et la gestion des ressources pour atteindre les objectifs.
+Relation à la nature|Reconnecteur|Je cherche des occasions régulières de me reconnecter à la nature.
+Motivation|Reconnaissance|La reconnaissance sociale me motive à persévérer dans mes efforts.
+Motivation|Autodétermination|Je suis motivé par le sentiment d'autonomie et de maîtrise.
+Valeurs|Honnêteté|L'honnêteté est une valeur non négociable pour moi.
+Valeurs|Pragmatisme social|Je privilégie des solutions qui fonctionnent, même imparfaites.
+Tempérament|Mesuré|Je prends le temps d'évaluer avant d'agir, même sous pression.
+Habitudes de vie|Alimentation consciente|Je choisis mes aliments en fonction de leur impact sur ma santé et la planète.
+Habitudes de vie|Spontané alimentaire|Je mange selon mes envies du moment sans planification stricte.
+Gestion des émotions|Autorégulation|Je mets en place des stratégies pour réguler mes émotions efficacement.
+Gestion des émotions|Extériorisation|Je partage mes émotions immédiatement avec mon entourage.
+Tolérance à l'ambiguïté|Explorative|L'ambiguïté stimule ma créativité et mon apprentissage.
+Tolérance à l'ambiguïté|Besoin de structure|Je préfère des cadres clairs pour me sentir efficace.
+Curiosité sociale|Intervenant|J'interviens pour clarifier ou améliorer les interactions sociales.
+Curiosité sociale|Observateur discret|Je préfère observer plutôt que participer activement aux dynamiques sociales.
+Orientation temporelle|Planificateur quotidien|Je planifie mes journées avec des objectifs concrets et réalisables.
+Orientation temporelle|Spontanéité temporelle|Je laisse souvent la journée se dérouler sans plan strict.
+Sens de l'humour|Absurd|J'apprécie l'humour absurde et les situations incongrues.
+Sens de l'humour|Observational|Je fais souvent des remarques humoristiques basées sur l'observation du quotidien.
+Adaptabilité culturelle|Appréciateur|Je m'efforce d'apprécier et d'apprendre des différences culturelles.
+Adaptabilité culturelle|Préservateur identitaire|Je protège activement les éléments de ma culture d'origine.
+Confiance en soi|Auto-efficacité|Je crois en ma capacité à accomplir les tâches que j'entreprends.
+Confiance en soi|Modeste doute|Je garde une part de doute qui me pousse à me préparer davantage.
+Orientation morale|Empathique|Je prends en compte les émotions et besoins des autres dans mes jugements moraux.
+Orientation morale|Déontologique|Je suis guidé par des règles morales claires et universelles.
+Gestion financière|Diversificateur|Je répartis mes économies sur plusieurs types d'investissements.
+Gestion financière|Liquidité priorisée|Je garde une part importante de mes économies en liquidités accessibles.
+Orientation professionnelle|Spécialiste|Je vise l'excellence dans un domaine précis plutôt que la polyvalence.
+Orientation professionnelle|Généraliste|Je préfère développer des compétences variées et transférables.
+Relation au savoir|Curiosité appliquée|Je cherche à appliquer rapidement ce que j'apprends.
+Relation au savoir|Théoricien|J'apprécie les cadres théoriques et la profondeur conceptuelle.
+Sens de la responsabilité|Civique|Je respecte mes devoirs civiques et sociaux.
+Sens de la responsabilité|Personnelle|Je prends soin de mes obligations personnelles avant tout.
+Préférence sensorielle|Multisensoriel|Je préfère les expériences qui sollicitent plusieurs sens simultanément.
+Préférence sensorielle|Simplicité sensorielle|Je préfère des environnements sensoriels calmes et peu stimulants.
+Tolérance sociale|Hospitalier|J'accueille volontiers des personnes nouvelles chez moi.
+Tolérance sociale|Sélectif social|Je choisis soigneusement les personnes que j'invite dans mon cercle proche.
+Gestion du conflit|Médiateur|Je facilite le dialogue entre parties en conflit pour trouver un terrain d'entente.
+Orientation spirituelle|Pratique rituelle|Je trouve du sens dans des rituels réguliers et structurés.
+Orientation spirituelle|Sceptique spirituel|Je questionne les pratiques spirituelles et cherche des preuves.
+Curiosité technologique|Adoptant précoce|J'essaie souvent les nouvelles technologies dès leur sortie.
+Curiosité technologique|Attentiste|J'attends que la technologie soit éprouvée avant de l'adopter.
+Préférence de travail|Rythme soutenu|Je préfère des périodes de travail intenses suivies de repos.
+Préférence de travail|Rythme modéré|Je préfère un rythme de travail constant et équilibré.
+Gestion du stress|Soutien social|Je m'appuie sur mon réseau pour traverser les périodes stressantes.
+Gestion du stress|Coping solitaire|Je gère le stress principalement par des stratégies personnelles et solitaires.
+Orientation sociale|Collectif|Je privilégie les actions qui bénéficient au groupe plutôt qu'à l'individu.
+Sens de l'aventure|Découverte culinaire|J'aime tester des plats et cuisines inconnus lors de mes voyages.
+Sens de l'aventure|Aventure extrême|Je recherche des sensations fortes et des défis physiques.
+Relation au changement|Adaptateur rapide|Je m'adapte rapidement aux nouvelles situations et contraintes.
+Relation au changement|Résistant|Je préfère maintenir les pratiques qui ont fait leurs preuves.
+Préférence d'information|Synthétique|Je préfère des résumés clairs et synthétiques pour prendre des décisions.
+Préférence d'information|Détaillé|Je veux accéder à des informations complètes et détaillées avant de conclure.
+Sens de la loyauté|Professionnel fidèle|Je reste fidèle à mes engagements professionnels sur le long terme.
+Sens de la loyauté|Cause fidèle|Je soutiens des causes qui correspondent à mes convictions profondes.
+Gestion des priorités|Valeur-driven|Je priorise les tâches qui correspondent à mes valeurs personnelles.
+Gestion des priorités|Tâche-driven|Je priorise selon l'urgence et la charge de travail immédiate.
+Relation à l'autorité|Collaboratif critique|Je collabore avec l'autorité tout en gardant un regard critique.
+Préférence de consommation|Local-first|Je privilégie les produits locaux et les circuits courts.
+Préférence de consommation|Global-first|Je choisis souvent des produits internationaux pour leur diversité.
+Capacité d'écoute|Curatif|J'écoute pour aider l'autre à trouver des solutions à ses problèmes.
+Capacité d'écoute|Collecteur d'information|J'écoute pour recueillir des données utiles à mes décisions.
+Orientation vers l'innovation|Disruptif|Je cherche à remettre en cause les modèles établis pour innover.
+Orientation vers l'innovation|Amélioratif|Je préfère améliorer progressivement les systèmes existants.
+Sens de la responsabilité civique|Engagé local|Je participe activement aux initiatives locales et municipales.
+Sens de la responsabilité civique|Engagé national|Je m'investis dans des actions à l'échelle nationale pour le bien commun.
+Curiosité artistique|Collecteur|Je collectionne des œuvres ou objets artistiques qui m'inspirent.
+Curiosité artistique|Spectateur|Je préfère apprécier l'art sans nécessairement le collectionner.
+Gestion de la réputation|Soigneuse numérique|Je gère activement ma présence en ligne pour préserver ma réputation.
+Gestion de la réputation|Authentique|Je privilégie l'authenticité même si cela expose des imperfections.
+Relation au temps libre|Apprentissage|Je consacre mon temps libre à apprendre de nouvelles compétences.
+Relation au temps libre|Détente totale|Je consacre mon temps libre à me reposer sans objectifs précis.
+Préférence d'apprentissage|Collaboratif|J'apprends mieux en échangeant avec d'autres personnes.
+Préférence d'apprentissage|Autonome|Je préfère apprendre seul à mon rythme et selon mes besoins.
+Sens de la planification|Visionnaire long terme|Je construis des plans qui s'étendent sur plusieurs années.
+Sens de la planification|Adaptatif court terme|Je planifie à court terme et j'ajuste souvent mes objectifs.
+Relation à la critique|Réceptif constructif|Je accueille la critique quand elle est formulée de manière constructive.
+Orientation vers la santé|Holistique|Je prends en compte le corps et l'esprit pour préserver ma santé.
+Orientation vers la santé|Symptomatique|Je traite les symptômes quand ils apparaissent plutôt que de prévenir.
+Gestion des ressources|Partageur|Je partage volontiers mes ressources avec mon entourage proche.
+Gestion des ressources|Accumulation|Je préfère constituer un stock de ressources pour l'avenir.
+Préférence de loisirs|Créatif collectif|Je pratique des loisirs créatifs en groupe pour partager l'expérience.
+Préférence de loisirs|Créatif solitaire|Je crée seul pour me concentrer et approfondir mes idées.
+Orientation familiale|Égalitaire|Les responsabilités familiales sont partagées équitablement chez moi.
+Orientation familiale|Hiérarchique|Les rôles familiaux sont clairement définis selon l'âge et l'expérience.
+Relation à l'autoréflexion|Journalier|Je tiens un journal pour suivre mes pensées et progrès.
+Relation à l'autoréflexion|Occasionnel|Je réfléchis à moi-même surtout lors d'événements marquants.
+Préférence de décision|Données-driven|Je prends des décisions basées sur des données et des analyses.
+Préférence de décision|Intuition-driven|Je me fie souvent à mon intuition pour décider rapidement.
+Relation au feedback|Proactif|Je sollicite activement du feedback pour m'améliorer.
+Relation au feedback|Réactif|Je n'accepte le feedback que lorsqu'il m'est donné spontanément.
+Orientation vers la qualité|Perfectionniste|Je tends vers la perfection même si cela rallonge les délais.
+Orientation vers la qualité|Suffisant pragmatique|Je vise un niveau de qualité suffisant pour être efficace.
+Relation à la nouveauté|Explorateur social|J'aime découvrir de nouvelles tendances sociales et modes de vie.
+Relation à la nouveauté|Conservateur prudent|Je préfère attendre que la nouveauté soit validée avant de l'adopter.
+Gestion des relations|Réciproque émotionnelle|Je donne de l'affection en espérant en recevoir en retour.
+Préférence de communication|Synthétique écrite|Je communique par écrit en privilégiant la concision et la clarté.
+Préférence de communication|Développée verbale|Je m'exprime mieux à l'oral avec des explications détaillées.
+Orientation vers la performance|Auto-compétition|Je me compare d'abord à mes propres performances passées.
+Orientation vers la performance|Comparative|Je me mesure souvent aux autres pour évaluer mon niveau.
+Relation à la technologie|Sécurité proactive|Je mets en place des mesures pour protéger mes comptes et appareils.
+Relation à la technologie|Confort d'usage|Je choisis la technologie qui simplifie ma vie, même si elle n'est pas la plus sûre.
+Préférence de vie urbaine|Accès services|J'apprécie la proximité des services et infrastructures urbaines.
+Préférence de vie urbaine|Calme rural|Je privilégie la tranquillité et l'espace de la vie rurale.
+Gestion des émotions|Acceptation|J'accepte mes émotions sans chercher à les juger immédiatement.
+Gestion des émotions|Contrôle externe|Je cherche des solutions externes pour gérer mes émotions (thérapie, conseils).
+Orientation vers l'apprentissage|Approfondissement|Je creuse un sujet jusqu'à en maîtriser les détails.
+Orientation vers l'apprentissage|Largeur|Je préfère accumuler des connaissances variées plutôt que d'approfondir une seule.
+Relation à la compétition|Fair-play|Je respecte les règles et l'esprit du jeu même en compétition.
+Préférence de consommation médiatique|Éducatif|Je privilégie les contenus qui m'apportent des connaissances utiles.
+Préférence de consommation médiatique|Divertissement léger|Je consomme des contenus principalement pour me divertir et me détendre.
+Orientation vers la communauté|Organisateur|J'organise des événements pour rassembler et mobiliser ma communauté.
+Orientation vers la communauté|Supporteur discret|Je soutiens la communauté en coulisses sans être visible.
+Relation à la critique sociale|Provocateur|Je provoque le débat pour faire évoluer les idées reçues.
+Relation à la critique sociale|Prudent public|Je évite les prises de position publiques pour préserver mes relations.
+Préférence de voyage|Slow travel|Je préfère voyager lentement pour mieux connaître un lieu.
+Préférence de voyage|Itinérant|Je préfère multiplier les destinations même pour de courts séjours.
+Relation à la santé mentale|Ouvert au soin|Je consulte sans hésiter un professionnel quand j'en ressens le besoin.
+Relation à la santé mentale|Autogestion|Je gère mes difficultés psychologiques principalement par mes propres moyens.
+Orientation vers la durabilité|Transitionnaire|Je m'engage à réduire progressivement mon empreinte écologique.
+Relation au travail|Mission-driven|Je choisis un travail qui a du sens pour moi au-delà du salaire.
+Relation au travail|Rémunération-driven|Le salaire et les avantages sont mes principaux critères de choix professionnel.
+Préférence de logement|Éco-responsable|Je choisis un logement selon son impact environnemental.
+Préférence de logement|Confort maximal|Je privilégie le confort et les commodités avant tout.
+Relation à l'information|Sceptique médiatique|Je doute des médias et je vérifie systématiquement les sources.
+Relation à l'information|Confiant médiatique|Je fais confiance aux médias établis pour fournir une information fiable.
+Orientation vers la famille|Proche aidant|Je consacre du temps à soutenir les membres de ma famille élargie.
+Orientation vers la famille|Autonomie familiale|Chaque membre de la famille gère sa vie de manière autonome.
+Relation à la consommation culturelle|Curateur local|Je soutiens et promeus la création culturelle locale.
+Relation à la consommation culturelle|Grand public|Je consomme ce qui est populaire et largement diffusé.
+Gestion des habitudes|Rituel matinal|J'ai une routine matinale qui structure ma journée.
+Gestion des habitudes|Rituel nocturne|J'ai des rituels du soir qui m'aident à me détendre et dormir.
+Orientation vers la justice|Restaurative|Je privilégie la réparation des torts plutôt que la punition.
+Relation à la technologie personnelle|Interopérable|Je choisis des outils qui fonctionnent bien ensemble et facilitent mon flux de travail.
+Relation à la technologie personnelle|Propriétaire|Je privilégie des solutions fermées si elles offrent une meilleure expérience utilisateur.
+Préférence de loisirs créatifs|Textile|Je pratique des activités créatives liées au textile (tricot, couture).
+Préférence de loisirs créatifs|Audio-visuel|Je crée des contenus audio ou vidéo pour m'exprimer.
+Orientation vers la communauté locale|Bâtisseur|Je participe à des projets d'amélioration durable de mon quartier.
+Orientation vers la communauté locale|Support ponctuel|J'aide ponctuellement les initiatives locales quand je le peux.
+Relation à la diversité|Curieux inclusif|Je cherche activement à comprendre et intégrer la diversité autour de moi.
+Préférence de consommation alimentaire|Local seasonal|Je privilégie les aliments locaux et de saison.
+Préférence de consommation alimentaire|Découverte gastronomique|Je cherche des expériences culinaires nouvelles et exotiques.
+Orientation vers la sécurité|Assurance proactive|Je souscris à des assurances et protections pour anticiper les risques.
+Orientation vers la sécurité|Confiance institutionnelle|Je fais confiance aux institutions pour gérer les risques collectifs.
+Relation à la consommation médiatique|Curateur critique|Je sélectionne et commente activement les médias que je consomme.
+Orientation vers l'éducation|Innovateur pédagogique|Je soutiens des méthodes d'enseignement innovantes et actives.
+Orientation vers l'éducation|Traditionnel pédagogique|Je privilégie des méthodes d'enseignement éprouvées et structurées.
+Relation à la mobilité|Nomade|Je change fréquemment de lieu de résidence pour des raisons professionnelles ou personnelles.
+Relation à la mobilité|Ancré|Je construis ma vie autour d'un lieu stable et durable.
+Préférence de consommation culturelle|Indépendant curieux|Je recherche des œuvres indépendantes et originales.
+Préférence de consommation culturelle|Mainstream consommateur|Je suis les tendances culturelles populaires du moment.
+Gestion de la carrière|Mentorat réciproque|Je recherche des relations professionnelles où mentorat et apprentissage sont mutuels.
+Gestion de la carrière|Ascension hiérarchique|Je vise des postes de responsabilité et d'influence dans ma carrière.
+Relation à l'engagement civique|Mobilisateur|Je mobilise d'autres personnes pour des causes qui me tiennent à cœur.
+Relation à l'engagement civique|Observateur critique|Je m'informe et j'analyse sans nécessairement m'engager publiquement.
+Orientation vers la sécurité financière|Planificateur retraite|Je prépare activement ma retraite par des placements réguliers.
+Orientation vers la sécurité financière|Consommation présente|Je privilégie profiter du présent plutôt que d'épargner intensément pour l'avenir.
+Relation à la technologie sociale|Modérateur|Je modère ou filtre activement les interactions sur mes plateformes sociales.
+Relation à la technologie sociale|Partageur spontané|Je partage spontanément des moments de ma vie sur les réseaux sociaux.
+Extraversion|Enthousiasme social|Je m'implique volontiers dans des conversations animées avec des inconnus.
+Extraversion|Prise d'initiative sociale|Je propose souvent des activités de groupe et j'organise des sorties.
+Conscience|Rigueur|Je vérifie systématiquement mon travail pour éviter les erreurs.
+Conscience|Respect des procédures|Je respecte les règles et procédures même quand elles sont contraignantes.
+Ouverture|Curiosité scientifique|Je m'intéresse aux découvertes scientifiques et aux nouvelles recherches.
+Ouverture|Expérimentation artistique|J'aime tester de nouvelles formes d'expression artistique.
+Agréabilité|Bienveillance active|Je prends des initiatives pour aider les personnes en difficulté.
+Agréabilité|Tolérance|Je tolère les différences d'opinion sans jugement hâtif.
+Névrosisme|Préoccupation|Je rumine parfois des scénarios négatifs qui m'empêchent de dormir.
+Névrosisme|Hypersensibilité|Je suis facilement touché par les remarques des autres.
+Honnêteté-Humilité|Simplicité|Je préfère une vie simple plutôt que la recherche du prestige.
+Honnêteté-Humilité|Respect des autres|Je traite chacun avec respect, indépendamment de son statut.
+Style d'attachement|Sécurisé expressif|Je partage mes émotions sans craindre d'être jugé.
+Créativité|Idéation rapide|Les idées me viennent rapidement quand je suis stimulé.
+Créativité|Conception systémique|Je conçois des solutions qui prennent en compte de nombreux paramètres.
+Style de communication|Persuasif|Je sais convaincre les autres de la pertinence de mes idées.
+Style de communication|Écoute active|Je reformule souvent pour m'assurer d'avoir bien compris l'autre.
+Rapport au numérique|Productivité numérique|J'utilise des outils numériques pour optimiser mon travail quotidien.
+Rapport au numérique|Détox régulier|Je fais régulièrement des pauses numériques pour me ressourcer.
+Orientation culturelle|Curieux local|Je découvre et soutiens les initiatives culturelles de ma région.
+Orientation culturelle|Ambassadeur culturel|Je partage et promeus ma culture auprès d'autres communautés.
+Gestion du temps|Priorisation|Je classe mes tâches selon leur importance réelle et je m'y tiens.
+Gestion du temps|Multitâche|Je gère plusieurs tâches en parallèle sans perdre le fil.
+Éthique personnelle|Cohérence|Mes actions reflètent généralement mes valeurs déclarées.
+Éthique personnelle|Compromis stratégique|Je fais parfois des compromis pour préserver des objectifs plus larges.
+Rapport au risque|Entrepreneur calculé|Je prends des risques mesurés pour lancer de nouveaux projets.
+Rapport au risque|Aversion modérée|Je limite les risques quand les conséquences sont lourdes.
+Style de leadership|Collaboratif inclusif|Je implique les membres de l'équipe dans les décisions importantes.
+Style de leadership|Directive ponctuelle|Je prends parfois des décisions fermes quand la situation l'exige.
+Relation à la nature|Protection active|Je participe à des actions concrètes pour préserver la biodiversité.
+Relation à la nature|Appréciation contemplative|Je trouve du réconfort en observant la nature sans intervenir.
+Motivation|Défi personnel|Je me fixe des défis personnels pour me dépasser régulièrement.
+Motivation|Stabilité recherchée|Je privilégie des objectifs qui garantissent une stabilité durable.
+Valeurs|Solidarité active|Je m'engage concrètement pour soutenir les personnes vulnérables.
+Valeurs|Liberté individuelle|Je défends la liberté individuelle comme valeur centrale.
+Tempérament|Calme persistant|Je garde une attitude posée même dans les situations tendues.
+Tempérament|Impulsivité contrôlée|Je peux agir vite, mais j'essaie de limiter les excès impulsifs.
+Habitudes de vie|Routine sportive|Je pratique une activité physique régulière et planifiée.
+Habitudes de vie|Loisirs variés|Je diversifie mes loisirs pour maintenir mon équilibre personnel.
+Gestion des émotions|Acceptation active|J'accepte mes émotions et j'agis pour les transformer positivement.
+Gestion des émotions|Expression contrôlée|Je choisis le moment et le cadre pour exprimer mes émotions.
+Tolérance à l'ambiguïté|Explorateur calme|L'incertitude m'incite à explorer plutôt qu'à m'inquiéter.
+Tolérance à l'ambiguïté|Besoin de repères|J'ai besoin de repères clairs pour me sentir efficace dans l'incertitude.
+Curiosité sociale|Interrogateur bienveillant|Je pose des questions pour comprendre sans juger.
+Curiosité sociale|Distance respectueuse|Je respecte la vie privée des autres et n'insiste pas.
+Orientation temporelle|Planification flexible|Je planifie mais je laisse de la place à l'imprévu.
+Orientation temporelle|Présent engagé|Je vis pleinement le présent tout en gardant quelques objectifs futurs.
+Sens de l'humour|Auto-dérision légère|Je plaisante sur mes petites erreurs pour détendre l'atmosphère.
+Sens de l'humour|Humour observateur|Je fais souvent des remarques drôles basées sur l'observation du quotidien.
+Adaptabilité culturelle|Apprenant actif|Je m'efforce d'apprendre rapidement les codes culturels locaux.
+Adaptabilité culturelle|Préservation identitaire|Je veille à préserver mes traditions tout en m'adaptant.
+Confiance en soi|Assurance pragmatique|Je me sens capable quand j'ai préparé et planifié.
+Confiance en soi|Humilité confiante|Je suis confiant sans me considérer supérieur aux autres.
+Orientation morale|Conséquentialiste|J'évalue les actions selon leurs conséquences pour le plus grand nombre.
+Orientation morale|Principes fixes|Je m'en tiens à des principes moraux clairs même si cela coûte.
+Gestion financière|Épargne disciplinée|Je mets de côté régulièrement pour mes projets futurs.
+Gestion financière|Dépense réfléchie|Je réfléchis avant d'acheter pour éviter les achats impulsifs.
+Orientation professionnelle|Croissance continue|Je cherche constamment des opportunités de développement professionnel.
+Orientation professionnelle|Stabilité loyale|Je privilégie un emploi stable et des relations professionnelles durables.
+Relation au savoir|Curiosité appliquée|Je transforme rapidement mes apprentissages en actions concrètes.
+Relation au savoir|Recherche approfondie|J'approfondis les sujets qui m'intéressent jusqu'à la maîtrise.
+Sens de la responsabilité|Fiabilité sociale|Les autres me considèrent comme une personne sur qui compter.
+Sens de la responsabilité|Délégation stratégique|Je délègue pour mieux répartir les responsabilités et responsabiliser les autres.
+Préférence sensorielle|Préférence visuelle|Je retiens mieux les informations présentées sous forme visuelle.
+Préférence sensorielle|Préférence tactile|J'apprends mieux en manipulant des objets et en pratiquant.
+Tolérance sociale|Inclusif actif|Je crée des espaces où chacun se sent accueilli et entendu.
+Tolérance sociale|Sélectif prudent|Je choisis mes cercles sociaux en fonction de valeurs partagées.
+Gestion du conflit|Recherche de compromis|Je cherche des solutions qui satisfont au mieux toutes les parties.
+Gestion du conflit|Affirmation des limites|Je pose des limites claires quand un conflit menace mon bien-être.
+Orientation spirituelle|Pratique personnelle|Je pratique des rituels spirituels qui me nourrissent intérieurement.
+Orientation spirituelle|Scepticisme réfléchi|Je questionne les croyances spirituelles et cherche des preuves personnelles.
+Curiosité technologique|Explorateur d'outils|J'essaie régulièrement de nouveaux outils pour améliorer mes processus.
+Curiosité technologique|Sélecteur pragmatique|Je choisis la technologie qui apporte un bénéfice concret et durable.
+Préférence de travail|Collaboration hybride|Je combine travail en équipe et moments de concentration individuelle.
+Préférence de travail|Autonomie forte|Je préfère travailler de manière autonome avec peu de supervision.
+Gestion du stress|Préparation mentale|Je prépare mentalement les situations stressantes pour mieux les affronter.
+Gestion du stress|Soutien externe|Je sollicite l'aide d'amis ou de professionnels en cas de stress intense.
+Orientation sociale|Engagement collectif|Je participe à des projets collectifs pour produire un impact durable.
+Orientation sociale|Autonomie personnelle|Je privilégie des actions qui renforcent mon autonomie individuelle.
+Sens de l'aventure|Découverte locale|Je découvre régulièrement des lieux et activités près de chez moi.
+Sens de l'aventure|Exploration lointaine|Je planifie des voyages vers des destinations lointaines et inconnues.
+Relation au changement|Anticipateur|J'anticipe les changements et je prépare des plans d'adaptation.
+Relation au changement|Acceptation progressive|J'accepte le changement quand je vois ses bénéfices concrets.
+Préférence d'information|Vérification multiple|Je croise plusieurs sources avant de me forger une opinion.
+Préférence d'information|Résumé synthétique|Je préfère des synthèses claires pour gagner du temps d'analyse.
+Sens de la loyauté|Loyalité familiale|Je suis fidèle aux engagements pris envers ma famille proche.
+Sens de la loyauté|Loyalité professionnelle|Je soutiens mon équipe et mon employeur dans les moments difficiles.
+Gestion des priorités|Impact long terme|Je priorise les actions qui auront un impact durable sur mes objectifs.
+Gestion des priorités|Réponse immédiate|Je traite d'abord ce qui demande une réponse rapide pour éviter l'accumulation.
+Relation à l'autorité|Dialogue critique|Je dialogue avec l'autorité pour améliorer les décisions prises.
+Relation à l'autorité|Conformité prudente|Je me conforme aux règles tant qu'elles me semblent justes.
+Préférence de consommation|Éthique responsable|Je choisis des produits qui respectent l'environnement et les travailleurs.
+Préférence de consommation|Praticité|Je privilégie les produits pratiques et durables pour mon quotidien.
+Capacité d'écoute|Empathique actif|Je écoute pour comprendre et offrir un soutien adapté.
+Capacité d'écoute|Analyse factuelle|J'écoute pour collecter des informations utiles à la décision.
+Orientation vers l'innovation|Prototype rapide|Je construis des prototypes pour tester rapidement des idées nouvelles.
+Orientation vers l'innovation|Évaluation rigoureuse|J'évalue soigneusement les innovations avant de les déployer.
+Sens de la responsabilité civique|Participation active|Je participe activement aux consultations et débats publics.
+Sens de la responsabilité civique|Observation critique|Je m'informe et j'analyse avant de m'engager publiquement.
+Sociable|Facilement accessible|Je réponds volontiers aux invitations et je participe aux activités sociales.
+Introverti|Réfléchi|Je préfère réfléchir seul avant de partager mes idées en groupe.
+Consciencieux|Ponctuel|J'arrive à l'heure et je respecte les délais convenus.
+Désorganisé|Spontanéité|Je fonctionne mieux sans planning strict et j'improvise souvent.
+Agréable|Serviable|Je propose mon aide quand je vois quelqu'un en difficulté.
+Compétitif|Motivé|Je me fixe des objectifs et je fais tout pour les atteindre.
+Anxieux|Préoccupé|Je m'inquiète parfois pour des détails qui semblent mineurs aux autres.
+Calme|Posé|Je garde mon sang-froid dans la plupart des situations stressantes.
+Curieux|Apprenant|J'aime découvrir de nouvelles choses et approfondir mes connaissances.
+Traditionnel|Respect des coutumes|Je suis attaché aux traditions familiales et culturelles.
+Ouvert|Explorateur d'idées|J'accueille volontiers des idées qui remettent en question mes certitudes.
+Pragmatique|Orienté solution|Je cherche des solutions concrètes plutôt que des débats théoriques.
+Optimiste|Confiant|Je m'attends généralement à de bons résultats et j'agis en conséquence.
+Pessimiste|Préparé|Je me prépare au pire pour mieux gérer les imprévus.
+Responsable|Fiable|On peut compter sur moi pour tenir mes engagements.
+Indépendant|Autonome|Je préfère prendre mes décisions et assumer leurs conséquences.
+Familial|Protecteur|Je veille au bien-être des membres de ma famille.
+Ambitieux|Orienté carrière|Je travaille pour progresser professionnellement et atteindre des objectifs.
+Économe|Prévisionnel|Je planifie mes dépenses et j'épargne pour l'avenir.
+Dépensier|Plaisir immédiat|J'achète parfois pour me faire plaisir sans trop réfléchir.
+Accueillant|Hospitalier|J'aime recevoir et prendre soin de mes invités.
+Réservé|Discret|Je partage peu d'informations personnelles et je garde mes distances.
+Aventurier|Explorateur|Je cherche des expériences nouvelles et stimulantes.
+Sédentaire|Confort domestique|Je préfère le confort de la maison aux voyages fréquents.
+Sportif|Régulier|Je pratique une activité physique de façon régulière pour rester en forme.
+Sédentaire|Repos privilégié|Je consacre mon temps libre au repos et à la détente.
+Technophile|Curieux digital|J'aime tester de nouvelles applications et outils numériques.
+Prudent numérique|Protection des données|Je fais attention à ma vie privée et à la sécurité en ligne.
+Leader|Initiateur|Je prends souvent l'initiative pour lancer des projets ou des actions.
+Collaboratif|Soutien|Je préfère travailler en équipe et soutenir les autres membres.
+Empathique|Compréhensif|Je comprends facilement les émotions et les besoins des autres.
+Analytique|Logique|Je raisonne de manière structurée et j'analyse les faits avant d'agir.
+Spontané|Improvisateur|Je prends des décisions rapides et j'aime l'imprévu.
+Planificateur|Organisé|Je prépare et structure mes activités pour être efficace.
+Confiant|Assuré|Je crois en mes capacités et j'ose prendre des initiatives.
+Hésitant|Prudent|Je demande souvent des avis avant de me décider.
+Tolérant|Ouvert d'esprit|J'accepte des opinions et modes de vie différents des miens.
+Conservateur|Attaché aux normes|Je préfère les pratiques et valeurs éprouvées.
+Généreux|Donateur|Je donne volontiers du temps ou des ressources pour aider les autres.
+Compétitif|Ambitieux sportif|La compétition me motive à me dépasser et à progresser.
+Coopératif|Esprit d'équipe|Je privilégie la coopération pour atteindre des objectifs communs.
+Prudent|Réservé au risque|Je préfère éviter les situations où les conséquences sont incertaines.
+Audacieux|Prise de risque|Je suis prêt à tenter des choses nouvelles malgré l'incertitude.
+Routinier|Habitudes stables|J'ai des routines quotidiennes qui me rassurent et me structurent.
+Flexible|Adaptable|Je m'adapte facilement aux changements et aux imprévus.
+Sérieux|Consciencieux|Je m'investis sérieusement dans mes responsabilités et mes tâches.
+Détendu|Décontracté|Je prends la vie avec calme et j'évite de m'alarmer pour peu de choses.
+Observateur|Attentif|Je remarque facilement les détails et les comportements autour de moi.
+Indifférent social|Autonome|Je suis peu intéressé par les dynamiques sociales et préfère mon indépendance.
+Pratique|Orienté résultat|Je privilégie les actions concrètes qui produisent des résultats tangibles.
+Idéaliste|Valeurs fortes|Je suis guidé par des principes et des idéaux personnels.
+Sensible|Émotif|Je ressens intensément les émotions et je les exprime parfois ouvertement.
+Résilient|Rebond rapide|Je me remets rapidement des difficultés et je reprends mes activités.
+Curieux intellectuel|Lecteur assidu|Je lis régulièrement pour m'informer et nourrir ma réflexion.
+Réseautage|Connecteur|Je crée et entretiens des relations utiles pour la vie sociale et professionnelle.
+Discret|Réservé personnel|Je protège ma vie privée et je partage peu d'informations personnelles.
+Expressif|Communicatif|J'exprime facilement mes idées et mes émotions aux autres.
+Souci de la santé|Préventif|Je fais attention à mon alimentation et à mon hygiène de vie.
+Négligent santé|Occasionnel|Je prends soin de ma santé surtout quand un problème apparaît.
+Frugal|Économe|Je privilégie la simplicité et la modération dans mes choix de consommation.
+Prudent financier|Budgeteur|Je gère un budget et je planifie mes dépenses mensuelles.
+Investisseur|Planification long terme|Je place une part de mes revenus pour préparer l'avenir.
+Parent engagé|Présence|Je consacre du temps et de l'énergie à l'éducation des enfants.
+Célibataire|Autonomie relationnelle|Je profite de ma liberté et je construis ma vie sans dépendance affective.
+Professionnel sociable|Networking actif|Je développe des contacts professionnels pour faire avancer ma carrière.
+Travailleur discret|Efficace en coulisse|Je préfère produire des résultats sans chercher la reconnaissance publique.
+Bricoleur|Pratique manuelle|J'aime réparer et améliorer les objets par moi-même.
+Adepte du confort|Recherche confort|Je privilégie le confort matériel et la facilité au quotidien.
+Actif en ligne|Partageur|Je communique et partage régulièrement sur les réseaux sociaux.
+Discret en ligne|Usage limité|J'utilise peu les réseaux sociaux et je préfère les échanges directs.
+Organisateur|Planificateur social|J'aime organiser des réunions, fêtes ou rencontres pour rassembler les gens.
+Participant|Spectateur social|Je préfère assister aux événements plutôt que de les organiser.
+Découvreur culinaire|Gourmand|J'aime tester des plats et cuisines nouvelles.
+Conservateur culinaire|Préférence familière|Je préfère les plats familiers et les recettes connues.
+Engagé local|Voisin actif|Je participe aux activités et initiatives de mon quartier.
+Indifférent local|Vie privée locale|Je vis ma vie locale sans m'impliquer dans les affaires du voisinage.
+Formé continuellement|Apprentissage professionnel|Je suis des formations pour améliorer mes compétences professionnelles.
+Stable professionnel|Loyal employé|Je reste fidèle à mon employeur quand les conditions sont justes.
+Ami fidèle|Soutien constant|Je suis présent pour mes amis dans les moments difficiles.
+Relationnel large|Grand réseau|J'ai beaucoup de connaissances mais peu d'amis proches.
+Organisé familial|Routines familiales|Je mets en place des routines pour faciliter la vie familiale.
+Flexible familial|Adaptation familiale|Je m'adapte aux besoins changeants de ma famille.
+Respectueux des règles|Conformité|Je respecte les lois et les règles sociales par principe.
+Questionneur|Esprit critique|Je remets en question les normes et je cherche des explications.
+Serein|Gestion calme|Je gère les imprévus avec calme et méthode.
+Nerveux|Réactivité émotionnelle|Je réagis rapidement et fortement aux situations stressantes.
+Soigneux|Entretien|Je prends soin de mon logement et de son entretien régulier.
+Minimaliste|Simplicité volontaire|Je choisis de vivre avec peu d'objets et de distractions.
+Curieux culturel|Spectateur culturel|Je fréquente musées, concerts et événements culturels.
+Peu intéressé culturel|Divertissement simple|Je préfère des divertissements simples et accessibles.
+Prévenant|Anticipation sociale|Je pense aux besoins des autres et j'anticipe pour les aider.
+Autonome émotionnel|Autogestion|Je gère mes émotions sans trop solliciter les autres.
+Équilibré social|Alternance|J'alterne entre moments sociaux et temps seul pour me ressourcer.
+Ambitieux équilibré|Vie-travail|Je vise des objectifs professionnels tout en préservant ma vie personnelle.
+Sélectif relationnel|Choix d'entourage|Je choisis soigneusement les personnes à qui accorder ma confiance.
+Confiant relationnel|Ouverture|Je fais facilement confiance et je crée rapidement des liens.
+Sociable naturel|Facilité relationnelle|Je noue des conversations facilement et sans effort apparent.
+Réfléchi|Auto-analyse|Je prends du recul pour analyser mes choix et mes comportements.
+Chaleureux|Accueil quotidien|Je crée un climat chaleureux et accueillant autour de moi.

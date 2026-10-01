@@ -3648,6 +3648,29 @@ bool fragmentTrouve(const std::string& texte, const std::string& frag) {
 // Mot-cle du message -> facette visee (sans accents, minuscules).
 std::string facetteVisee(const std::string& p) {
     static const char* regles[][2] = {
+        { "honnete", "honnete" }, { "mensong", "honnete" }, { "verite", "honnete" },
+        { "vanter", "modestie" },
+        { "attachement", "attachement" }, { "abandon", "attachement" },
+        { "creatif", "creativite" }, { "creativite", "creativite" },
+        { "communication", "communication" }, { "diplomate", "communication" },
+        { "numerique", "numerique" }, { "digital", "numerique" }, { "gadget", "numerique" },
+        { "technolog", "technologie" },
+        { "leadership", "leadership" }, { "dirige", "leadership" },
+        { "humour", "humour" }, { "drole", "humour" },
+        { "risque", "risque" }, { "aventure", "aventur" },
+        { "nature", "nature" },
+        { "ecolog", "durabilite" }, { "dechet", "durabilite" },
+        { "valeur", "valeur" }, { "ethique", "ethique" }, { "moral", "morale" },
+        { "motivation", "motivation" }, { "temperament", "temperament" },
+        { "habitude", "habitude" }, { "mode de vie", "habitude" },
+        { "confiance", "confiance" },
+        { "spirituel", "spirituel" },
+        { "responsab", "responsabilit" },
+        { "financ", "financ" }, { "epargn", "financ" }, { "budget", "financ" },
+        { "econom", "financ" },
+        { "voyage", "voyage" }, { "equilibre", "equilibre" },
+        { "travail", "travail" },
+        { "critique", "critique" },
         { "aimes quoi", "centres d interets" }, { "aimes faire", "centres d interets" },
         { "interet", "centres d interets" }, { "interesse", "centres d interets" },
         { "passion", "centres d interets" }, { "hobby", "centres d interets" },
@@ -3733,28 +3756,32 @@ std::string reponsePersonnalite(const std::string& brut) {
         p.find("tu ressens") != std::string::npos ||
         p.find("comment tu te sens") != std::string::npos;
     std::string facette = facetteVisee(p);
+    // Facette seulement si le message s'adresse au bot (tu / ton / ta /
+    // tes / toi) : "raconte une histoire" n'est pas "tu aimes les histoires".
+    bool adresseAuBot = contientMot(brut, "tu") || contientMot(brut, "ton") ||
+                        contientMot(brut, "ta") || contientMot(brut, "tes") ||
+                        contientMot(brut, "toi");
     // Une vraie question factuelle ("c'est quoi la capitale") reste reservee
-    // au savoir / a l'en ligne : la personnalite n'intervient que si le sujet
-    // parle de lui ou d'un theme de facette adresse au bot. Les centres
-    // d'interet appartiennent au bot meme formules factuellement
-    // ("c'est quoi tes centres d'interet ?").
+    // au savoir / a l'en ligne. Exception : message adresse au bot avec un
+    // theme de facette reconnu -> la personnalite repond quand meme
+    // ("c'est quoi tes centres d'interet ?", "c'est quoi ton humour ?").
     if (!surSoi && estQuestionFactuelle(brut) &&
-        facette != "centres d interets") return "";
+        !(adresseAuBot && !facette.empty())) return "";
     if (!surSoi) {
         if (facette.empty()) return "";
-        // Facette seulement si le message s'adresse au bot (tu / ton / ta /
-        // tes / toi) : "raconte une histoire" n'est pas "tu aimes les histoires".
-        bool adresseAuBot = contientMot(brut, "tu") || contientMot(brut, "ton") ||
-                            contientMot(brut, "ta") || contientMot(brut, "tes") ||
-                            contientMot(brut, "toi");
         if (!adresseAuBot) return "";
     }
     std::vector<int> candidates;
     for (unsigned int i = 0; i < personnalite.size(); i++) {
         bool garder = false;
         if (!facette.empty()) {
+            // La facette visee peut apparaitre dans le champ facette OU dans
+            // le champ trait : les nouveaux lots nomment leurs dimensions
+            // dans le trait ("Honnête-Humilite", "Style de communication"...).
             std::string f = sansAccents(minuscules(personnalite[i].facette));
-            garder = (f.find(facette) != std::string::npos);
+            std::string t = sansAccents(minuscules(personnalite[i].trait));
+            garder = (f.find(facette) != std::string::npos) ||
+                     (t.find(facette) != std::string::npos);
         } else garder = true;
         if (garder) candidates.push_back((int)i);
     }
