@@ -78,7 +78,6 @@ try {
                 Log-Succes "Telechargement termine !"
             } catch {
                 Log-Erreur "Impossible de telecharger cloudflared."
-                Log "Essaie avec -Tunnel ngrok"
                 return
             }
         }
@@ -91,21 +90,6 @@ try {
         Write-Host ""
         
         & $cloudflaredExe tunnel --url http://localhost:8080
-        
-    } elseif ($Tunnel -eq "ngrok") {
-        if (-not (Get-Command "ngrok" -ErrorAction SilentlyContinue)) {
-            Log-Erreur "Ngrok non trouve. Installe-le depuis https://ngrok.com/download"
-            return
-        }
-        
-        Write-Host ""
-        Write-Host "  ========================================" -ForegroundColor Yellow
-        Write-Host "  LIEN PUBLIC (Ngrok) :" -ForegroundColor Yellow
-        Write-Host "  Copie-colle ce lien et envoie-le !" -ForegroundColor Yellow
-        Write-Host "  ========================================" -ForegroundColor Yellow
-        Write-Host ""
-        
-        & ngrok http 8080
     }
 } finally {
     Log "Arret du serveur..."

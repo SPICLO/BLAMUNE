@@ -1415,9 +1415,6 @@ function Valider-CorsOrigin([string]$requete) {
     if ($origin -match '^https?://[a-zA-Z0-9-]+\.vercel\.app$') { return $origin }
     # Dev : localhost
     if ($origin -match '^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$') { return $origin }
-    # Tunnels
-    if ($origin -match '^https?://[a-zA-Z0-9-]+\.ngrok-free\.dev$') { return $origin }
-    if ($origin -match '^https?://[a-zA-Z0-9-]+\.ngrok\.io$') { return $origin }
     return ''
 }
 
@@ -1642,7 +1639,7 @@ try {
 
             $script:corsOrigin = Valider-CorsOrigin $requete
 
-            # Tracker la connexion (IP reelle via ngrok ou locale)
+            # Tracker la connexion (IP reelle via tunnel ou locale)
                 $ipClient = ""
                 try { $ipClient = $client.Client.RemoteEndPoint.Address.IPAddressToString } catch {}
                 $ipClient = Extraire-IPReelle $requete $ipClient

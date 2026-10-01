@@ -299,8 +299,6 @@ try {
                     $corsOrigin = $originHeader
                 } elseif ($originHeader -match '^https?://[a-zA-Z0-9-]+\.vercel\.app$') {
                     $corsOrigin = $originHeader
-                } elseif ($originHeader -match '^https?://[a-zA-Z0-9-]+\.ngrok-free\.dev$') {
-                    $corsOrigin = $originHeader
                 } else {
                     $corsOrigin = 'null'
                 }

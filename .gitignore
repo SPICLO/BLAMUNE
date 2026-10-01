@@ -16,7 +16,6 @@ attaques.log
 .protection_hash.json
 curl_out.txt
 curl_output.txt
-ngrok.exe
 cloudflared.exe
 bot.exe
 stats.json
