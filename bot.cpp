@@ -9243,17 +9243,16 @@ int main() {
             continue;
         }
 
-        // ============ PRIORITE AU BOT : PERSONNALITE, SAVOIR, PUIS EN LIGNE ============
+        // ============ PRIORITE AU BOT : PERSONNALITE PUIS SAVOIR LOCAL ============
         // 1) La personnalite (personnalite.txt, Big Five) repond EN LOCAL :
         //    "qui es tu", "tu es sociable", "c'est quoi ton caractere"... Le
         //    bot est d'abord lui-meme, sans Gemini ni reseau.
         // 2) Une question factuelle deja connue de savoir.txt est repondue sur
         //    place (immediate, gratuite, meme hors ligne).
-        // 3) Tout le reste part vers la version en ligne (blamune.onrender.com)
-        //    si le local n'a rien dit ; si le reseau, le quota ou le serveur
-        //    tombe, on retombe sur les blocs locaux ci-dessous (connaissances
-        //    partagees, definitions, regles, moteur de conversation) sans rien
-        //    laisser paraitre.
+        // 3) Gemini / la version en ligne est COUPEE : tout le reste part vers
+        //    les blocs locaux ci-dessous (connaissances partagees, definitions,
+        //    regles, moteur de conversation). L'appel en ligne existe toujours
+        //    dans appelerEnLigne() mais n'est plus declenche ici.
         {
             bool reponduIci = false;
             // 1) La personnalite d'abord : les questions sur soi et les
@@ -9297,17 +9296,8 @@ int main() {
                     reponduIci = true;
                 }
             }
-            // 3) Le reste part en ligne seulement si le local n'a rien dit ;
-            //    si le reseau, le quota ou le serveur tombe, les blocs locaux
-            //    ci-dessous reprennent sans rien laisser paraitre.
-            if (!reponduIci) {
-                std::string repLigne = appelerEnLigne(phrase, mode);
-                if (!repLigne.empty()) {
-                    std::cout << botNom + " : " << repLigne << "\n";
-                    dernierSujet = p;
-                    reponduIci = true;
-                }
-            }
+            // 3) (coupe) plus d'envoi en ligne : les blocs locaux suivants
+            //    prennent le relais immediatement, sans latence ni quota.
             if (reponduIci) continue;
         }
 
