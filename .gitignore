@@ -25,3 +25,6 @@ logs/
 invites.json
 .blamune_session
 hors_ligne
+*.bak_*
+.protection_hash.json.bak_*
+savoir_nouvelles.txt

@@ -12,95 +12,95 @@ entraîneur|Personne qui prépare et guide les sportifs.
 compétition|Épreuve où on essaie de gagner.
 record|Meilleure performance jamais réalisée.
 repas|Moment où on mange, généralement trois fois par jour.
-pain|Aliment cuit à base de farine, d'eau et de levure.
+pain|Une preparation de farine, d'eau, de sel et de levure, dont la pate est petrie puis cuite. La levein fait gonfler la pate et lui donne sa texture alveolee. Les principaux types sont le pain blanc, le complet, la baguette et la brioche.|1
 viande|Chair des animaux qu'on consomme.
 légume|Plante potagère qu'on mange.
 fruit|Aliment sucré issu des arbres ou des plantes.
-café|Boisson chaude et stimulante faite à partir de graines.
-fromage|Produit laitier fermenté, souvent affiné.
-chocolat|Douceur faite à base de cacao et de sucre.
+cafe|Une boisson obtenue en infusant des graines de cafe torrefiees dans de l'eau chaude. Un espresso est plus court et plus concentre qu'un cafe allonge, et un filtre laisse passer l'eau a travers un papier. La cafeine stimule le systeme nerveux central.|1
+fromage|Un aliment obtenu en faisant cailler le lait, puis en pressant et en affinage. Le gout, la texture et l'odeur dependent du lait utilise, du temps d'affinage et de la methode. La mention AOP ou AOC certifie son origine geographique.|1
+chocolat|Un dessert obtenu a partir du cacao, dont les feves sont torrefiees, concassees puis broyees en poudre. Avec du sucre, du lait et parfois du beurre, il donne un produit dont la teneur en cacao, de 30 a 90 pour cent, determine l'amertume.|1
 cuisine|Pièce où on prépare les repas.
 recette|Liste des ingrédients et instructions pour cuisiner.
-valise|Bagage pour transporter ses affaires en voyage.
-avion|Véhicule qui vole dans le ciel.
-hôtel|Établissement où on dort contre de l'argent.
+valise|Un contenant souple ou rigide pour transporter des vetements et des effets. Une valise cabine respecte les limites de la compagnie, generalement un format de 55 centimètres de long au maximum.|2
+avion|Un transport aerien qui deplace des passagers ou du fret entre deux aeroports. La cabine est pressurisee pour preserver la sante a l'altitude, et l'equipage navigue a l'aide d'instruments ou de satellites.|2
+hotel|Un etablissement qui loue des chambres pour une ou plusieurs nuits, avec un service de reception, un petit-dejeuner et souvent un reseau wifi. On le classe par nombre d'etoiles, qui refletent le niveau de confort et de service.|2
 plage|Bord de mer ou de lac avec du sable.
-montagne|Relief naturel très élevé.
+montagne|Une elevation de terrain de plusieurs centaines de metres de denivele, au-dessus de la limite des arbres. On y pratique la randonnee, l'escalade, le ski en hiver, mais l'air y est plus rare et la temperature plus basse.|2
 carte|Plan géographique pour s'orienter.
 pays|Territoire délimité par des frontières.
 voyager|Se déplacer d'un endroit à un autre.
 touriste|Personne qui visite un lieu pour le plaisir.
 aventure|Expérience nouvelle et excitante.
 chanson|Mélodie chantée avec des paroles.
-guitare|Instrument à cordes qu'on gratte.
-rythme|Battement régulier de la musique.
-concert|Spectacle musical public.
+guitare|Un instrument a cordes pincees, generalement six, avec un corps creux. La guitare basse a des cordes plus longues et plus graves, la guitare electrique se branche sur un ampli, et l'acoustique se joue sans amplificateur.|3
+rythme|L'organisation des durees et des accents, ce qui donne a la musique son mouvement. Le tempo donne la vitesse de base, et un rythme est simple quand il se repete sur une courte sequence, complexe quand il varie.|3
+concert|Une representation musicale en direct devant un public, dont l'ambiance est l'element central. L'artiste est physiquement dans la salle, ce qui rend l'evenement unique par rapport a un simple enregistrement.|3
 artiste|Personne qui crée ou interprète de la musique.
 paroles|Texte d'une chanson.
 instrument|Objet utilisé pour faire de la musique.
 chanteur|Personne qui chante.
 mélodie|Suite de notes agréables à l'oreille.
-festival|Événement musical avec plusieurs artistes.
-livre|Ensemble de pages reliées contenant un texte.
+festival|Un evenement qui regroupe plusieurs artistes sur plusieurs jours, avec des scenes et un cadre commun. Les plus connus sont Glastonbury et Roskilde, et ils attirent souvent plusieurs dizaines de milliers de personnes.|3
+livre|Un ensemble de feuilles reliees qui composent un texte, organise en chapitres ou en parties. On distingue la litterature, qui vise a l'effet esthetique, des ouvrages techniques ou scientifiques, qui visent a transmettre des connaissances.|4
 film|Histoire racontée en images animées.
-musée|Lieu où sont exposées des œuvres d'art.
-peinture|Art de représenter avec des couleurs.
-théâtre|Spectacle joué par des comédiens.
+musee|Un etablissement qui conserve et expose des pieces d'art pour eduquer et faire connaitre. Les collections peuvent etre scientifiques ou artistiques, anciennes ou contemporaines, et la visite est souvent gratuite.|4
+peinture|Une technique d'expression par l'application de couleurs sur une surface, a l'huile, l'aquarelle, l'acrylique ou la tempere. Le style d'une oeuvre depend de sa periode historique et des influences de l'artiste.|4
+theatre|Une forme de spectacle qui combine le texte, le jeu d'acteurs, la scenographie et la mise en scene. On distingue la comedie, la tragedie et le drame, qui different par le ton et l'issue de l'intrigue.|4
 traditions|Coutumes transmises de génération en génération.
-histoire|Récit des événements du passé.
+histoire|Une science qui etudie le passe de l'humanite par les traces qu'il a laissees. Elle s'appuie sur les sources ecrites, l'archéologie, la genealogie et l'oralite, et se distingue de la memoire par sa critique des sources.|4
 poésie|Art d'écrire des vers.
 sculpture|Art de tailler ou modeler des formes.
 patrimoine|Ensemble des biens culturels d'un pays.
 bureau|Lieu où on travaille assis à un bureau.
 patron|Chef ou propriétaire d'une entreprise.
 collègue|Personne qui travaille avec nous.
-salaire|Somme d'argent reçue en échange du travail.
-réunion|Rassemblement pour discuter de sujets professionnels.
+salaire|La remuneration versee a un salarie pour son travail, calculee selon un taux horaire ou mensuel. Il existe un salaire brut, avant retenues, et un salaire net, reellement verse. Le salaire minimum est fixe par la loi.|5
+reunion|Une rencontre organisee autour d'un ordre du jour, qui sert a decider, a coordonner ou a partager de l'information. Une reunion efficace a un objectif clair, une duree limitee et des participants identifies, sans quoi elle devient improductive.|5
 ordinateur|Machine électronique utilisée pour travailler.
-télétravail|Travailler depuis son domicile.
-objectif|But à atteindre dans le travail.
+teletravail|Une modalite de travail a distance, ou l'emploie effectue ses taches depuis son domicile. Elle est cadre par un accord qui definit les horaires, les conditions de connexion et le droit a la deconnexion.|5
+objectif|Le resultat attendu d'une action, formule de facon mesurable et datee. Un objectif doit etre specifique, mesurable, realisable, pertinent et limite dans le temps, sinon il ne permet pas de juger si l'action a reussi.|5
 contrat|Document signé qui fixe les règles.
-formation|Période d'apprentissage pour se perfectionner.
-médecin|Professionnel qui soigne les gens.
-sommeil|Période de repos nocturne.
+formation|L'action d'acquerir des connaissances ou des competences par des moyens pedagogiques. Elle peut etre initiale, continue ou certifiante, et elle est financee par l'entreprise ou par l'individu selon la filiere et le droit applicable.|5
+medecin|Un professionnel de sante forme a la medecine, qui diagnostique les maladies et prescrit des traitements. On distingue le generaliste, qui suit l'ensemble du patient, du specialiste, expert d'un organe ou d'une discipline.|6
+sommeil|Une periode de repos physiologique de plusieurs heures, indispensable a la recuperation de l'organisme. Il se decoupe en cycles de sommeil paradoxal et de sommeil lent, et un adulte a besoin d'environ sept a neuf heures. Un manque prolongent provoque l'irritabilite, la perte de memoire et les difficultes de concentration.|6
 sport|Activité physique pratiquée pour rester en forme.
 alimentation|Ce qu'on mange pour se nourrir.
 douleur|Sensation désagréable dans le corps.
-médicament|Substance utilisée pour guérir.
-stress|Tension nerveuse due à la pression.
-fatigue|État de grande lassitude, besoin de repos.
-hygiène|Ensemble des pratiques pour rester propre et en bonne santé.
+medicament|Une preparation contenant une ou plusieurs substances actives destinees a prevenir, diagnostiquer ou traiter une maladie. Il se delivre avec une ordonnance, se conserve dans des conditions precises, et ne se partage jamais entre personnes.|6
+stress|Une reaction de l'organisme face a une pression, qui mobilise l'adrenaline et le cortisol. Un stress ponctuel peut etre adaptateur, mais un stress chronique epuise les reserves et peut provoquer des troubles du sommeil, de l'humeur ou des douleurs musculaires.|6
+fatigue|Une sensation d'epuisement physique ou mental qui ne cede pas au repos immediat. Elle peut venir d'un manque de sommeil, d'un stress chronique, d'une alimentation desequilibree ou d'une maladie sous-jacente, et merite un avis medical si elle persiste.|6
+hygiene|Un ensemble de gestes qui limitent la propagation des microbes : se laver les mains a l'eau et au savon, se brosser les dents deux fois par jour et aerer les pieces. C'est un moyen simple et peu couteux de prevention.|6
 bien-être|État agréable de santé physique et mentale.
 optimiste|Personne qui voit le bon côté des choses.
 pessimiste|Personne qui voit plutôt le mauvais côté.
 patient|Personne qui sait attendre sans s'énerver.
 généreux|Personne qui donne facilement aux autres.
-audacieux|Personne qui ose faire des choses risquées.
+audacieux|Qui n'a pas peur de prendre des risques pour defendre une idee. L'audace se distingue de l'imprudence en ce qu'elle est calculee et assume ses consequences, et elle permet souvent de realiser ce que la prudence seule aurait laisse de cote.|7
 timide|Personne réservée, qui ose peu parler.
 franc|Personne qui dit ce qu'elle pense.
-introverti|Personne qui préfère être seule ou avec peu de monde.
-extraverti|Personne qui aime être entourée et sociable.
+introverti|Une personne qui recharge son energie en solitaire plutot qu'en societe. Les introvertis ne sont pas antisociaux : ils ont simplement besoin de temps seul pour se recentrer avant de pouvoir interagir avec le groupe.|7
+extraverti|Une personne qui prend son energie dans le contact avec les autres, qui aime parler en groupe et pense a voix haute. L'extraversion est un continu : beaucoup de gens se situent au milieu entre ces deux poles.|7
 fidèle|Personne sur qui on peut compter et qui reste loyal.
-smartphone|Téléphone portable intelligent.
-internet|Réseau mondial qui permet de communiquer.
+smartphone|Un telephone portable equipe d'un ecran tactile, d'un processeur puissant et d'un acces a Internet. Il combine les fonctions d'un telephone, d'un ordinateur, d'une camera et d'un lecteur de musique, et se recharge par USB ou sans fil.|10
+internet|Un reseau mondial qui relie entre eux des milliards d'appareils et permet l'echange de donnees. Il repose sur le protocole TCP/IP et fonctionne en trois couches : le reseau physique, le reseau Internet et la couche applicative qui fournit le web et le courriel.|10
 réseaux sociaux|Plateformes comme Facebook ou Instagram.
-intelligence artificielle|Programme qui imite l'intelligence humaine.
-cloud|Stockage de données en ligne.
+intelligence artificielle|Un ensemble de techniques qui permettent a une machine d'effectuer des taches normalement reservees a l'intelligence humaine, comme comprendre un langage ou reconnaitre une image. Elle se base sur l'apprentissage automatique, qui ajuste les parametres d'un modele a partir de donnees.|9
+cloud|Des services informatiques accessibles par Internet, qui stockent et traitent les donnees sur des serveurs distants au lieu d'un ordinateur personnel. On y trouve du stockage, du calcul, des bases de donnees et des logiciels, avec l'avantage de l'acces depuis n'importe quel appareil.|10
 application|Programme utilisé sur un téléphone.
-données|Informations stockées ou transmises.
-streaming|Visionnage de vidéos sans téléchargement.
+donnees|Des informations brutes, comme des textes, des images, des nombres ou des mesures, que les machines peuvent stocker et traiter. On distingue les donnees structurees, rangees en tableaux, et non structurees, comme les textes ou les photos.|10
+streaming|La lecture en continu d'un contenu audio ou video depuis Internet, sans telechargement prealable. Ce mode de consommation est devenu la norme, mais il necessite une connexion stable et une bande passante suffisante.|10
 hacker|Personne qui s'introduit dans les systèmes informatiques.
 abonnement|Paiement régulier pour un service.
-routine|Habitudes qu'on répète chaque jour.
-bricolage|Activité manuelle dans la maison.
-jardin|Espace vert autour de la maison.
-lecture|Activité de lire un livre.
-balade|Promenade tranquille sans but précis.
-ménage|Nettoyage de la maison.
-courses|Achat de nourriture et de produits.
+routine|Un ensemble de gestes repetes a intervalles reguliers, qui structure le quotidien. Les routines réduisent la charge mentale de decision, puisqu'il n'y a pas a reflechir a ce qu'il faut faire dans telle ou telle situation.|11
+bricolage|Le fait de faire soi-meme des travaux de reparation ou d'amenagement dans sa maison. C'est une activite a la fois utile et detentante, qui developpe la dexterite et la satisfaction du travail accompli.|8
+jardin|La culture et l'entretien d'un espace de plantes ornementales ou potageres. Le jardinage est une activite physique douce et saisonniere, qui produit des legumes frais et ameliore le bien-etre au contact du dehors.|8
+lecture|Une activite qui consiste a parcourir un texte pour en comprendre le sens et en tirer du plaisir. La lecture enrichit le vocabulaire, ameliore la concentration et ouvre a des cultures et des epoques differentes.|8
+balade|Une marche en plein air, souvent courte et agreable, sans objectif particulier. Elle se fait seul ou en famille, au parc ou dans la nature, et constitue l'un des moyens les plus simples de se detendre.|8
+menage|Les taches d'entretien de la maison : laver, essuyer, ranger, passer l'aspirateur, faire la lessive. Elles occupent du temps important et ne sont generalement pas partageees equitablement dans un foyer.|11
+courses|Les achats alimentaires et de premiere necessite faits dans un magasin ou un supermarche. Elles peuvent etre faites en grande surface, en boutique de proximite ou en ligne, avec des prix et des qualites tres differents selon le mode de distribution.|11
 bricoler|Réparer ou construire quelque chose.
-forêt|Grand espace boisé.
-océan|Grande étendue d'eau salée.
+foret|Une vaste etendue couverte d'arbres, qui produit de l'oxygene, abrite une part majeure du vivant et stocke du carbone. Les forets ont une fonction ecologique, economique et culturelle, et se regenerent naturellement par les graines si le sol n'est pas derange.|12
+ocean|Une immense masse d'eau salee qui recouvre environ 71 % de la surface du globe. Il produit une grande partie de l'oxygene de l'atmosphere, absorbe le CO2 et alimente une part importante de l'humanite, mais il est touche par la pollution et la surepeche.|12
 maison|Lieu où on habite.
 famille|Ensemble des parents et enfants.
 mère|Femme qui a des enfants.
@@ -108,7 +108,7 @@ père|Homme qui a des enfants.
 frère|Garçon né des mêmes parents.
 sœur|Fille née des mêmes parents.
 ami|Personne avec qui on a des liens affectifs.
-enfant|Jeune personne.
+enfant|une personne en cours de croissance, de la naissance a la puberte. L'enfant a besoin de nourriture, de sommeil, d'affection et de jeu pour se developer, et l'ecole lui apprend les bases de la lecture, de l'ecriture et du calcul.|7
 adulte|Personne qui a atteint l'âge adulte.
 vie|Période entre la naissance et la mort.
 mort|Fin de la vie.
@@ -124,9 +124,9 @@ ciel|Espace au-dessus de nos têtes.
 terre|Planète où nous vivons.
 eau|Liquide transparent et vital.
 feu|Flamme qui produit chaleur et lumière.
-vent|Mouvement d'air.
+vent|Un mouvement de l'air d'une zone de haute pression vers une zone de basse pression, determine par le soleil et la rotation de la Terre. Il peut etre doux ou violent, et sa force s'exprime sur une echelle de Beaufort, de la brise a l'ouragan.|12
 neige|Précipitation de cristaux de glace.
-pluie|Gouttes d'eau tombant du ciel.
+pluie|L'eau atmospherique qui retombe sur le sol sous forme de gouttes, produite par condensation de la vapeur d'eau dans les nuages. Elle est indispensable au cycle de l'eau et à l'agriculture, mais peut aussi provoquer des inondations quand elle est trop abondante ou mal evacuee.|12
 chaleur|Température élevée.
 froid|Température basse.
 gens|Êtres humains.
@@ -139,7 +139,7 @@ cœur|Organe qui fait circuler le sang.
 sang|Liquide rouge dans le corps.
 corps|Ensemble physique d'une personne.
 docteur|Personne qui soigne les gens.
-hôpital|Lieu où on soigne les malades.
+hopital|Une structure de soins qui accueille et traite les patients, avec des services medicaux et chirurgicaux. Il existe des hopitaux publics finances par la collectivite, et des etablissements prives, souvent plus rapides mais payants.|6
 école|Lieu où on apprend.
 professeur|Personne qui enseigne.
 étudiant|Personne qui apprend.
@@ -150,8 +150,8 @@ voir|Percevoir avec les yeux.
 toucher|Entrer en contact avec quelque chose.
 sentir|Percevoir par l'odorat ou le toucher.
 manger|Absorber de la nourriture.
-boire|Avaler un liquide.
-dormir|Être en état de repos.
+boire|L'action de faire entrer des liquides dans l'organisme, le plus souvent par la bouche. Un adulte a besoin d'environ 1,5 litre d'eau par jour, davantage par temps chaud, et un exces peut entrainer un deshydratation.|6
+dormir|Une action de repos physiologique indispensable a la consolidation de la memoire et a la reparation des tissus. Les troubles du sommeil comme l'insomnie ou l'apnee du sommeil affectent l'humeur, la concentration et la sante cardiovasculaire, et se traitent par une bonne hygiene du sommeil ou par avis medical.|6
 marcher|Se déplacer à pied.
 courir|Se déplacer vite à pied.
 aller|Se déplacer vers un endroit.
@@ -167,13 +167,13 @@ faire|Accomplir une action.
 vouloir|Désirer quelque chose.
 pouvoir|Avoir la capacité de faire.
 devoir|Être obligé de faire.
-savoir|Connaître ou être capable.
+savoir|Un ensemble de connaissances acquises par l'etude et l'experience. On distingue le savoir que des faits et des principes, le savoir comment faire des competences pratiques, et le savoir pourquoi qui cherche les causes.|9
 penser|Réfléchir avec son esprit.
 croire|Être convaincu de quelque chose.
 rire|Exprimer de la joie par un son.
 pleurer|Verser des larmes.
 sourire|Courber les lèvres pour montrer de la joie.
-musique|Art des sons et des mélodies.
+musique|Un ensemble de sons organises selon une structure temporelle et un systeme tonal ou modal. Elle se decrit par quatre parametres : le tempo, la tonalite, le timbre et la structure, et peut etre notee ou jouee a l'oreille.|3
 dessin|Image faite à la main.
 couleur|Apparence des choses selon la lumière.
 rouge|Couleur du sang.
@@ -219,13 +219,13 @@ acheter|Acquérir quelque chose contre de l'argent.
 vendre|Céder quelque chose contre de l'argent.
 argent|Monnaie pour payer.
 prix|Coût d'un objet.
-travail|Activité professionnelle.
+travail|L'activite productive qu'une personne exerce contre une remuneration, en echange d'un bien ou d'un service. Le travail peut etre salarie, independant ou associatif, et l'activite domestique n'est pas comptabilisee comme du travail.|5
 métier|Profession exercée.
 entreprise|Organisation commerciale.
 commerce|Activité de vendre.
-tourisme|Activité de visiter des lieux.
+tourisme|L'ensemble des deplacements et des activités Motivés par le plaisir ou la curiosité, hors contexte professionnel. Il se decline en tourisme de plage, urbain, rural, culturel et economique, ce dernier etant le plus répandu.|2
 voyage|Déplacement vers un autre lieu.
-restaurant|Lieu où on mange.
+restaurant|Un etablissement qui sert des repas sur place ou a emporter. On y trouve de la restauration rapide, un bistrot, une brasserie ou un etablissement gastronomique, ces deux derniers etant les plus couts comme les plus exigeants.|1
 nourriture|Ce qu'on mange pour se nourrir.
 lait|Liquide blanc produit par les animaux.
 poisson|Animal aquatique.
@@ -234,11 +234,11 @@ sel|Substance pour relever le goût.
 thé|Boisson chaude à base de feuilles.
 bière|Boisson alcoolisée.
 vin|Boisson fermentée à base de raisin.
-football|Sport de ballon.
+football|Les deux equipes de onze joueurs se disputent un ballon sur un terrain de 90 metres de long. Le match dure 90 minutes, en deux mi-temps, plus le temps additionnel. On marque un but en envoyant le ballon dans les buts adverses.|0
 basket-ball|Sport de panier.
-tennis|Sport de raquette.
-natation|Sport aquatique.
-jeu|Activité ludique.
+tennis|Deux joueurs se font face sur un court separe par un filet, en se renvoyant la balle avec une raquette. Un set se gagne a 6 jeux avec deuxjeux d'ecart, et le match se joue au meilleur de trois sets.|0
+natation|On nage dans une piscine de 50 metres, chaque nageur cherche a battre le temps de son coureur le plus proche. Les epreuves principales sont le 100, le 200 et le 400 metres nage libre, les quatre autres styles, puis le medley combine les quatre nages.|0
+jeu|Une activite de divertissement fondee sur des regles, un but et le plaisir. On distingue les jeux de societe, les jeux video, les jeux de cartes et les jeux de plein air, qui se pratiquent seuls ou en groupe.|8
 joueur|Personne qui joue.
 gagner|Remporter une compétition.
 perdre|Être battu dans une compétition.
@@ -248,17 +248,17 @@ tristesse|Sentiment de peine.
 colère|Sentiment d'énervement.
 peur|Sentiment d'inquiétude.
 espoir|Sentiment de confiance.
-santé|État de bien-être.
+sante|L'etat de bien-etre physique et mental d'une personne, qui depasse la simple absence de maladie. Elle depend de nombreux facteurs : alimentation, sommeil, activite physique, relations sociales et environnement.|6
 médecine|Science des soins.
-maladie|Altération de la santé.
+maladie|Une alteration de l'etat de sante due a un dysfonctionnement de l'organisme, qui se traduit par des symptomes et des signes. Certaines sont infectieuses et contagieuses, d'autres degeneratives ou genetiques, et le diagnostic repose sur un examen clinique et des examens complementaires.|6
 vérité|Ce qui est vrai.
 mensonge|Ce qui est faux.
 liberté|Possibilité d'agir librement.
 paix|Absence de conflit.
 guerre|Conflit armé.
 nature|Ensemble du monde sans l'homme.
-animal|Être vivant non végétal.
-arbre|Grande plante à tronc.
+animal|Un etre vivant qui se nourrit d'autres etres vivants, qui se deplace et qui percoit son environnement. Les animaux jouent un role essentiel dans l'equilibre des ecosystemes, comme predateurs, proies, decomposeurs ou pollinisateurs.|12
+arbre|Une plante ligneuse qui pousse verticalement et se ramifie, avec un tronc et des branches. Il produit de l'oxygene, abrite des especes, retient le sol contre l'erosion et absorbe le CO2. Il a besoin d'eau, de lumiere et d'une terre riche.|12
 fleur|Partie colorée des plantes.
 mer|Grande étendue d'eau salée.
 printemps|Saison des fleurs.
@@ -560,19 +560,19 @@ chimie|Science des substances.
 chose|Objet, élément.
 classe|Groupe d'élèves, catégorie.
 clavier|Ensemble de touches.
-climat|Ensemble des conditions météorologiques.
+climat|L'ensemble des caracteristiques meteorologiques d'une region, qui evoluent sur le long terme. Le rechauffement climatique est la hausse de la temperature moyenne mondiale, due principalement aux activites humaines et aux emissions de gaz a effet de serre.|12
 collège|Établissement scolaire.
 comité|Groupe de personnes chargées d'une tâche.
 comparer|Mettre en parallèle.
-compétence|Savoir-faire.
+competence|Une capacite mobilisable pour atteindre un objectif, qui combine des savoirs, des savoir-faire et des savoir-etre. Elle s'acquiert par la formation, l'experience ou la pratique, et se formalise par un referentiel ou une certification.|5
 complet|Qui est entier, total.
 composer|Créer, assembler.
 comprendre|Saisir le sens.
 comptable|Personne qui tient les comptes.
-concentration|Action de concentrer son attention.
+concentration|La capacite de porter son attention sur une tache precise en excluant le reste. Elle est limitee dans le temps et depend du sommeil, du stress et de l'environnement. Son entrainement passe par la repetition et les exercices de respiration.|9
 concept|Idée abstraite.
 condition|Situation, exigence.
-confiance|Assurance, croyance en quelqu'un.
+confiance|Le fait de croire en ses capacites et en la possibilite d'agir efficacement. Une confiance saine se construit par des experiences reussies, tandis que l'excès de confiance conduit a mal evaluer les risques et le manque a la paralysie.|7
 conflit|Désaccord, opposition.
 conscience|Connaissance de soi et des actes.
 conséquence|Résultat d'une action.
@@ -642,7 +642,7 @@ coordination|Action de coordonner ses mouvements.|0
 équilibre|Stabilité du corps.|0
 récupération|Période de repos après l'effort.|0
 hydratation|Action de boire pour rester en forme.|0
-énergie|Force physique pour agir.|0
+energie|La capacite d'un systeme a produire un effet : mouvement, chaleur, lumiere. Les energies renouvelables, solaire, eolien, hydraulique et biomasse, se renouvellent rapidement, contrairement aux energies fossiles qui sont epuisables.|0
 muscle|Tissu qui permet les mouvements.|0
 articulation|Zone de jonction entre deux os.|0
 blessure|Lésion physique survenue pendant le sport.|0
@@ -666,7 +666,7 @@ podium|Estrade où montent les gagnants.|0
 hymne|Chanson jouée pour honorer un pays.|0
 drapeau|Symbole d'un pays brandi lors des compétitions.|0
 faim|Besoin de se nourrir.|1
-soif|Besoin de boire.|1
+soif|la sensation de besoin de boire, regulée par l'organisme en fonction du taux d'hydratation. Elle peut disparaitre chez les personnes agees ou qui prennent certains medicaments, et il faut alors boire meme sans soif pour maintenir une hydratation correcte.|1
 aliment|Ce que l'on mange.|1
 calorie|Unité d'énergie fournie par la nourriture.|1
 protéine|Nutriment essentiel pour les muscles.|1
@@ -726,7 +726,7 @@ visite|Action de découvrir un lieu.|2
 guide|Personne qui fait visiter.|2
 boussole|Instrument pour trouver le nord.|2
 gps|Système de navigation.|2
-itinéraire|Chemin à suivre.|2
+itineraire|L'ensemble des etapes d'un voyage, avec leur ordre et leurs moyens de transport. Un bon itineraire tient compte des horaires, des correspondances et du temps de trajet reel, pas seulement de la distance a vol d'oiseau.|2
 trajet|Parcours effectué.|2
 voyageur|Personne en voyage.|2
 explorateur|Personne qui découvre de nouveaux lieux.|2
@@ -743,9 +743,9 @@ langue|Moyen de communication.|2
 coutume|Habitude d'un pays.|2
 hébergement|Lieu où l'on dort.|2
 auberge|Petit hôtel.|2
-camping|Lieu de vacances en plein air.|2
+camping|Un hebergement en plein air sous tente, en caravane ou en bungalow, avec des emplacements amenages. C'est la solution la moins chere pour dormir hors de chez soi, a condition d'avoir un peu d'equipement.|2
 tente|Abri de camping.|2
-randonnée|Promenade en nature.|2
+randonnee|Une marche en pleine nature, sur des sentiers balises ou non, d'une duree de quelques heures a plusieurs jours. Elle se prepare avec des chaussures adaptees, de l'eau, une carte et des vetements de rechange.|2
 excursion|Sortie d'une journée.|2
 safari|Observation des animaux sauvages.|2
 note|Son musical.|3
@@ -762,7 +762,7 @@ reggae|Musique jamaïcaine.|3
 hip-hop|Culture urbaine incluant le rap.|3
 rap|Style musical avec des paroles scandées.|3
 blues|Musique mélancolique.|3
-jazz|Musique improvisée.|3
+jazz|Une musique nee dans les communautes afro-americaines de Nouvelle-Orleans vers 1900, qui privilegie l'improvisation et la variation sur un theme. Ses formes vont du dixieland au bebop puis au jazz moderne, et c'est un langage vivant.|3
 classique|Musique traditionnelle.|3
 contemporain|Musique moderne.|3
 compositeur|Personne qui écrit de la musique.|3
@@ -774,7 +774,7 @@ duo|Deux musiciens.|3
 trio|Trois musiciens.|3
 quatuor|Quatre musiciens.|3
 quintette|Cinq musiciens.|3
-partition|Texte musical écrit.|3
+partition|L'ecrit qui indique ce que chaque instrument doit jouer : notes, durees et nuances. C'est ce qui permet a plusieurs musiciens de jouer ensemble en respectant le meme texte, avec un chef d'orchestre ou un chef de chant.|3
 portée|Ensemble de lignes pour écrire la musique.|3
 clef|Signe qui indique la hauteur des notes.|3
 tempo|Vitesse de la musique.|3
@@ -797,7 +797,7 @@ littérature|Ensemble des oeuvres écrites.|4
 poème|Texte en vers.|4
 fable|Court récit avec une morale.|4
 conte|Récit merveilleux.|4
-roman|Long récit imaginaire.|4
+roman|Un recit de longueur variable, en prose, qui raconte une ou plusieurs histoires avec des personnages. Le roman peut etre historique, psychologique, policier ou de tout autre genre, et se lit de facon continue.|4
 nouvelle|Récit court.|4
 tragédie|Pièce de théâtre dramatique.|4
 comédie|Pièce de théâtre joyeuse.|4
@@ -811,7 +811,7 @@ peintre|Personne qui peint.|4
 sculpteur|Personne qui sculpte.|4
 architecte|Personne qui conçoit des bâtiments.|4
 galerie|Lieu d'exposition d'art.|4
-exposition|Présentation d'oeuvres.|4
+exposition|Une presentation organisee d'oeuvres dans un lieu, avec un theme, un accrochage et souvent un texte de presentation. Une exposition est une lecture du presentateur, qui selectionne et ordonne lesoeuvres pour son propos.|4
 tradition|Coutume transmise.|4
 folklore|Ensemble des traditions populaires.|4
 croyance|Ce en quoi on croit.|4
@@ -822,7 +822,7 @@ pèlerinage|Voyage religieux.|4
 mythologie|Ensemble des mythes.|4
 légende|Récit traditionnel merveilleux.|4
 épopée|Long récit héroïque.|4
-philosophie|Réflexion sur la vie.|4
+philosophie|La reflexion sur les grandes questions de l'existence, de la connaissance et de la morale. Les grands mouvements sont le materialisme, l'idealisme, le realisme, l'existentialisme et le poststructuralisme, qui les traitent differemment.|4
 éthique|Science de la morale.|4
 esthétique|Étude de la beauté.|4
 humanisme|Courant de pensée centré sur l'humain.|4
@@ -838,11 +838,11 @@ abstrait|Art qui ne représente pas le réel.|4
 culturel|Relatif à la culture.|4
 érudit|Personne très cultivée.|4
 boulot|Langage familier pour le travail.|5
-carrière|Parcours professionnel.|5
+carriere|L'ensemble des etapes successives de la vie professionnelle, du premier emploi a la retraite. Elle se construit par des mobilites, des formations et des projets, et se distingue du simple emploi par sa continuity et son objectif a long terme.|5
 recrutement|Action d'embaucher.|5
-entretien|Discussion pour un emploi.|5
+entretien|Le moment ou un recruteur evalue les competences et la motivation d'un candidat, par des questions directes ou pratiques. Il se deroule en plusieurs etapes : une presentation, des questions de competence, puis une mise en situation. La preparation compte autant que l'experience.|5
 stage|Période d'essai en entreprise.|5
-apprentissage|Période de formation.|5
+apprentissage|Le processus par lequel on acquiert des connaissances, des competences ou des automatismes. Il peut etre explicite et conscient, ou implicite comme l'acquisition des gestes. La repetition espacee et le sommeil consolident la memoire.|5
 fiche de paie|Document qui détaille le salaire.|5
 prime|Somme supplémentaire versée.|5
 impôt|Somme versée à l'État.|5
@@ -866,7 +866,7 @@ projet|Plan d'action.|5
 mission|Tâche confiée.|5
 séminaire|Session de formation.|5
 congé|Période de repos autorisée.|5
-vacances|Période de congés.|5
+vacances|Une periode de conge pendant laquelle on cesse le travail pour se reposer. Elles peuvent etre prises dans son pays ou a l'etranger, et constituent le premier moteur du tourisme.|5
 rtt|Réduction du temps de travail.|5
 flexibilité|Capacité à s'adapter.|5
 polyvalence|Capacité à faire plusieurs tâches.|5
@@ -875,14 +875,14 @@ décision|Choix effectué.|5
 délégation|Confier une tâche.|5
 autonomie|Capacité à agir seul.|5
 efficacité|Capacité à produire des résultats.|5
-productivité|Quantité de travail produit.|5
+productivite|Le rapport entre le travail produit et le temps ou les ressources mis en oeuvre pour l'obtenir. Elle se mesure par des indicateurs, et s'ameliore généralement en clarifiant les priorites et en supprimant les taches sans valeur ajoutee.|5
 rendement|Efficacité au travail.|5
 symptôme|Signe d'une maladie.|6
 fièvre|Élévation de la température corporelle.|6
 toux|Réflexe de l'organisme.|6
 rhume|Infection bénigne.|6
 grippe|Maladie virale.|6
-allergie|Réaction à une substance.|6
+allergie|Une reaction du systeme immunitaire a une substance sans danger, le plus souvent un pollen, un aliment ou un acarien. Elle se manifeste par des eternuements, des demangeaisons ou une respiration difficile, et se traite a l'antihistaminique.|6
 asthme|Difficulté respiratoire.|6
 diabète|Maladie du sucre.|6
 hypertension|Tension artérielle élevée.|6
@@ -892,13 +892,13 @@ infection|Invasion de l'organisme par des microbes.|6
 virus|Agent infectieux microscopique.|6
 bactérie|Micro-organisme.|6
 antibiotique|Médicament contre les bactéries.|6
-vaccin|Produit pour prévenir une maladie.|6
+vaccin|Un produit qui entraine le systeme immunitaire a reconnaitre un agent pathogene, sans provoquer la maladie. Il reduit fortement le risque de formes graves et protege les personnes fragiles qui les entourent.|6
 épidémie|Propagation d'une maladie.|6
 pandémie|Épidémie mondiale.|6
 clinique|Établissement de soins.|6
 infirmier|Soignant qui aide les médecins.|6
 pharmacien|Spécialiste des médicaments.|6
-dentiste|Médecin des dents.|6
+dentiste|Un praticien specialise dans les dents et les tissus de la bouche, qui previent et traite les caries, les infections et les troubles de la mastication. Une consultation reguliere, souvent semestrielle, permet de depister tot les problemes.|6
 ophtalmologue|Médecin des yeux.|6
 dermatologue|Médecin de la peau.|6
 cardiologue|Médecin du coeur.|6
@@ -929,7 +929,7 @@ attentionné|Qui fait attention aux autres.|7
 aventureux|Qui aime l'aventure.|7
 courageux|Qui n'a pas peur.|7
 créatif|Qui invente des choses.|7
-curieux|Qui veut apprendre.|7
+curieux|Le caractere de quelqu'un qui aime apprendre et poser des questions. La curiosite est un moteur de la connaissance : c'est elle qui pousse a explorer de nouveaux domaines et a remettre en question ses croyances.|7
 déterminé|Qui est motivé.|7
 dynamique|Plein d'énergie.|7
 égoïste|Qui ne pense qu'à soi.|7
@@ -957,7 +957,7 @@ rancunier|Qui n'oublie pas les offenses.|7
 rêveur|Qui imagine beaucoup.|7
 sage|Qui est prudent et réfléchi.|7
 sensuel|Qui ressent intensément.|7
-sérieux|Qui n'est pas frivole.|7
+serieux|Le caractere de quelqu'un qui prend ses responsabilites, tient ses engagements et va au bout de ce qu'il commence. Cette qualite est demande dans la vie professionnelle, mais elle peut aussi rendre la personne exigeante avec elle-meme.|7
 sincère|Qui est honnête.|7
 sociable|Qui aime les gens.|7
 solitaire|Qui aime être seul.|7
@@ -984,12 +984,12 @@ sable|Grains fins sur la plage.|8
 terreau|Terre fertile pour les plantes.|8
 engrais|Substance qui nourrit les plantes.|8
 pesticide|Produit pour tuer les insectes.|8
-pollution|Dégradation de l'environnement.|8
-recyclage|Transformation des déchets.|8
-déchet|Ce qu'on jette.|8
+pollution|L'introduction dans un milieu de substances ou de dechets qui alterent son equilibre. On parle de pollution de l'air, de l'eau, des sols ou sonore. Les principales causes sont les activites humaines : industrie, transport, agriculture et dechets non traites.|8
+recyclage|La transformation de dechets en nouveaux produits, afin de limiter l'extraction de matieres premieres et de reduire l'enfouissement. Le tri a la source, par couleur de bac, est la premiere etape : papier, verre, metal et plastique ne suivent pas les memes filieres.|8
+dechet|Un objet ou une matiere dont on separe parce qu'elle n'a plus l'usage prevu. Ils se trient en ordures menageres, emballages, verre, papier et dechets électroniques. Le recyclage permet de reduire la quantite enfouie et de totalement de ressources.|8
 poubelle|Récipient pour les déchets.|8
 compost|Engrais naturel.|8
-écologie|Science de l'environnement.|8
+ecologie|La science qui etudie les relations entre les etres vivants et leur milieu. Elle permet de comprendre comment les ecosystemes fonctionnent et de proposer des solutions pour preserver la biodiversite et restaurer les milieux degrades.|8
 durable|Qui dure dans le temps.|8
 brosse|Outil pour se coiffer.|8
 serviette|Tissu pour se sécher.|8
@@ -1026,7 +1026,7 @@ câble|Filaire pour transmettre des données.|10
 batterie|Source d'énergie pour les appareils.|10
 chargeur|Appareil pour recharger.|10
 port|Connecteur pour brancher des périphériques.|10
-mémoire|Espace de stockage.|10
+memoire|La capacite du cerveau a conserver et a retrouver des informations. On distingue la memoire a court terme qui retient quelques secondes, la memoire de travail qui manipule l'information en cours, et la memoire a long terme qui stocke durablement les connaissances.|10
 disque dur|Appareil de stockage de données.|10
 serveur|Ordinateur central.|10
 réseau|Ensemble d'ordinateurs connectés.|10
@@ -1046,7 +1046,7 @@ reconnaissance vocale|Identification par la voix.|10
 impression 3d|Création d'objets en trois dimensions.|10
 robot|Machine automatisée.|10
 ia|Intelligence artificielle.|10
-algorithme|Série d'instructions.|10
+algorithme|Une suite finie d'operations qui decrit pas a pas comment resoudre un probleme. On l'ecrit avant de le programmer, et son efficacite depend du nombre d'operations, que l'on note souvent en O(n) ou O(n) carre.|10
 programmation|Écriture de codes.|10
 code|Langage informatique.|10
 développeur|Personne qui programme.|10
@@ -1059,7 +1059,7 @@ capteur|Appareil qui détecte.|10
 biométrie|Identification par le corps.|10
 cryptage|Protection des données par codage.|10
 décryptage|Décodage des données.|10
-api|Interface de programmation.|10
+api|Une interface qui permet a un programme dECHANGER des donnees avec un service en ligne, sans connaitre son fonctionnement interne. C'est la brique de base du web moderne, qui relie les applications entre elles.|10
 intégration|Assemblage de systèmes.|10
 mise à jour|Nouvelle version d'un logiciel.|10
 téléchargement|Transfert de données.|10
@@ -1068,16 +1068,16 @@ abstraction|Capacité à penser à des concepts éloignés du concret.|9
 acuité|Finesse et rapidité de compréhension.|9
 attention|Concentration de l'esprit sur un objet.|9
 capacité|Aptitude à faire quelque chose.|9
-cerveau|Organe physique de la pensée.|9
+cerveau|Le centre de commande du systeme nerveux, qui traite les informations, controle les mouvements, les emotions et la memoire. Il est constitue de neurones qui communiquent par des synapses, et consomme une part importante de l'energie du corps.|9
 clairvoyance|Capacité à voir clair dans une situation.|9
 compréhension|Action de saisir le sens.|9
 connaissance|Savoir acquis.|9
-créativité|Capacité à inventer du nouveau.|9
+creativite|La capacite a produire des idees nouvelles et originales, a sortir des schemas habituels. Elle nourrit l'art, la recherche et l'entrepreneuriat, et se stimule par l'exposition a des domaines tres differents les uns des autres.|9
 déduction|Action de tirer une conclusion logique.|9
 discernement|Capacité à juger correctement.|9
 éducation|Processus de transmission des savoirs.|9
-empathie|Capacité à comprendre les émotions des autres.|9
-esprit critique|Capacité à remettre en question.|9
+empathie|La capacite a comprendre et a partager les emotions d'autrui, sans necessariamente les ressentir soi-meme. Elle repose sur la lecture des signaux sociaux, et s'entraine par l'ecoute active et l'attention aux reactions des autres.|9
+esprit critique|La capacite d'evaluer une information avec recul, en verifiant sa source, sa date et ses arguments. Il se construit par la comparaison des sources et en distinguant un fait d'une opinion, ce qui protege des manipulations.|9
 évaluation|Estimation de la valeur de quelque chose.|9
 expérience|Savoir acquis par la pratique.|9
 génie|Intelligence exceptionnelle.|9
@@ -1089,7 +1089,7 @@ inspiration|Idée soudaine, élan créatif.|9
 intellect|Faculté de comprendre et de raisonner.|9
 intuition|Perception rapide, sans raisonnement.|9
 jugement|Capacité à porter une évaluation.|9
-logique|Raisonnement cohérent.|9
+logique|La discipline qui etudie les regles de la pensee valide et les inferences correctes. La logique formelle utilise des symboles et des regles precises, tandis que la logique naturelle s'appuie sur le langage courant et le sens commun.|9
 métacognition|Réflexion sur ses propres processus mentaux.|9
 méthode|Manière de faire ordonnée.|9
 neurone|Cellule du système nerveux.|9
@@ -1097,7 +1097,7 @@ observation|Action d'examiner attentivement.|9
 perspicacité|Finesse de perception.|9
 prévision|Anticipation d'un événement.|9
 problème|Question à résoudre.|9
-réflexion|Action de réfléchir, de peser.|9
+reflexion|Le processus par lequel l'esprit revient sur une pensee, une action ou une experience pour l'analyser et en tirer un enseignement. La reflexion critique fait progresser, mais la rumination, qui tourne en boucle sans avancer, devient nocive et entretient l'anxiete.|9
 sagacité|Qualité de jugement clairvoyant.|9
 savant|Personne qui possède un grand savoir.|9
 sens critique|Aptitude à distinguer le vrai du faux.|9
@@ -1113,3 +1113,112 @@ connais|Je ne sais pas encore...|10
 suite|Je ne sais pas encore...|6
 rex|c'est mon chien prefere
 foot|c'est un sport|0
+basketball|Cinq joueurs de chaque equipe jouent sur un parquet. On marque en encaissant le ballon dans un panier haut a 3,05 metres. La rencontre dure 48 minutes, en quatre quarts de 12 minutes. Un lancer franc vaut 1 point, un tir a l'exterieur du panneau vaut 3 points.|0
+rugby|Deux equipes de quinze joueurs se disputent un ballon ovale. Un essai vaut 5 points quand un joueur pose le ballon au sol dans l'aire de but. Le coup d'envoi, la touche et le dropout sont des particularites de ce sport.|0
+marathon|C'est une course de 42,195 kilometres, soit 26 miles et 385 metres, sur route ou en piste. Les records masculins sont inferieurs a 2 heures et les feminins a 2 heures et 15. C'est la distance des Jeux olympiques d'ete depuis 1984.|0
+cyclisme|On pedale sur une bicyclette, en course sur route ou en contre-la-montre ou le coureur ideal ne touche presque jamais ses freins. Le Tour de France dure trois semaines et deux contre-la-montre determinent l'ecart final au classement general.|0
+entrainement|Le travail physique regulier qui prepare a la competition : echauffement, seances de resistance, travail cardiovasculaire et etirements. Le surentrainement provoque l'inverse des effets, avec fatigue chronique et baisse des performances, d'ou l'importance de la recuperation.|0
+penalite|Une epreuve de football ou le gardien de but arrete le tir d'un joueur adverse, pour eviter un but. On parle de tir au but lorsque le but est otherwise vide et que l'arbitre signale une faute en zone de tir, le gardien placant a neuf metres du but.|0
+formule 1|Une discipline de course automobile sur circuit, avec des monoplaces, des pilotes et des ecuries. Chaque Grand Prix se court en plusieurs tours, et le classement s'etablit au nombre de points cumules sur la saison.|0
+sports olympiques|Les Jeux olympiques sont la plus grande reunion sportive internationale. Ils se tiennent tous les quatre ans, en alternant les ete et l'hiver. La france a accumule de nombreuses medailles depuis la creation des modernes Jeux en 1896.|0
+pizza|Une pâte fine garnie de sauce tomate, de mozzarella et d'autres ingredients, cuite a tres haute temperature dans un four a pierre. Ce plat est ne a Naples, en Italie, et s'est repandu partout dans le monde.|1
+pates|Un aliment a base de farine de ble et d'eau, faconne en formes variees comme penne, spaghetti ou fusilli. Pour etre al dente, on cuit dans une grande quantite d'eau salee, quelques minutes seulement avant d'egoutter.|1
+patisserie|Le terme couvre de nombreuses douceurs :cakes, viennoiseries, biscuits et entremets. Les techniques de base sont fouetter les whites, incorporer les poudre et maitriser les cuissons, chaque gates differant par la temperature et le temps.|1
+régime Amaigrissant|Une alimentation hypocalorique suivie dans le but de perdre du poids. Un rééquilibrage alimentaire durable se construit sur une alimentation variée et un mouvement régulier, pas sur un manque drastique qui/aboutit à des carences et à l'effet yoyo.|6
+fromage blanc|Un fromage frais, riche en acide lactique, souvent consommé avec du miel ou des fruits. Il apporte du calcium et des protéines, et se distingue des fromages affinés par sa texture crémeuse et son goût doux.|1
+pain complet|Une pain qui contient toutes les farines, notamment le son, et non seulement la farine de blé blanche. Il est plus riche en fibres, en vitamines et en minéraux que le pain blanc, et rassasie plus longtemps.|1
+boisson energetique|Une boisson sucree contenant de la cafeine et du sucre, censuree pour donner un coup de boost. Elle n'apporte rien que le cafe noir et de l'eau ne donnent pas, et l'exces de sucre est nefaste pour la sante sur la duree.|6
+passeport|Un document officiel delivre par l'Etat qui prouve l'identite et la nationalite d'un citoyen. Il permet de franchir les frontieres, est valable dix ans dans l'Union europeenne, et se demande a la mairie du domicile.|2
+aeroport|Un site equipe de pistes d'atterrissage, de terminaux et de services pour l'accueil des passagers et le traitement des bagages. On y trouve aussi des commerces, des hotellerie et des transports vers la ville.|2
+carte geographique|Une representation plane d'un territoire qui distingue les routes, les villes et les reliefs. Une carte topographique montre le relief par des courbes de niveau, et une carte de l'IGN indique les itineraires routiers.|2
+piano|Un instrument a clavier et a cordes frappees, qui compte 88 touches et plus de 200 cordes. Il sert a la musique classique, au jazz et a la pop, et sert aussi de laboratoire a la composition, en testant les accords avant de les distribuer.|3
+rapper|Une pratique musicale qui combine la parole declamee sur un rythme, souvent une boucle samplee, avec des techniques de rimes et de questions orales. Les morceaux les plus connus sont le rap classique, le trap et le drill.|3
+musique classique|Une musique ecrite issue de la tradition occidentale, qui va du Moyen Age auIconve siecle. Elle se distingue par l'ecrit et la partition, qui permettent a plusieurs musiciens de jouer ensemble le meme texte.|3
+cinema|Une technique de projection d'images en mouvement sur un ecran, avec du son. L'analyse d'un film se fait a travers le recit, le jeu des acteurs et la mise en scene, et la realisation s'apprend par le travail en atelier.|4
+civilisation|L'ensemble des caracteristiques partagees d'une societe : institutions, lois, langues, arts et techniques. On distingue les civilisations anciennes, comme l'Egypte ou la Mesopotamie, des civilisations modernes, marquees par la mondialisation.|4
+traduction|L'action de rendre un texte d'une langue dans une autre, en adaptant le sens, le ton et lesculture. La traduction litteraire se joue sur la beaute des mots, la traduction technique sur la fidelite au sens, et la traduction automatique progresse vite.|4
+management|La fonction de pilotage d'une equipe ou d'une organisation : fixer des objectifs, organiser et motiver. Il existe plusieurs styles, dont le directif, le participatif et le deleguant, avec des effets differents sur la vie du groupe.|5
+entretien annuel|Une rencontre periodique entre un salarie et son responsable, qui fait le point sur le travail fait, les objectifs et l'evolution souhaitee. C'est le moment d'echanger sur les difficultes, les competences a acquis et les projets a venir.|5
+nutrition|L'ensemble des processus par lesquels l'organisme assimile les aliments et les utilise pour produire de l'energie et reparer les tissus. Un equilibre entre glucides, proteines, lipides, fruits et legumes est la base d'une alimentation variee et equilibree.|6
+exercice|Une activite physique reguliere qui renforce les muscles, ameliore le cardio-respiratoire et reduit les risques cardiovasculaires. Les recommandations de sante publique sont d'au moins 30 minutes d'activite moderee par jour, cinq jours par semaine.|6
+respiration|L'echange de gaz entre l'organisme et l'air, qui fournit l'oxygene necessaire aux cellules et elimine le dioxyde de carbone. Elle se fait par les poumons, mais la respiration cellulaire dans chaque cellule en est l'etape finale.|6
+reanimation|Ensemble de techniques medicales destinees a restaurer les fonctions vitales d'une personne en arret cardio-respiratoire. Le massage cardiaque, la ventilation au ballon masquage et le defibrillateur en sont les gestes de base, a faire sans attendre les secours.|6
+prevention|Ensemble des actions qui visent a eviter l'apparition ou l'aggravation d'une maladie, en agissant sur les facteurs de risque. La vaccination, le depistage, l'hygiene et la reduction du tabac en sont les principaux leviers.|6
+hormone|Une molecule produite par une glande endocrine et liberee dans le sang, qui agit sur des tissus cibles. Les hormones reglent la croissance, le metabolisme, le sommeil et l'humeur, et leur desordre perturbe l'equilibre de l'organisme.|6
+medecine generale|La specialite qui suit l'ensemble du patient, toutes categories d'age et de maladie confondues. Le medecin generaliste est le premier recours, il coordonne le parcours de soins et oriente vers un specialiste si necessaire.|6
+vaccination|Elle consiste a administrer un vaccin pour proteger contre une maladie infectieuse. Elle renforce les defenses immunitaires, reduit les complications et les deces, et la couverture vaccinale protege aussi les personnes qui ne peuvent pas etre vaccinees.|6
+mal de dos|Une douleur de la region lombaire, tres courante, liee a la sedentarite, au stress et aux mauvaises postures. La majorite des cas se traitent par une activite physique adaptee, des etirements et une correction posturale. Quand la douleur persiste au-dela de six semaines, un avis medical s'impose.|6
+greffe|Une intervention chirurgicale qui remplace ou repare un organe abime par un tissu provenant d'un donneur. La greffe d'organe concerne le coeur, le rein, le foie ou le poumon, et elle debouche sur un traitement immunosuppresseur a vie.|6
+fatigue chronique|Une fatigue persistante qui ne disparait pas avec le repos et limite les activites quotidiennes. Elle peut avoir des causes multiples, medicales, hormonales ou psychologiques, et doit etre exploree par un medecin plutot que de rester inexpliquee.|6
+irritabilite|Une disposition a reagir violemment a des stimuli normalement anodins, liee a la fatigue, au stress ou a la frustration. Elle peut disparaitre avec un bon sommeil et des activites physiques, et si elle dure, un avis medical est recommande.|6
+os|Les os forment la structure rigide du corps, les muscles et les dents. Ils se renouvellent en continu, leur densite diminuant avec l'age. Le calcium, la vitamine D et l'exercice physiques sont essentiels a leur solidite.|6
+peau|Un organe qui protege le corps des infections, du soleil et des blessures. Elle a une'epaisseur, une elasticite et une couleur qui varient, et se nourrit en partie de la vitamine D produite par le soleil.|6
+os et calcium|Les os constituent une reserve de calcium, liberee selon les besoins de l'organisme. Une alimentation riche en calcium et une exposition reguliere au soleil pour la vitamine D permettent de maintenir une densite osseuse correcte.|6
+personnalite|L'ensemble des traits de caractere relativement stables qui distinguent une personne et guident ses reactions. Le modele des cinq grands facteurs, OCEAN, en decrit cinq dimensions : extraversion, agreabilite, conscience, neuroticisme et ouverture.|7
+humeur|La disposition affective d'une personne a un moment donne, qui varie dans la journee et selon le contexte. Elle depend du sommeil, de l'alimentation, du stress et des relations sociales, et influence notre facon de penser et d'agir.|7
+optimisme|Une personne qui attend une issue favorable et voit le bon cote des choses. L'optimisme modere aide a perseverer face aux echecs, tandis que l'exc-es de pessimisme conduit a la demotivation.|7
+patience|La capacite a attendre et a supporter un ecart entre l'effort consenti et le resultat obtenu. Elle se travaille, et elle fait souvent la difference entre un travail qui aboutit et un abandon en cours de route.|7
+generosite|Le caractere de quelqu'un qui donne sans attendre de contrepartie, en temps, en argent ou en attention. La generosite peut etre naturelle ou apprise, et elle renforce les liens sociaux dans la plupart des cas.|7
+emotif|Qui est porte par l'emotion et reagit au sentiment avant a la raison. Une personne tres emotionnelle perçoit finement les humeurs des autres, ce qui est un atout relationnel, mais la rend aussi plus vulnerable.|7
+discret|Le fait de ne pas loves parler de ce qui releve de l'intimite d'autrui. La discretion est une qualite sociale majeure, car elle est la base de la confiance entre les personnes qui partagent un espace commun.|7
+solidaire|Le caractere de quelqu'un qui se sent responsable de la situation des autres. La solidarite se manifeste par l'entraide et le soutien, et elle est l'un des fondements de la vie collective.|7
+charisme|La capacite de certains individus a attirer les autres par leur energie, leur voix et leur confiance. Il depend autant des traits de caractere que de la maniere de parler et de se presenter.|7
+travail d'equipe|Une maniere de travailler a plusieurs, ou chacun apporte sa part en vue d'un but commun. Il suppose de la communication, d'une repartition claire des roles et d'une confiance mutuelle, pour l'aboutissement du projet.|5
+honnetete|la qualite de quelqu'un qui dit vrai et ne trompe pas deliberement, meme quand cela l'arrange de ne pas le faire. L'honnetete est une confiance qui se construit lentement et se perd tres vite une fois qu'on la constate.|7
+fierte|Une personne qui tire de la satisfaction de ce qu'elle accomplit. La fierte accompagne les succes et procure un sentiment d'appartenance, et elle s'appuie sur des succes reels et continus, jamais sur une comparaison permanente avec les autres.|7
+peche|Une activite qui consiste a attraper des poissons avec un hamecon et un leurre. Elle se pratique en riviere, en lac ou en mer, et necessite un equipement adapte ainsi qu'un permis obligatoire controle par les gardes de l'eau.|8
+danse|Une forme d'expression corporelle par le mouvement rythme et la musique. Il existe de nombreux styles, contemporain, hip-hop, salsa ou ballet, qui demandent des niveaux de technique et des capacites physiques differents.|8
+peche a la ligne|Une forme de peche sportive qui se distingue de la peche au filet. Elle se pratique depuis la berge ou en bateau et suppose le respect strict des tailles minimales et des periodes de fermeture pour proteger les especes.|8
+sieste|Une courte periode de sommeil ou de repos dans la journee, generalement de vingt a trente minutes. Elle permet de reduire la fatigue accumulee et d'améliorer la vigilance, mais une sieste trop longue ou trop tardive peut perturber le sommeil de la nuit.|8
+patins|Des chaussures munies de roues ou de lames qui permettent de glisser sur un sol. On distingue le patinage sur glace, le roller, le skateboard et le rollerblade. C'est un sport qui travaille l'equilibre, la force des jambes et la coordination.|8
+collection|Une reunion d'objets d'un meme type, comme des livres anciens, des cartes ou des pieces de monnaie. Le collectionneur classe, cherche les specimens rares et apprend a reconnaitre les authentiques des faux.|8
+lecture du soir|Une habitude reguliere de lire avant de dormir, qui peut aider a s'endormir en detendant l'esprit. Elle consiste a choisir un texte calme, non stimulant, et a regler la luminosite pour ne pas troubler la melatonine.|8
+jeu de societe|Un jeu ou l'on joue a plusieurs autour d'un plateau, avec des regles et de l'interaction. Il developpe la logique, la communication et la strategie, et c'est aussi un occasion de lien social, comme un bridge ou un Catan.|8
+raisonnement|Un processus cognitif qui consiste a appliquer des regles logiques a des informations afin d'atteindre une conclusion. Un raisonnement correct part de premises vraies et utilise des inferences valides, et il peut etre inductif, deductif ou par analogie.|9
+intelligence|La capacite d'un etre a comprendre, d'apprendre, de raisonner et de s'adapter a une situation nouvelle. L'intelligence artificielle cherche a reproduire certaines de ces fonctions par des machines, en simulant des processus cognitifs.|9
+apprentissage automatique|Une methode qui consiste a entrainer un modele mathematique sur des donnees, afin qu'il apprenne une regle ou une fonction a partir d'exemples fournis plutot que d'ecrire des regles a la main. On distingue l'apprentissage supervise, non supervise et par renforcement.|9
+resolution de problemes|Le processus par lequel on cherche a resoudre une situation difficile. Il passe generalement par plusieurs etapes : identifier le probleme, explorer des pistes, en tester une, puis evaluer le resultat et ajuster si necessaire.|9
+biais cognitif|Une erreur de raisonnement recurrente et systematique. Le biais de confirmation nous fait chercher les arguments qui confortent nos croyances, le biais d'ancrage nous fait dependre d'une premiere information, et l'effet halo nous fait juger une personne entiere sur un seul trait.|9
+structurer|Une competence du travail intellectuel qui consiste a organiser logiquement des informations, a les hierarchiser et a les relier entre elles. C'est ce qui permet de comprendre un sujet dans son ensemble plutot que comme une somme de details.|9
+apprentissage par l'exemple|La methode la plus ancienne de transmission des connaissances, qui consiste a imiter un modele plutot qu'a suivre une regle. Elle est tres efficace pour l'acquisition des gestes et du langage, et c'est le fondement de l'apprentissage automatique moderne.|9
+charge mentale|Le fait de devoir garder en tete toutes les taches a faire, ce qui est epuisant meme sans effort physique. Elle est plus importante chez les personnes qui portent beaucoup de responsabilites, et elle baisse quand on externalise les taches, par exemple en ecrivant des listes.|5
+rigidite|Une personne rigide a du mal a s'adapter a une situation nouvelle et s'accroche a ses habitudes. La rigidite se mesure par des tests psychologiques, et elle diminue avec l'age et l'entrainement cognitif a la flexibilite.|7
+pixel|La plus petite unite d'une image numerique, un carre de couleur. La definition d'un ecran s'exprime en nombre de pixels, et la qualite depend de leur nombre : plus il y en a, plus l'image est precise.|10
+logiciel|Un ensemble de programmes qui permettent a un ordinateur d'effectuer des taches. On distingue le systeme d'exploitation qui gere le materiel, les logiciels applicatifs comme un navigateur ou un traitement de texte, et les bibliotheques de code reutilisables.|10
+reseau social|Une plateforme en ligne ou des utilisateurs partagent des contenus et echangent entre eux. Elles reposent sur des profils, un fil d'actualite et des relations entre membres, et influencent fortement la circulation de l'information.|10
+chiffrement|Une technique qui transforme des donnees en un format illisible, afin que seules les personnes autorisees puissent y acceder. Le chiffrement symetrique utilise une meme cle pour chiffrer et dechiffrer, l'asymetrique repose sur une paire de cles liees.|10
+cle API|Un identifiant secret qui autorise un programme a acceder a un service en ligne sans passer par une interface web. C'est un acces courant des services web, et elle doit etre gardee secrete : quiconque la possede peut agir en votre nom.|10
+moteur de recherche|Un programme qui classe les pages web selon leur pertinence pour une recherche. Il prend en compte les mots de la requete, la qualite et l'autorite des sites, le comportement des visiteurs et la fraicheur du contenu.|10
+donnees personnelles|Les informations qui permettent d'identifier une personne, comme son nom, son adresse, son numero ou ses habitudes de navigation. Elles sont protegees par la loi, en Europe par le RGPD, qui impose leur consentement et leur suppression possible.|10
+site web|un ensemble de pages et de ressources accessibles par une adresse sur Internet. Un site statique sert des fichiers prets, tandis qu'un site dynamique genere ses pages a la demande, par exemple a partir d'une base de donnees.|10
+python|Un langage de programmation recommande aux debutants pour sa syntaxe claire et son vaste ecosysteme de bibliotheques. Il sert a l'analyse de donnees, au web, a l'intelligence artificielle et a l'automatisation de taches, et son code se lit presque comme de l'anglais.|10
+debusage|la recherche et la correction d'erreurs dans un programme. On procede generalement en reproduisant l'erreur, en isolant la cause, puis en corrigeant et en verifiant avec un test que le bug a disparu.|10
+email|un message electronique envoye et recu par Internet, qui peut contenir du texte, des pieces jointes et des images. Il a remplace le courrier papier pour la rapidite, et s'organise en boite de reception, dossiers et etiquettes.|10
+navigation|le fait de circuler dans Internet en passant d'une page a l'autre par des liens ou des boutons. Un navigateur moderne gere onglets, historique, favoris et bloqueurs de contenu, et traduit la page quand necessaire.|10
+bibliotheque logicielle|un ensemble de fonctions pretes a l'emploi, reutilisables dans un programme sans les ecrire soi-meme. Chaque langage dispose de bibliotheques standard, et il existe des communautes qui en publient des milliers d'autres en libre acces.|10
+meteo|La prevision et l'observation de l'atmosphere : temperature, pluie, vent, nuages. Elle s'obtient par des satellites, des radars et des stations au sol, et influence directement les activites, les transports et les activites de plein air.|11
+transport|Le fait de deplacer des personnes ou des marchandises d'un endroit a un autre. On distingue les transports collectifs, bus, metro et train, les transports individuels, voiture, velo et marche, et le transport de marchandises par route, rail, air ou voie maritime.|11
+matin|La periode du jour qui va du lever du soleil au milieu de la matinee. Elle est souvent la plus productive, et une routine matinale, lever, exercice et petit-dejeuner, permet de commencer la journee sur de bonnes bases.|11
+soiree|La periode de la journee entre la fin d'apres-midi et le coucher. On y dîne, on se detend, on regarde un film ou on recoit des amis. La qualite du sommeil depend en partie des heures qui precedent le coucher.|11
+trier|Le fait de classer des objets ou des documents selon un critere, pour les ranger plus facilement. On commence souvent par eliminer ce qui est inutile, puis on regroupe les objets restants par usage ou par taille.|11
+chauffage|Un appareil qui produit de la chaleur pour rechauffer un logement. Le chauffage central a eau chaude est le plus repandu en France, souvent alimente au gaz naturel ou par une pompe a chaleur electrique, avec des thermostats pour reguler la temperature piece par piece.|11
+isolation|la pose d'une couche isolante sur les murs, le toit et les fenetres, qui reduit les pertes de chaleur et donc la facture. C'est l'un des leviers les plus efficaces pour diminuer la consommation d'energie d'un logement.|11
+eclairage|L'ensemble des dispositifs qui fournissent de la lumiere dans un espace. L'eclairage naturel, par les fenetres, est le plus simple pour le confort et l'economie, et il se complete d'un eclairage artificiel adapte a l'usage : lecture, travail ou simple ambiance.|11
+arrosage|Un acte consistant a donner de l'eau aux plantes d'interieur ou du jardin. La frequence depend de l'espece, de la saison et de la temperature, et un arrosage excessif est plus dangereux qu'un manque d'eau pour la plupart des plantes.|11
+rangement|La disposition ordonnee des objets dans un espace, pour rendre leur acces et leur rangement faciles. La regle d'une place pour chaque chose reduit le temps perdu a chercher un objet dans la maison.|11
+quartier|Le secteur d'une ville ou d'une agglomeration, delimite par des limites administratives ou des reperes urbains. Un quartier se caracterise par son urbanisation, sa population, ses activites et son ambiance, ce qui lui donne une identite propre.|11
+ascenseur|Un appareil qui fait monter et descendre les personnes ou les charges entre plusieurs etages d'un batiment. Il permet de limiter les escaliers, qui restent utiles pour l'exercice et la securite en cas de panne de courant.|11
+contrat de location|Le document qui lie un locataire a un bailleur pour l'usage d'un logement contre un loyer. Il precise le loyer, les charges, la duree du bail, l'etat des lieux et les regles de la vie commune.|5
+impots|Les taxes prelevees par l'Etat ou les collectivites sur les revenus ou la consommation. En France, l'impot sur le revenu est progressif selon les tranches, et chaque annee une declaration resume les revenus de l'annee precedente.|5
+epargne|la constitutions d'un capital en epargnant une partie de ses revenus, au lieu de tout depenser. L'epargne sert a se securiser face aux imprévus, et deplacement, et elle rapporte un interet modeste contre un risque tres faible.|5
+titre de transport|le document qui donne droit a prendre les transports en commun dans une ville ou une region. Il est souvent enregistre sur une carte ou une application, et se renouvelle periodiquement contre paiement.|11
+appartement|Un logement compose de plusieurs pieces, situe dans un immeuble collectif. Il se compose d'un sejour, de chambres, d'une cuisine et d'une salle de bains, et le charges et les parties communes sont partagees avec les autres proprietaires.|11
+biodiversite|La diversite des especes animales et vegetales, et des milieux qui les abritent. C'est un equilibre fragile : la destruction d'un habitat ou l'introduction d'une espece invasive peut la degrader durablement.|12
+environnement|L'ensemble des milieux naturels et des facteurs qui entourent et influencent un etre vivant. La qualite de l'environnement depend directement de nos activites, et sa preservation passe par des gestes individuels et des politiques publiques.|12
+plante|Un etre vivant qui ne peut pas se deplacer et qui produit sa propre nourriture par photosynthese. Les plantes ont besoin de lumiere, d'eau, d'air, de nutriments et d'une temperature adaptee, et elles jouent un role central dans l'ecosysteme.|12
+gaspillage|Le fait de jeter des ressources alors qu'elles pourraient etre consommees ou reusees. Le gaspillage alimentaire est un enjeu majeur : une part importante de la production mondiale est perdue entre le champ et l'assiette, pour des raisons de transport ou de date.|12
+climat et meteo|La meteo decrit l'etat de l'atmosphere a court terme, a quelques jours, tandis que le climat decrit les tendances moyennes sur plusieurs decennies. Un episode de froid est un phenomene meteorologique, et le rechauffement global est un phenomene climatique.|12
+sols|la couche superficielle de la terre ou poussent les plantes et vivent de nombreux organismes. Sa composition, sa structure et sa teneur en eau determinent sa fertilite, et sa degradation par l'erosion ou l'usage intensif est difficile à reverser.|12
+insectes|un groupe d'animaux invertébrés à six pattes, qui représente la plus grande partie de la biodiversite terrestre. Ils jouent des roles essentiels, comme la pollinisation, la decomposition de la matiere organique et le recyclage des nutriments.|12
+forêt tropicale|Une forêt dense et humide équatoriale, où la biodiversité est très élevée et la canopée forme une seule couche continue. Elle abrite une part majeure des espèces terrestres, mais elle disparaît à cause de la déforestation liée à l'agriculture.|12
+renouvelable|Une source d'énergie qui se reconstitue rapidement à l'échelle humaine, comme le solaire, l'éolien, l'hydroélectricité ou le bois. Elle s'oppose aux énergies fossiles, charbon, pétrole et gaz, qui sont épuisables et émettent du CO2.|12

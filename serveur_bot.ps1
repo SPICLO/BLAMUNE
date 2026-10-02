@@ -1527,7 +1527,9 @@ function Extraire-Param([string]$body, [string]$cle) {
 # ---------------- DEMARRAGE ----------------
 if (-not (Test-Path -LiteralPath $ExeBot) -and $Mode -eq "2") {
     Write-Host "ERREUR : bot.exe introuvable dans" $Racine
-    Write-Host "Recompile le bot (g++ -std=c++17 bot.cpp -o bot.exe -lwininet) puis relance."
+    Write-Host "Recompile le bot avec le compilateur MinGW de Dev-C++ installe sur cette machine :"
+    Write-Host '  "C:\Program Files (x86)\Dev-Cpp\MinGW64\bin\g++.exe" -std=c++14 bot.cpp -o bot.exe -lwininet'
+    Write-Host "(-std=c++14 et non c++17 : la version de g++ fournie, 4.9.2, refuse c++17.)"
     Read-Host "Appuie sur Entree pour fermer"
     exit 1
 }
