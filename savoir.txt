@@ -1222,3 +1222,4 @@ sols|la couche superficielle de la terre ou poussent les plantes et vivent de no
 insectes|un groupe d'animaux invertébrés à six pattes, qui représente la plus grande partie de la biodiversite terrestre. Ils jouent des roles essentiels, comme la pollinisation, la decomposition de la matiere organique et le recyclage des nutriments.|12
 forêt tropicale|Une forêt dense et humide équatoriale, où la biodiversité est très élevée et la canopée forme une seule couche continue. Elle abrite une part majeure des espèces terrestres, mais elle disparaît à cause de la déforestation liée à l'agriculture.|12
 renouvelable|Une source d'énergie qui se reconstitue rapidement à l'échelle humaine, comme le solaire, l'éolien, l'hydroélectricité ou le bois. Elle s'oppose aux énergies fossiles, charbon, pétrole et gaz, qui sont épuisables et émettent du CO2.|12
+truc|c est que j aime le kintsugi|11

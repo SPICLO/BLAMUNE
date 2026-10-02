@@ -1069,11 +1069,10 @@ static const Sujet sujets[] = {
     { "je", 0, 0, 0 }, { "tu", 1, 0, 0 }, { "il", 2, 0, 0 },
     { "elle", 2, 1, 0 }, { "on", 2, 0, 0 }, { "nous", 3, 0, 1 },
     { "vous", 4, 0, 1 }, { "ils", 5, 0, 1 }, { "elles", 5, 1, 1 },
-    { "ma mere", 2, 1, 0 }, { "mon pere", 2, 0, 0 }, { "mon frere", 2, 0, 0 },
-    { "ma soeur", 2, 1, 0 }, { "mon mari", 2, 0, 0 }, { "ma femme", 2, 1, 0 },
-    { "mon enfant", 2, 0, 0 }, { "mon bebe", 2, 0, 0 }, { "ma grand-mere", 2, 1, 0 },
-    { "mon oncle", 2, 0, 0 }, { "mon cousin", 2, 0, 0 }, { "mes enfants", 5, 0, 1 },
-    { "le patron", 2, 0, 0 }, { "mon collegue", 2, 0, 0 }, { "le professeur", 2, 0, 0 },
+    // Pas de sujets familiaux ("ma mere", "mes enfants") : le bot dirait avoir
+    // une famille et s'attribuerait une vie qu'il n'a pas.
+    { "le voisin", 2, 0, 0 }, { "le voisin du dessous", 2, 0, 0 },
+    { "le patron", 2, 0, 0 }, { "le collegue", 2, 0, 0 }, { "le professeur", 2, 0, 0 },
     { "le medecin", 2, 0, 0 }, { "le facteur", 2, 0, 0 }, { "le boulanger", 2, 0, 0 },
     { "la caissiere", 2, 1, 0 }, { "le chauffeur de bus", 2, 0, 0 }, { "le plombier", 2, 0, 0 },
     { "la nounou", 2, 1, 0 },
@@ -1567,6 +1566,85 @@ std::string phraseFactuelle(const std::string& nom, const std::string& age,
     return faits[prochainIndice((int)faits.size())];
 }
 
+// Un mot est traite comme "sujet credible" seulement si le bot a une preuve
+// qu'il l'a deja vu dans un contexte reel : une entree de savoir.txt, un mot de
+// vocabulaire.txt, ou un mot que l'utilisateur a employ trois fois.
+//
+// Sans cette verification, extraireTheme() renvoie le mot le plus long qui
+// n'est pas dans sa liste noire, et des mots parasites s'invitent dans les
+// phrases composees : "le soleil regarde les exit", "ma mere est montee a
+// propos de quit" (le theme venait des commandes de fin de session).
+bool motEstSujetConnu(const std::string& mot,
+                      const std::vector<std::string>& cles,
+                      const std::vector<std::string>& vocabulaire,
+                      const std::map<std::string, int>& motsObserves,
+                      const std::string& nom) {
+    if (mot.empty()) return false;
+    std::string m = minuscules(sansAccents(mot));
+    if (m.size() < 3) return false;
+    // Un mot classe NOM mais qui est en realite une forme verbale ("courront",
+    // "sejour") ne convient pas comme sujet : le composeur produirait
+    // "ils courront sejour".
+    if (categoriserMot(mot) == CAT_NOM && m.size() >= 6 &&
+        (m.compare(m.size() - 3, 3, "ent") == 0 ||
+         m.compare(m.size() - 2, 2, "er") == 0 ||
+         m.compare(m.size() - 3, 3, "ant") == 0))
+        return false;
+    // le nom de l'utilisateur est toujours un sujet legitime
+    if (!nom.empty() && m == minuscules(sansAccents(nom))) return true;
+    // 1. connu par le vocabulaire ou par les cles du savoir
+    for (unsigned int i = 0; i < vocabulaire.size(); i++)
+        if (m == minuscules(sansAccents(vocabulaire[i]))) return true;
+    for (unsigned int i = 0; i < cles.size(); i++)
+        if (m == minuscules(sansAccents(cles[i]))) return true;
+    // 2. connu parce que l'utilisateur l'a employ trois fois
+    std::map<std::string, int>::const_iterator it = motsObserves.find(m);
+    if (it != motsObserves.end() && it->second >= 3) return true;
+    return false;
+}
+
+// Un message sans vrai contenu ("kkk lll") ne doit pas devenir un "sujet"
+// memorise : sinon les relances le repete mot pour mot ("Tu m'avais parle de
+// kkk lll"). On exige au moins un mot de 4 lettres connu du vocabulaire ou
+// du savoir, sinon le message ne compte pas comme un sujet.
+bool phraseContientUnSujet(const std::string& msg,
+                           const std::vector<std::string>& cles,
+                           const std::vector<std::string>& vocabulaire) {
+    std::string t = minuscules(sansAccents(msg));
+    std::string mot;
+    for (unsigned int i = 0; i <= t.size(); i++) {
+        char c = (i < t.size()) ? t[i] : ' ';
+        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) mot += c;
+        else {
+            if (mot.size() >= 4) {
+                for (unsigned int j = 0; j < vocabulaire.size(); j++)
+                    if (minuscules(sansAccents(vocabulaire[j])) == mot) return true;
+                for (unsigned int j = 0; j < cles.size(); j++)
+                    if (minuscules(sansAccents(cles[j])) == mot) return true;
+            }
+            mot.clear();
+        }
+    }
+    return false;
+}
+
+// Le bot ne doit pas s'attribuer une vie personnelle : sans ce filtre, un mot
+// de vocabulaire comme "enfant" ou "frere" (present dans vocabulaire.txt)
+// entrait dans le complement COI "a " + mot, et le bot affirmait avoir des
+// enfants ("Le truc c'est que mes enfants rentrent a propos de conduire").
+bool motInterditPourLeBot(const std::string& mot) {
+    static const char* interdits[] = {
+        "enfant", "enfants", "fille", "fils", "frere", "soeur", "sœur", "mere", "mere",
+        "pere", "parent", "parents", "famille", "mari", "femme", "epoux", "époux",
+        "cousin", "cousine", "oncle", "tante", "neveu", "niece", "grandmere",
+        "mamie", "papi", "baby", "ado", "adolescent", 0
+    };
+    std::string m = minuscules(sansAccents(mot));
+    for (int i = 0; interdits[i] != 0; i++)
+        if (m == minuscules(sansAccents(interdits[i]))) return true;
+    return false;
+}
+
 // Assemble une phrase neuve avec le bloc PHRASE. Le COMPLEMENT est construit
 // autour du theme de la phrase de l'utilisateur (cohésion avec ce qu'il dit),
 // ou autour d'un mot deja connu. Quand il n'y a aucun theme exploitable, on
@@ -1581,20 +1659,34 @@ std::string construirePhraseBloc(const std::string& p,
                                  const std::string& genre,
                                  const std::vector<std::string>& cles,
                                  const std::vector<std::string>& vocabulaire,
-                                 const std::map<std::string, int>& motsFavoris) {
+                                 const std::map<std::string, int>& motsFavoris,
+                                  const std::map<std::string, int>& motsObserves) {
     // bloc COMPLEMENT : le theme de la phrase de l'utilisateur, sinon un mot
     // deja connu (vocabulaire, connaissances, mots qu'il emploie souvent) pour
     // que le bot se developpe avec les mots qu'il apprend.
     std::string theme = extraireTheme(p);
+    // Garde-fou de coherence : on n'injecte un mot de l'utilisateur dans une
+    // phrase composee que si le bot a deja ce mot en reference. Sans cela, le
+    // mot le plus long du message (souvent une commande parasite comme
+    // "exit" ou "quit") se retrouve au milieu d'une phrase absurde.
+    if (!theme.empty() && !motEstSujetConnu(theme, cles, vocabulaire, motsObserves, nom))
+        theme = "";
     if (theme.empty()) {
         std::vector<std::string> connus;
         for (unsigned int i = 0; i < vocabulaire.size(); i++)
-            if (!estPetitMot(vocabulaire[i])) connus.push_back(vocabulaire[i]);
+            if (!estPetitMot(vocabulaire[i]) && !motInterditPourLeBot(vocabulaire[i]))
+                connus.push_back(vocabulaire[i]);
         for (unsigned int i = 0; i < cles.size(); i++)
-            if (cles[i].find(' ') == std::string::npos && !estPetitMot(cles[i]))
+            if (cles[i].find(' ') == std::string::npos && !estPetitMot(cles[i]) &&
+                !motInterditPourLeBot(cles[i]))
                 connus.push_back(cles[i]);
         for (std::map<std::string, int>::const_iterator it = motsFavoris.begin(); it != motsFavoris.end(); ++it)
-            if (it->second >= 2 && !estPetitMot(it->first)) connus.push_back(it->first);
+            // 3 occurrences minimum : a 2, le mot vient souvent d'un mot-outil
+            // employe par hasard ("beaucoup", "toujours") et produit des
+            // phrases absurdes ("l'orage achete le beaucoup").
+            if (it->second >= 3 && !estPetitMot(it->first) &&
+                motEstSujetConnu(it->first, cles, vocabulaire, motsObserves, nom))
+                connus.push_back(it->first);
         if (!connus.empty()) theme = connus[prochainIndice((int)connus.size())];
     }
 
@@ -1620,6 +1712,8 @@ std::string construirePhraseBloc(const std::string& p,
     std::vector<std::string> vocabNoms, vocabVerbes, vocabAdj, vocabLieux, vocabTemps, vocabPersonnes;
     for (unsigned int i = 0; i < vocabulaire.size(); i++) {
         if (estPetitMot(vocabulaire[i])) continue;
+        // on ecarte les mots de famille : le bot ne doit pas s'inventer une vie
+        if (motInterditPourLeBot(vocabulaire[i])) continue;
         CategorieMot cat = categoriserMot(vocabulaire[i]);
         switch (cat) {
             case CAT_NOM:      vocabNoms.push_back(vocabulaire[i]); break;
@@ -1656,14 +1750,17 @@ std::string construirePhraseBloc(const std::string& p,
             // COD : integrer le theme comme complement
             int mode = prochainIndice(4);
             if (mode == 0) {
-                complement = theme;
-            } else if (mode == 1) {
-                complement = "le " + theme;
-            } else if (mode == 2) {
-                complement = "la " + theme;
-            } else {
-                complement = "les " + theme;
-            }
+                        complement = theme;
+                    } else if (mode == 1) {
+                        complement = "le " + theme;
+                    } else if (mode == 2) {
+                        complement = "la " + theme;
+                    } else {
+                        // on n'ajoute pas "les" devant un mot deja pluriel ou deja
+                        //article : sinon on obtient "les tete", "les enfants"
+                        bool dejaPluriel = !theme.empty() && theme.size() > 1 && theme[theme.size() - 1] == 's';
+                        complement = dejaPluriel ? theme : ("les " + theme);
+                    }
         }
         else if (v.complementType == 1) {
             // COI : "a" + theme
@@ -2395,12 +2492,21 @@ std::string detecterTypePhrase(const std::string& p) {
         return "comparaison";
 
     // --- CONSEIL / DEMANDE D'AVIS ---
-    if (p.find("je devrais") != std::string::npos || p.find("tu crois que") != std::string::npos ||
-        p.find("tu penses que") != std::string::npos || p.find("qu'est-ce que tu") != std::string::npos ||
-        p.find("tu penses quoi") != std::string::npos || p.find("conseil") != std::string::npos ||
-        p.find("tu me conseilles") != std::string::npos || p.find("t'en penses quoi") != std::string::npos ||
-        p.find("ton avis") != std::string::npos || p.find("tu ferais quoi") != std::string::npos ||
-        p.find("j'hesite entre") != std::string::npos || p.find("j hesite entre") != std::string::npos)
+        // "qu'est-ce que tu penses" existe aussi sans apostrophe ("qu est ce que tu
+        // penses"), forme courante quand l'utilisateur tape vite : sans elle, la
+        // question passait au composeur de phrases et le bot repondait n'importe
+        // quoi ("Reflectir avec son esprit" en guise d'avis).
+        if (p.find("je devrais") != std::string::npos || p.find("tu crois que") != std::string::npos ||
+            p.find("tu penses que") != std::string::npos || p.find("qu'est-ce que tu") != std::string::npos ||
+            p.find("qu est ce que tu") != std::string::npos ||
+            p.find("qu'est ce que tu") != std::string::npos ||
+            p.find("que penses tu") != std::string::npos ||
+            p.find("tu en penses quoi") != std::string::npos ||
+            p.find("t'en penses quoi") != std::string::npos || p.find("t en penses quoi") != std::string::npos ||
+            p.find("tu penses quoi") != std::string::npos || p.find("conseil") != std::string::npos ||
+                    p.find("tu me conseilles") != std::string::npos ||
+                    p.find("ton avis") != std::string::npos || p.find("tu ferais quoi") != std::string::npos ||
+                    p.find("j'hesite entre") != std::string::npos || p.find("j hesite entre") != std::string::npos)
         return "conseil";
 
     // --- DESCRIPTION / EXPLICATION ---
@@ -3101,7 +3207,7 @@ std::string questionCreative(const std::string& dernierSujet) {
         "Si tu pouvais inventer un metier qui n'existe pas, ce serait quoi ?",
         "Si tu etais un animal, tu serais lequel et pourquoi ?",
         "Tu prefererais pouvoir voler ou être invisible ?",
-        "Si tu pouvais dinner avec n'importe qui de l'histoire, qui ?",
+        "Si tu pouvais diner avec n'importe qui de l'histoire, qui ?",
         "C'est quoi le truc le plus bizarre que tu aies mange ?",
         "Si tu pouvais teleporter n'importe ou la, tu irais ou ?",
         "Tu prefererais vivre sans musique ou sans films ?",
@@ -3652,12 +3758,14 @@ std::string facetteVisee(const std::string& p) {
         // Lot "queue" : facettes de conversation. En haut de liste : ce sont
         // des questions de conversation qui priment sur les themes ("que
         // penses tu du travail ?" = demander un avis, pas parler metier).
-        { "blague", "humour" }, { "vanne", "humour" }, { "rire", "humour" },
+        { "blague", "humour" }, { "vanne", "humour" }, { "vannes", "humour" },
+        { "rire", "humour" }, { "rires", "humour" },
         { "relation", "relations" }, { "amitie", "relations" }, { "amis", "relations" },
+        { "ami", "relations" },
         { "famille", "relations" }, { "amour", "relations" }, { "conflit", "relations" },
         { "couple", "relations" }, { "jalousie", "relations" }, { "trahison", "relations" },
         { "proche", "relations" }, { "parent", "relations" },
-        { "emotions", "emotions" }, { "apais", "emotions" }, { "respiration", "emotions" },
+        { "emotions", "emotions" }, { "apaise", "emotions" }, { "respiration", "emotions" },
         { "epuise", "emotions" }, { "dormir", "emotions" },
         { "que penses tu", "opinions" }, { "tu penses quoi", "opinions" },
         { "ton avis", "opinions" }, { "detest", "opinions" }, { "opinions", "opinions" },
@@ -3997,8 +4105,26 @@ int main() {
             std::cout << "Bonjour, je suis ton assistant. Quel est ton nom ? ";
         }
         std::string nomSaisi;
-        std::getline(std::cin, nomSaisi);
-        if (!nomSaisi.empty()) nom = nomSaisi;
+            std::getline(std::cin, nomSaisi);
+            // Un nom est un mot court, sans ponctuation. Sans cette verification, une
+            // phrase tapée par erreur ("le truc c'est que j'aime le kintsugi") devient le
+            // nom de l'utilisateur, et le bot s'adresse ensuite a lui par cette phrase
+            // pendant toute la session.
+            if (!nomSaisi.empty()) {
+                std::string candidat = nettoyerLigne(nomSaisi);
+                bool phrase = candidat.find(' ') != std::string::npos || candidat.size() > 24 ||
+                              candidat.find('?') != std::string::npos ||
+                              candidat.find('!') != std::string::npos;
+                // un nom peut legitimerement contenir un trait d'union ou un point
+                if (phrase) {
+                    std::cout << "Juste ton prenom, ca suffit ? ";
+                    std::getline(std::cin, candidat);
+                    candidat = nettoyerLigne(candidat);
+                }
+                if (!candidat.empty() && candidat.find(' ') == std::string::npos &&
+                    candidat.size() <= 24)
+                    nom = candidat;
+            }
         if (nom.empty() && mode == 2) nom = "BLAMUNE";   // sans nom, on appelle BLAMUNE
         if (nom.empty() && mode != 2) nom = "l'ami";     // sans nom, eviter "Salut  !"
     }
@@ -9163,7 +9289,40 @@ int main() {
                 }
                 // 4. type de phrase : narration, besoin, jugement, etc.
                 std::string typePhrase = detecterTypePhrase(p);
-                if (!typePhrase.empty()) {
+                    // "qu'est-ce que tu penses de moi ?" appelle une reponse sur
+                    // l'utilisateur, pas un avis general. Traite ici parce que c'est
+                    // le seul endroit ou l'on dispose du profil (nom, age, hobby,
+                    // gouts) ; sinon la question tombe dans le composeur de phrases
+                    // et la reponse n'a aucun rapport avec ce qui est demande.
+                    if (p.find("penses de moi") != std::string::npos ||
+                        p.find("pense de moi") != std::string::npos ||
+                        p.find("penses tu de moi") != std::string::npos ||
+                        p.find("tu penses de moi") != std::string::npos ||
+                        p.find("pense de toi") != std::string::npos ||
+                        p.find("penses de toi") != std::string::npos) {
+                        std::vector<std::string> observations;
+                        if (!hobby.empty()) {
+                            observations.push_back("j'aime bien que tu sois passionne par " + hobby);
+                            observations.push_back("tu parles de " + hobby + " avec beaucoup d'enthusiasme");
+                        }
+                        if (!aime.empty())
+                            observations.push_back("tu aimes " + aime + ", c'est agreable a entendre");
+                        if (!age.empty())
+                            observations.push_back("tu as " + age + ", et tu le vis bien");
+                        if (!ville.empty())
+                            observations.push_back("tu vis a " + ville + ", ca donne de l'air a tes histoires");
+                        if (!nom.empty())
+                            observations.push_back("tu donnes l'impression d'etre quelqu'un de sincere");
+                        observations.push_back("tu poses les bonnes questions, c'est agreable");
+                        observations.push_back("j'aime bien echanger avec toi");
+                        observations.push_back("tu sembles quelqu'un de reflexif");
+                        std::string obs = observations[prochainIndice((int)observations.size())];
+                        std::cout << botNom + " : " << obs
+                                  << ". C'est ce que je remarque pour l'instant.\n";
+                        dernierSujet = p;
+                        continue;
+                    }
+                    if (!typePhrase.empty()) {
                     std::string reaction = reponseSelonType(typePhrase, p);
                     if (!reaction.empty()) {
                         std::cout << botNom + " : " << reaction << "\n";
@@ -9558,7 +9717,7 @@ int main() {
                                      "Apprends-la-moi en disant par exemple : \"je t'apprends que X est Y\" !\n";
                     }
                     else if (!extraireTheme(phrase).empty())
-                        std::cout << botNom + " : " << construirePhraseBloc(phrase, nom, age, hobby, aime, aimePas, genre, cles, vocabulaire, motsFavoris) << "\n";
+                        std::cout << botNom + " : " << construirePhraseBloc(phrase, nom, age, hobby, aime, aimePas, genre, cles, vocabulaire, motsFavoris, motsObserves) << "\n";
                     else
                         std::cout << botNom + " : " << inconnu[prochainIndice(3)] << "\n";
                 }
@@ -9663,9 +9822,10 @@ int main() {
                     std::string theme = extraireTheme(phrase);
                     if (!theme.empty() && extraireSujetQuestion(p).empty()) {
                         // L'utilisateur a mentionne un sujet -> construire une phrase autour
-                        std::cout << botNom + " : " << construirePhraseBloc(phrase, nom, age, hobby, aime, aimePas, genre, cles, vocabulaire, motsFavoris) << "\n";
+                        std::cout << botNom + " : " << construirePhraseBloc(phrase, nom, age, hobby, aime, aimePas, genre, cles, vocabulaire, motsFavoris, motsObserves) << "\n";
                     }
-                    else if (!dernierSujet.empty() && dernierSujet != p) {
+                    else if (!dernierSujet.empty() && dernierSujet != p &&
+                             phraseContientUnSujet(dernierSujet, cles, vocabulaire)) {
                         // Relancer sur le dernier sujet discute
                         std::string relancesSujet[3] = {
                             "On parlait de " + dernierSujet + " non ? Continue !",
@@ -9758,7 +9918,7 @@ int main() {
                     if (estQuestionFactuelle(p))
                         std::cout << botNom + " : Je ne connais pas encore la réponse a ca. Apprends-la-moi en disant par exemple : \"je t'apprends que X est Y\" !\n";
                     else if (!extraireTheme(phrase).empty() && prochainIndice(2) == 0)
-                        std::cout << botNom + " : " << construirePhraseBloc(phrase, nom, age, hobby, aime, aimePas, genre, cles, vocabulaire, motsFavoris) << "\n";
+                        std::cout << botNom + " : " << construirePhraseBloc(phrase, nom, age, hobby, aime, aimePas, genre, cles, vocabulaire, motsFavoris, motsObserves) << "\n";
                     else
                         std::cout << botNom + " : Bonne question ! Je n'y avais pas pense.\n";
                     repondu = true;
@@ -9832,9 +9992,10 @@ int main() {
                     // Fallback intelligent : repondre au contenu du message utilisateur
                     std::string theme = extraireTheme(phrase);
                     if (!theme.empty() && extraireSujetQuestion(p).empty()) {
-                        std::cout << botNom + " : " << construirePhraseBloc(phrase, nom, age, hobby, aime, aimePas, genre, cles, vocabulaire, motsFavoris) << "\n";
+                        std::cout << botNom + " : " << construirePhraseBloc(phrase, nom, age, hobby, aime, aimePas, genre, cles, vocabulaire, motsFavoris, motsObserves) << "\n";
                     }
-                    else if (!dernierSujet.empty() && dernierSujet != p) {
+                    else if (!dernierSujet.empty() && dernierSujet != p &&
+                             phraseContientUnSujet(dernierSujet, cles, vocabulaire)) {
                         // Relances sur le sujet en cours. Elles sont volontairement
                         // recyclees au lieu d'etre uniques : l'utilisateur qui
                         // repart sur le meme theme doit sentir que le bot s'en
