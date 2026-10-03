@@ -1590,8 +1590,10 @@ bool motEstSujetConnu(const std::string& mot,
          m.compare(m.size() - 2, 2, "er") == 0 ||
          m.compare(m.size() - 3, 3, "ant") == 0))
         return false;
-    // le nom de l'utilisateur est toujours un sujet legitime
-    if (!nom.empty() && m == minuscules(sansAccents(nom))) return true;
+    // Le nom de l'utilisateur n'est PAS un sujet : l'accepter le faisait
+    // apparaitre au milieu des phrases ("mon telephone avancera karim"),
+    // parce que extraireTheme renvoie le mot le plus long du message.
+    // Le nom a sa place dans les salutations, pas dans un complement.
     // 1. connu par le vocabulaire ou par les cles du savoir
     for (unsigned int i = 0; i < vocabulaire.size(); i++)
         if (m == minuscules(sansAccents(vocabulaire[i]))) return true;
@@ -1645,6 +1647,32 @@ bool motInterditPourLeBot(const std::string& mot) {
     return false;
 }
 
+// Un mot du vocabulaire est-il un infinitif du tableau des verbes ?
+// categoriserMot() se trompe sur les formes irregulieres : "commencer" et
+// "commencait" finissent par une terminaison de nom, donc le composeur les
+// traitait comme des complements ("la montre commencait le curling").
+// On interroge donc la vraie table des verbes, qui fait autorite.
+bool estInfinitifConnu(const std::string& mot) {
+    initialiserVerbes();
+    std::string m = minuscules(sansAccents(mot));
+    if (verbeIndex.find(m) != verbeIndex.end()) return true;
+    // formes conjuguees : on compare la racine avec le debut des infinitifs
+    static const char* fins[] = { "e", "es", "ons", "ez", "ent", "ai", "as",
+                                  "a", "ait", "ais", "ions", "iez", "aient",
+                                  "era", "eront", 0 };
+    for (int f = 0; fins[f]; f++) {
+        std::string suff = fins[f];
+        if (m.size() <= suff.size()) continue;
+        std::string racine = m.substr(0, m.size() - suff.size());
+        for (int t2 = 0; t2 < (int)verbes.size(); t2++) {
+            std::string inf = minuscules(sansAccents(verbes[t2].infinitif));
+            if (inf.size() < racine.size()) continue;
+            if (inf.compare(0, racine.size(), racine) == 0) return true;
+        }
+    }
+    return false;
+}
+
 // Assemble une phrase neuve avec le bloc PHRASE. Le COMPLEMENT est construit
 // autour du theme de la phrase de l'utilisateur (cohésion avec ce qu'il dit),
 // ou autour d'un mot deja connu. Quand il n'y a aucun theme exploitable, on
@@ -1674,7 +1702,9 @@ std::string construirePhraseBloc(const std::string& p,
     if (theme.empty()) {
         std::vector<std::string> connus;
         for (unsigned int i = 0; i < vocabulaire.size(); i++)
-            if (!estPetitMot(vocabulaire[i]) && !motInterditPourLeBot(vocabulaire[i]))
+            if (!estPetitMot(vocabulaire[i]) && !motInterditPourLeBot(vocabulaire[i]) &&
+                categoriserMot(vocabulaire[i]) != CAT_VERBE &&
+                !estInfinitifConnu(vocabulaire[i]))
                 connus.push_back(vocabulaire[i]);
         for (unsigned int i = 0; i < cles.size(); i++)
             if (cles[i].find(' ') == std::string::npos && !estPetitMot(cles[i]) &&
@@ -1715,6 +1745,9 @@ std::string construirePhraseBloc(const std::string& p,
         // on ecarte les mots de famille : le bot ne doit pas s'inventer une vie
         if (motInterditPourLeBot(vocabulaire[i])) continue;
         CategorieMot cat = categoriserMot(vocabulaire[i]);
+        // Un verbe n'a rien a faire dans un complement : "le magasin reste a
+        // propos de gemir" vient de "gemir", classe a tort comme nom.
+        if (cat == CAT_VERBE || estInfinitifConnu(vocabulaire[i])) continue;
         switch (cat) {
             case CAT_NOM:      vocabNoms.push_back(vocabulaire[i]); break;
             case CAT_VERBE:    vocabVerbes.push_back(vocabulaire[i]); break;
@@ -2072,8 +2105,13 @@ void sauvegarderSavoir(const std::vector<std::string>& cles,
 
 // Reecrit tout profil.txt depuis la memoire (une ligne par fait sur l'utilisateur).
 // Remplace l'ancien systeme qui ajoutait une ligne a chaque reponse (fichier infini).
+// Chemin du fichier de profil de l'utilisateur courant (voir cheminUtilisateur
+// pour l'explication). Declaration avancee : sauvegarderProfil est definie
+// bien avant le bloc memoire-par-utilisateur.
+std::string cheminFichierUtilisateur(const std::string& base);
+
 void sauvegarderProfil(const std::map<std::string, std::string>& profil) {
-    std::ofstream f("profil.txt", std::ios::binary);
+    std::ofstream f(cheminFichierUtilisateur("profil.txt").c_str(), std::ios::binary);
     if (!f.is_open()) return;
     for (std::map<std::string, std::string>::const_iterator it = profil.begin(); it != profil.end(); ++it) {
         std::string rep = it->second;
@@ -3924,6 +3962,35 @@ std::string reponsePersonnalite(const std::string& brut) {
     return rep;
 }
 
+// ==== MEMOIRE PAR UTILISATEUR ====
+// Le bot lisait et ecrivait un unique "memoire.txt" a la racine : deux personnes
+// sur le meme PC partageaient le meme profil (prenom, age, gouts), et l'une
+// ecraseait ce que l'autre venait d'apprendre. Le serveur, lui, stocke deja un
+// memoire.txt par utilisateur dans users/<uid>/.
+//
+// On utilise donc l'uid de session (.blamune_session) comme cle. Sans session —
+// mode hors ligne ou invite — on retombe sur le fichier partage historique,
+// pour ne perdre aucune donnee existante.
+static std::string gCheminMemoire = "memoire.txt";
+static std::string gCheminProfil = "profil.txt";
+
+std::string cheminFichierUtilisateur(const std::string& base) {
+    chargerSessionLigne();
+    if (ligneUid.empty()) return base;
+    return "users/" + ligneUid + "/" + base;
+}
+
+void preparerCheminsUtilisateur() {
+    gCheminMemoire = cheminFichierUtilisateur("memoire.txt");
+    gCheminProfil = cheminFichierUtilisateur("profil.txt");
+    if (gCheminMemoire != "memoire.txt") {
+        // cree le dossier du compte s'il n'existe pas encore
+        std::string dossier = "users/" + ligneUid;
+        std::string cmd = "if not exist \"" + dossier + "\" mkdir \"" + dossier + "\"";
+        std::system(cmd.c_str());
+    }
+}
+
 int main() {
     // Sortie non bufferisee : indispensable quand le bot est pilote par un
     // serveur (les reponses et invites doivent arriver immediatement, sans
@@ -4019,8 +4086,17 @@ int main() {
     // Ces mots sont appris quand le mode 1 converse avec les utilisateurs
     chargerVocabulairePartage(cles, reponses, motsClesAppris, vocabulaire);
 
-    // Charger le profil de la personne (memoire.txt)
-    std::ifstream fichier("memoire.txt");
+    // ==== MEMOIRE PAR UTILISATEUR ====
+    // Jusqu'ici le bot lisait et ecrivait un unique "memoire.txt" a la racine :
+    // deux personnes sur le meme PC partageaient le meme profil (prenom, age,
+    // gouts), et l'une ecraseait ce que l'autre venait d'apprendre. Le serveur
+    // stocke deja un memoire.txt par utilisateur dans users/<uid>/.
+    //
+    // On utilise donc l'uid de session (.blamune_session) comme cle. Sans
+    // session — mode hors ligne ou invite — on retombe sur le fichier partage
+    // historique, pour ne perdre aucune donnee existante.
+    preparerCheminsUtilisateur();
+    std::ifstream fichier(gCheminMemoire.c_str());
     if (fichier.is_open()) {
         std::getline(fichier, nom); nom = nettoyerLigne(nom);
         std::getline(fichier, plat); plat = nettoyerLigne(plat);
@@ -4071,7 +4147,7 @@ int main() {
     bool premierTour = nom.empty();
 
     // Charger ce que le mode normal a appris sur l'utilisateur (profil.txt)
-    std::ifstream profilFichier("profil.txt");
+    std::ifstream profilFichier(gCheminProfil.c_str());
     if (profilFichier.is_open()) {
         std::string ligne;
         while (std::getline(profilFichier, ligne)) {
@@ -8166,7 +8242,7 @@ int main() {
                 compte++;
             }
         }
-        std::ofstream sauvegarde("memoire.txt", std::ios::binary);
+        std::ofstream sauvegarde(gCheminMemoire.c_str(), std::ios::binary);
         if (sauvegarde.is_open()) {
             sauvegarde << nom << "\r\n" << plat << "\r\n" << hobby << "\r\n" << motsSauves << "\r\n" << genre
                        << "\r\n" << aime << "\r\n" << aimePas << "\r\n" << age

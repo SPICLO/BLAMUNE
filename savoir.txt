@@ -3,30 +3,30 @@ un robot|signifie une machine automatique
 tokyo|c'est la capitale du japon
 match|Rencontre sportive entre deux équipes ou adversaires.
 but|Action de marquer un point au football ou au hockey.
-course|Action de courir pour aller vite.
-équipe|Groupe de personnes qui jouent ou travaillent ensemble.
-stade|Grand terrain aménagé pour les sports.
-ballon|Objet rond et gonflé qu'on lance ou tape.
-arbitre|Personne qui fait respecter les règles.
-entraîneur|Personne qui prépare et guide les sportifs.
-compétition|Épreuve où on essaie de gagner.
-record|Meilleure performance jamais réalisée.
+course|L'action de courir, c'est-a-dire avancer rapidement en alternant appui et propulsion. En sport, une course est une epreuve de vitesse ou de fond : le 100 metres se gagne sur quelques secondes, le marathon sur des heures.|0
+equipe|Un ensemble de joueurs qui joue en meme temps contre une autre equipe. Le nombre de joueurs varie par sport : onze au football, cinq au basket, quinze au rugby. Les roles sont distribues (attaquant, defenseur, gardien) et chacun specialise.|0
+stade|Installation qui accueille un match, avec une pelouse entouree de piste, des tribunes et des vestiaires. Un stade de foot fait environ 105 metres sur 68. Le plus grand monde est au Camp Nou, a Barcelone, avec pres de 100 000 places.|0
+ballon|Objet rond en cuir ou en synthetique, gonfle par de l'air, qu'on passe au pied, a la main ou a la tete pour marquer un but. Un ballon de foot officiel pese de 410 a 450 grammes pour une circonference de 68 a 70 centimetres, taille 5.|0
+arbitre|Le referees des matchs. Il applique le reglement, signale les fautes, accorde les coups francs et peut avertir ou exclure un joueur. Deux assistants l'entourent sur les grandes competitions, et la video permet de reviser une decision douteuse.|0
+entraineur|Le professionnel qui prepare un sportif ou une equipe : il planifie les seances, regle la charge et suit l'evolution des performances. Son titre exact est/entraineur, et il fait aussi partie du staff medical et administratif.|0
+competition|Une epreuve officielle ou un championnat opposant des concurrents sur une meme tache. Elle peut se jouer en-individuel ou par equipes, et c'est la competition qui fait naitre le niveau.|0
+record|Le meilleur resultat jamais obtenu dans une discipline : le plus rapide, le plus haut, le plus fort. Un record du monde est homologue par la federation qui governe le sport, apres verification du materiel et du chronometrage.|0
 repas|Moment où on mange, généralement trois fois par jour.
 pain|Une preparation de farine, d'eau, de sel et de levure, dont la pate est petrie puis cuite. La levein fait gonfler la pate et lui donne sa texture alveolee. Les principaux types sont le pain blanc, le complet, la baguette et la brioche.|1
-viande|Chair des animaux qu'on consomme.
-légume|Plante potagère qu'on mange.
-fruit|Aliment sucré issu des arbres ou des plantes.
+viande|Les tissus musculeux des animaux consommes comme aliment. Le bœuf, le porc et le poulet couvrent l'essentiel de la consommation mondiale. La viande est une source de proteines et de fer, mais aussi de graisses saturées.|1
+legume|Un vegetal comestible autre qu'un fruit : carotte, tomate, pomme de terre, chou. Un regime equilibre en compte environ cinq par jour. Les legumes apportent des fibres, des vitamines et des mineraux, tres peu de calories.|1
+fruit|La partie comestible d'une plante qui porte les graines. Riche en eau, en sucres et en vitamines, un fruit apporte environ 50 a 100 kcal pour 100 grammes, moins qu'un Gateau mais souvent plus de sucre par piece.|1
 cafe|Une boisson obtenue en infusant des graines de cafe torrefiees dans de l'eau chaude. Un espresso est plus court et plus concentre qu'un cafe allonge, et un filtre laisse passer l'eau a travers un papier. La cafeine stimule le systeme nerveux central.|1
 fromage|Un aliment obtenu en faisant cailler le lait, puis en pressant et en affinage. Le gout, la texture et l'odeur dependent du lait utilise, du temps d'affinage et de la methode. La mention AOP ou AOC certifie son origine geographique.|1
 chocolat|Un dessert obtenu a partir du cacao, dont les feves sont torrefiees, concassees puis broyees en poudre. Avec du sucre, du lait et parfois du beurre, il donne un produit dont la teneur en cacao, de 30 a 90 pour cent, determine l'amertume.|1
-cuisine|Pièce où on prépare les repas.
+cuisine|Preparer des aliments pour les rendre consommables. On distingue les techniques de base — faire revenir, mijoter,.-- et l'art du knife. Un plat succes depend moins de la recette que de la maitrise de la cuisson.|1
 recette|Liste des ingrédients et instructions pour cuisiner.
 valise|Un contenant souple ou rigide pour transporter des vetements et des effets. Une valise cabine respecte les limites de la compagnie, generalement un format de 55 centimètres de long au maximum.|2
 avion|Un transport aerien qui deplace des passagers ou du fret entre deux aeroports. La cabine est pressurisee pour preserver la sante a l'altitude, et l'equipage navigue a l'aide d'instruments ou de satellites.|2
 hotel|Un etablissement qui loue des chambres pour une ou plusieurs nuits, avec un service de reception, un petit-dejeuner et souvent un reseau wifi. On le classe par nombre d'etoiles, qui refletent le niveau de confort et de service.|2
-plage|Bord de mer ou de lac avec du sable.
+plage|Une étendue de sable ou de galets au bord de l'eau. On y trouve le sablesec, le `\"` galet, les Recreations et les Comparable. Les plages surveillées sont reconnaissables à leur drapeau bleu, qui signale un espace classé et surveillé.|2
 montagne|Une elevation de terrain de plusieurs centaines de metres de denivele, au-dessus de la limite des arbres. On y pratique la randonnee, l'escalade, le ski en hiver, mais l'air y est plus rare et la temperature plus basse.|2
-carte|Plan géographique pour s'orienter.
+carte|Une représentation plane d'un territoire, qui montre les routes, les villes et les reliefs. La carte topographique indique les courbes de niveau, la carte de l'IGN la navigation, et la carte routière les temps de parcours.|2
 pays|Territoire délimité par des frontières.
 voyager|Se déplacer d'un endroit à un autre.
 touriste|Personne qui visite un lieu pour le plaisir.
@@ -120,7 +120,7 @@ année|Période de 365 jours.
 soleil|Étoile qui éclaire la Terre.
 lune|Satellite naturel de la Terre.
 étoile|Corps céleste lumineux.
-ciel|Espace au-dessus de nos têtes.
+ciel|L'espace atmospherique visible quand on leve les yeux. Il change de couleur selon le temps et l'heure : bleu le jour, rouge au lever et au coucher. Le ciel couvre la terre entière et ne s'arrête pas à l'horizon, le\"`"` c'est un effet de perspective.|12
 terre|Planète où nous vivons.
 eau|Liquide transparent et vital.
 feu|Flamme qui produit chaleur et lumière.
@@ -229,8 +229,8 @@ restaurant|Un etablissement qui sert des repas sur place ou a emporter. On y tro
 nourriture|Ce qu'on mange pour se nourrir.
 lait|Liquide blanc produit par les animaux.
 poisson|Animal aquatique.
-sucre|Aliment sucré.
-sel|Substance pour relever le goût.
+sucre|Un glucide au goût sucré, extrait principalement de la canne à sucre et de la betterave. Il est présent dans presque tous les aliments préparés. L'OMS recommande de limiter les sucres libres à moins de 10 % des apports énergétiques quotidiens.|1
+sel|Chlorure de sodium, assaisissant et conservateur. Le corps en a besoin en petite quantité, mais la consommation moyenne en Europe est d'environ 9 g par jour, soit le double des recommandations. Un excès augmente le risque d'hypertension artérielle.|1
 thé|Boisson chaude à base de feuilles.
 bière|Boisson alcoolisée.
 vin|Boisson fermentée à base de raisin.
@@ -260,7 +260,7 @@ nature|Ensemble du monde sans l'homme.
 animal|Un etre vivant qui se nourrit d'autres etres vivants, qui se deplace et qui percoit son environnement. Les animaux jouent un role essentiel dans l'equilibre des ecosystemes, comme predateurs, proies, decomposeurs ou pollinisateurs.|12
 arbre|Une plante ligneuse qui pousse verticalement et se ramifie, avec un tronc et des branches. Il produit de l'oxygene, abrite des especes, retient le sol contre l'erosion et absorbe le CO2. Il a besoin d'eau, de lumiere et d'une terre riche.|12
 fleur|Partie colorée des plantes.
-mer|Grande étendue d'eau salée.
+mer|Une grande étendue d'eau salée, moins vaste que l'océan. Les mers sont bordees de cotes et souvent peu profondes, contrairement aux oceans. La Mediterranee, la mer du Nord et la mer Noire sont parmi les principales mers europeennes.|12
 printemps|Saison des fleurs.
 été|Saison chaude.
 automne|Saison des feuilles mortes.
@@ -661,7 +661,7 @@ amateur|Personne qui pratique un sport sans en faire son métier.|0
 professionnel|Sportif qui vit de son sport.|0
 club|Association sportive.|0
 champion|Vainqueur d'une compétition.|0
-médaille|Récompense métallique pour un podium.|0
+medaille|Une recompense en metal attribuee aux trois premiers d'une competition. Elle existe en or, argent et bronze, selon la place, et le nombre d'editions moderne est de trois tous les quatre ans depuis 1900.|0
 podium|Estrade où montent les gagnants.|0
 hymne|Chanson jouée pour honorer un pays.|0
 drapeau|Symbole d'un pays brandi lors des compétitions.|0
@@ -699,12 +699,12 @@ buffet|Présentation de plats à disposition.|1
 menu|Liste des plats proposés.|1
 entrée|Premier plat du repas.|1
 plat principal|Plat central du repas.|1
-dessert|Plat sucré en fin de repas.|1
+dessert|Un plat sucre servi a la fin du repas. On parle de recette maison, de patisserie, de glace ou d'entremets. C'est le moment le plus agreable du repas, quand tout le monde a une assiette vide et du temps.|1
 yaourt|Lait fermenté.|1
-beurre|Matière grasse issue du lait.|1
+beurre|Un corps gras obtenu en barattant la crème. Le beurre demi-sel, salé à 1,5 %, est utilisé en cuisine française ; le beurre doux, salé à 0,3 %, sert surtout en pâtisserie. Il distingue notamment une béchamel d'une sauce au beurre.|1
 crème|Produit laitier épais.|1
-oeuf|Aliment issu de la poule.|1
-farine|Poudre obtenue à partir de céréales.|1
+oeuf|Un aliment de la ponte des oiseaux, composé d'un blanc riche en protéines et d'un jaune riche en lipides. Un œuf moyen pèse environ 50 g et apporte 70 kcal. Il se conserve plusieurs semaines au réfrigérateur.|1
+farine|Une poudre de blé ou d'une autre céréale obtenue par mouture. La farine de blé T65 convient aux pains et aux `\"` pâtes, la T55 aux `\"` pâtisseries. Plus le type est élevé, plus la farine est blanche et légère.|1
 levure|Agent qui fait gonfler la pâte.|1
 miel|Substance sucrée produite par les abeilles.|1
 destination|Lieu où l'on se rend.|2
@@ -1223,3 +1223,12 @@ insectes|un groupe d'animaux invertébrés à six pattes, qui représente la plu
 forêt tropicale|Une forêt dense et humide équatoriale, où la biodiversité est très élevée et la canopée forme une seule couche continue. Elle abrite une part majeure des espèces terrestres, mais elle disparaît à cause de la déforestation liée à l'agriculture.|12
 renouvelable|Une source d'énergie qui se reconstitue rapidement à l'échelle humaine, comme le solaire, l'éolien, l'hydroélectricité ou le bois. Elle s'oppose aux énergies fossiles, charbon, pétrole et gaz, qui sont épuisables et émettent du CO2.|12
 truc|c est que j aime le kintsugi|11
+coupe|Une epreuve qui oppose des joueurs ou des equipes issus de tournois differents, jusqu'a la finale. La plus celebre est la Coupe du monde de football, tous les quatre ans depuis 1930, que detient l'Argentine avec cinq titres.|0
+arbitrage|L'action de juger une competition en appliquant le reglement. L'arbitre central dirige la rencontre, ses assistants jugent les lignes et touche, et depuis 2012 la video permet de reviser les decisions sur l'image.|0
+plat|Une preparation deatoire et servie comme repas. On parle de plat principal, d'entree, de dessert ou d'accompagnement. Le plat du jour est servi dans les restaurants, et change generalement chaque semaine.|1
+viande blanche|Le poulet, la dinde, le veau et le porc sont appeles viandes blanches par opposition au bœuf et au gibier, dits viandes rouges. La différence tient surtout à la teneur en myoglobine et en graisses du muscle.|1
+huile|Matière grasse liquide extraite de graines ou de fruits. L'huile d'olive est riche en acides gras insaturés, celle de palme en graisses saturées. Le point de fumée et le mode d'extraction déterminent la qualité nutritionnelle et gustative.|1
+carteigographique|Une representation plane d'un territoire qui distingue les routes, les villes et les reliefs. Une carte topographique montre le relief par des courbes de niveau, et une carte de l'IGN indique les itinéraires routiers.|2
+volcan|Une montagne qui rejette de la lave, des cendres et des gaz. Sous la surface, le magma monte par des fissures et sort en éruption. Il existe environ 1500 volcans actifs dans le monde, dont une Forms partie se trouve sous les océans.|12
+orage|Un phénomène électrique atmosphérique accompagné de tonnerre, le plus souvent lié à un orage d'été. Un éclair peut atteindre 200 °C, et le risque principal pour l'humain est la foudre, pas la pluie. Un orage peut aussi donner la grêle et les Rafales de vent.|12
+rivière|Un cours d'eau d'eau douce qui coule de la source vers la mer, dans une vallée. Sa largeur varie de quelques mètres à plusieurs centaines, et son débit change avec la saison et les pluies en amont.|12
