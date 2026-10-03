@@ -5,7 +5,29 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: node server.js
+    # PAS DE DISQUE PERSISTANT ICI, et c'est volontaire.
+    # Render reserve les disques persistants aux plans payants (~0,25 $/Go/mois)
+    # : declarer un bloc "disk:" ici ferait echouer le deploiement en plan free.
+    #
+    # La persistance est assuree par JSONBin (storage.js) : chaque ecriture est
+    # poussee dans le cloud ~3 s plus tard, et le serveur restaure tout au
+    # demarrage. Le disque local de Render est ephemere, ce qui n'a donc aucune
+    # consequence tant que JSONBIN_API_KEY est definie.
     envVars:
+      # ---------- Persistance (OBLIGATOIRE) ----------
+      # Sans JSONBIN_API_KEY, storage.js ne sauvegarde rien : comptes, memoires,
+      # historiques ET le savoir appris sont perdus a chaque redeloiement.
+      # A definir dans le dashboard Render (jamais dans le depot).
+      - key: JSONBIN_API_KEY
+        sync: false
+      # Fige le bin utilise. Fortement recommande : sans lui, le serveur
+      # retrouve le bin a chaque demarrage en fouillant le compte, ce qui
+      # consomme des requetes et peut rater si plusieurs bins existent.
+      - key: JSONBIN_BIN_ID
+        sync: false
+      # ---------- Reponse IA en ligne (optionnel) ----------
+      # Le bot fonctionne a 100 % en local : ces variables ne servent que si
+      # tu relies le mode 1 a une API. Voir KEEPALIVE.md.
       - key: API_KEY
         sync: false
       - key: API_PROVIDER
