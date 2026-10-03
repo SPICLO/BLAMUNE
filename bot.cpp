@@ -697,10 +697,15 @@ bool motsProches(const std::string& motBrut, const std::string& cibleBrute) {
     // Les mots tres differents en longueur ne matchent pas
     if (maxLen > minLen * 2) return false;
 
+    // Tolerance aux fautes. Elle doit rattraper une lettre manquee ou en trop,
+    // sans confondre deux mots reels distincts : a 1 lettre pour les mots de
+    // 5-6 lettres, "desert" matchait "dessert" et le bot repondait une recette
+    // quand on lui demandait un desert. On exige desormais 8 lettres minimum
+    // pour beneficier de la tolerance.
     int seuil;
-    if (minLen <= 4) seuil = 0;
-    else if (minLen <= 6) seuil = 1;
-    else if (minLen <= 9) seuil = 2;
+    if (minLen <= 7) seuil = 0;
+    else if (minLen <= 9) seuil = 1;
+    else if (minLen <= 12) seuil = 2;
     else seuil = 3;
 
     // Distance standard
@@ -791,9 +796,15 @@ bool reponseProche(const std::string& phrase, const std::string& correcte) {
         for (unsigned int w = 0; w < motsP.size(); w++) {
             if (motsP[w].size() < 3) continue;
             if (motsP[w] == motsC[k]) return true;
+            // Seuil de tolerance aux fautes. A 1 seule lettre pour les mots
+            // courts, "desert" (6 lettres) matchait "dessert" (7) et le bot
+            // repondait une recette a la place d'un desert. On n'accorde le
+            // benefice du doute qu'au-dela de 7 lettres, ou 2 lettres quand le
+            // mot est long, ce qui suffit a rattraper les fautes courantes
+            // sans confondre deux mots reels distincts.
             int minLen = std::min(motsP[w].size(), motsC[k].size());
-            int seuil = (minLen >= 7) ? 2 : 1;
-            if (distanceEdit(motsP[w], motsC[k]) <= seuil) return true;
+            int seuil = (minLen >= 8) ? 2 : 0;
+            if (seuil > 0 && distanceEdit(motsP[w], motsC[k]) <= seuil) return true;
         }
     }
     return false;
@@ -1471,6 +1482,11 @@ std::string extraireTheme(const std::string& p) {
         "toutes", "rien", "chose", "quelque", "moi", "toi", "oui", "non",
         "pourquoi", "comment", "quand", "quel", "quelle", "quels", "quelles",
         "combien", "lequel", "laquelle", "lesquels", "lesquelles", "quoi",
+        // mots-outils de question : ils ne veulent rien dire comme sujet et
+        // le bot les retenait comme mot-cle ("je le retiens comme mot-cle
+        // du sujet nature" apres "c'est quoi la lune").
+        "c'est", "c est", "quoi", "quel", "quelle", "quels", "quelles",
+        "dis", "dis-moi", "dit", "dire", "sais", "sait", "savoir",
         // formes verbales du present les plus frequentes : ce sont des verbes
         // conjugues, pas des themes ("en apprendre plus sur ecoutes" est faux)
         "beaucoup", "toujours", "jamais", "souvent", "apres", "avant",
@@ -2076,6 +2092,13 @@ bool estMotCourant(const std::string& mot) {
         "encore", "meme", "vraiment", "beaucoup", "quelque", "chaque",
         "plusieurs", "celui", "celle", "ceux", "celles", "non", "oui",
         "ouais", "nan", "pas", "est", "etre", "avoir", "faire",
+        // mots-outils de question : ils ne designent aucun sujet. Sans eux,
+        // "c'est quoi la lune" repetait 3 fois suffisait a faire entrer
+        // "quoi" dans le vocabulaire du bot comme mot-cle du sujet nature.
+        "quoi", "quel", "quelle", "quels", "quelles", "qui", "que",
+        "ou", "ce", "cet", "cette", "ces", "son", "ta", "tes", "mon",
+        "dis", "dit", "dire", "sais", "sait", "savoir", "veux", "peux",
+        "veux", "peux", "dois", "fais", "fait", "vais", "vas", "dit",
         0
     };
     for (int i = 0; courants[i] != 0; i++) {
