@@ -71,6 +71,28 @@ npm start
 
 Le serveur ecoute sur `http://localhost:8080` (ou `PORT`). Au demarrage, il charge automatiquement le fichier `.env` (sauf lorsque `NODE_ENV=test`).
 
+## Construire le bot C++
+
+Le bot local est recompile depuis `bot.cpp` avec :
+
+```powershell
+.\build_bot.ps1
+```
+
+ou depuis l'invite de commandes :
+
+```cmd
+build_bot.bat
+```
+
+Cela appelle :
+
+```powershell
+g++ -std=c++14 bot.cpp -o bot.exe -lwininet
+```
+
+Le projet utilise C++14 car la version MinGW de Dev-C++ ne supporte pas C++17.
+
 ## Configuration de l'IA
 
 Le bot fonctionne **sans cle**. Pour activer la conversation intelligente :
