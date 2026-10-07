@@ -31,4 +31,5 @@ versions antérieures sont visibles dans `git log`.
 ### Corrigé
 - `themes.txt` / `themes_manquants.txt` (sorties générées, ~7 Mo) désormais ignorés par git.
 - Suppression des fichiers parasites : `config.json.placeholder`, `curl_out.txt`, `curl_output.txt`, `serveur_errors.log`.
+- Nettoyage des artefacts temporaires (`_g*.txt`, `_grep_perso.txt`, `fichiers_cpp.txt`, `signatures_cpp.txt`).
 - Contrôle admin factorisé (`isAdminUid`) et paramétrable par l'environnement.

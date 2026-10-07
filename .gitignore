@@ -37,3 +37,10 @@ themes_manquants.txt
 serveur_errors.log
 curl_out.txt
 curl_output.txt
+
+# --- Recherches / exports temporaires ---
+_g*.txt
+_grep_perso.txt
+fichiers_cpp.txt
+signatures_cpp.txt
+
