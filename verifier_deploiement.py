@@ -11,7 +11,7 @@ Controle ce qui peut casser un deploiement gratuit :
 """
 import os, re, subprocess, json, sys
 
-P = r"C:\Users\BENECHE\OneDrive\Documents\PROJET"
+P = os.path.dirname(os.path.abspath(__file__))
 os.chdir(P)
 ok = True
 
