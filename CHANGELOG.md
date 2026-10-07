@@ -14,10 +14,11 @@ versions antérieures sont visibles dans `git log`.
   Ollama, LM Studio, vLLM, Mistral, DeepSeek) en plus de Gemini.
 - Variables `ADMIN_PSEUDO` / `ADMIN_UID` pour ne plus coder en dur le pseudo admin.
 - `.editorconfig`, `.nvmrc`, `.prettierrc.json`, `eslint.config.mjs`.
-- Intégration continue : `.github/workflows/ci.yml`.
+- Intégration continue : `.github/workflows/ci.yml`, avec ESLint inclus.
 - Conteneurisation : `Dockerfile`, `.dockerignore`.
 - Tests unitaires `tests/unit.test.js` (runner natif `node:test`) et script `npm run test:unit`.
 - Icônes PWA complètes : `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `favicon.ico`.
+- ESLint maintenant installé en dépendance de développement et exécuté par `npm run lint`.
 
 ### Modifié
 - `config.json.example` : modèle aligné sur le défaut du serveur (`gemini-3.5-flash`).

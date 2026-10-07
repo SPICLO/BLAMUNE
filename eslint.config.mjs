@@ -19,7 +19,7 @@ export default [
       'no-const-assign': 'error',
       'no-dupe-keys': 'error',
       'no-redeclare': 'error',
-      'no-unused-vars': ['warn', { args: 'none' }]
+      'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none' }]
     }
   },
   {
@@ -31,7 +31,10 @@ export default [
         window: 'readonly', document: 'readonly', navigator: 'readonly',
         localStorage: 'readonly', fetch: 'readonly', self: 'readonly',
         caches: 'readonly', location: 'readonly', EventSource: 'readonly',
-        requestAnimationFrame: 'readonly'
+        requestAnimationFrame: 'readonly', AbortController: 'readonly',
+        TextDecoder: 'readonly', FileReader: 'readonly', Image: 'readonly',
+        SpeechSynthesisUtterance: 'readonly', Response: 'readonly',
+        URL: 'readonly', Headers: 'readonly', FormData: 'readonly'
       }
     }
   },
