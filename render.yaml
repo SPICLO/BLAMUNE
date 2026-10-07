@@ -36,4 +36,24 @@ services:
         value: gemini-3.5-flash
       - key: API_URL
         value: https://generativelanguage.googleapis.com/v1beta
+      # ---------- Reglages optionnels (defauts sains, a ajuster si besoin) ----------
+      # Limites anti-abus (requetes par minute).
+      - key: RATE_SEND_IP
+        value: 30
+      - key: RATE_SEND_UID
+        value: 20
+      # Attente max apres un "quota sature" (ms).
+      - key: QUOTA_ATTENTE_MAX_MS
+        value: 70000
+      - key: QUOTA_ATTENTE_MSG_MS
+        value: 10000
+      # Extraction des faits par le modele (0 = regex seules).
+      - key: MEMOIRE_EXTRACTION
+        value: 1
+      # Recherche web (0 = desactivee).
+      - key: RECHERCHE_WEB
+        value: 1
+      # Pseudo du compte admin (defaut : admin).
+      - key: ADMIN_PSEUDO
+        value: admin
     healthCheckPath: /ping

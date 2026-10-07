@@ -99,9 +99,25 @@ let config = {
 // ("no longer available to new users") : on le remplace par 3.8-flash.
 const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.7-flash'];
 
+// Fournisseurs "compatibles OpenAI" : ils exposent POST {base}/chat/completions
+// avec le meme format de messages que l'API OpenAI. Brancher Groq, OpenRouter,
+// Ollama, LM Studio, vLLM, Mistral ou DeepSeek ne demande alors aucun code :
+// il suffit de regler API_PROVIDER / API_URL / API_MODEL.
+const PROVIDERS_OPENAI = ['openai', 'groq', 'openrouter', 'ollama', 'lmstudio',
+  'vllm', 'together', 'mistral', 'deepseek', 'perplexity'];
+function providerOpenAI() {
+  return PROVIDERS_OPENAI.indexOf(String(config.api_provider || '').toLowerCase()) >= 0;
+}
+
+// Modeles de secours du mode compatible OpenAI (API_MODELS, separes par virgule).
+const OPENAI_FALLBACK_MODELS = String(process.env.API_MODELS || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+
 // Tous les modeles utilisables, du principal au fallback.
+// La liste de secours depend du fournisseur (Gemini vs compatible OpenAI).
 function modelesConnus() {
-  return [config.api_model, ...FALLBACK_MODELS.filter(m => m !== config.api_model)];
+  const secours = providerOpenAI() ? OPENAI_FALLBACK_MODELS : FALLBACK_MODELS;
+  return [config.api_model, ...secours.filter(m => m !== config.api_model)];
 }
 
 // Dernier modele qui a repondu. Le gaspillage avant : chaque requete
@@ -1252,6 +1268,9 @@ function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion, avecOutilsDe
 // quotas, on attend le rechargement de la fenetre gratuite puis on reessaie
 // une fois plutot que de rendre la main sur "probleme technique".
 async function appelerGemini(message, histo, onDelta, imageParts) {
+  // Fournisseur compatible OpenAI : on delegue (le reste du fichier reste
+  // centre sur le format Gemini historique).
+  if (providerOpenAI()) return appelerOpenAI(message, histo, onDelta, imageParts);
   const contents = construireContenus(limiterHisto(histo, HISTO_API_MAX), imageParts);
   const modeles = ordreModeles();
   let derniereErreur = null;
@@ -1329,6 +1348,139 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
   const echec = derniereErreur ? derniereErreur.message : 'Tous les modeles Gemini ont echoue';
   alerter(estQuota(derniereErreur) ? 'quota' : 'technique', echec);
   throw new Error(echec);
+}
+
+// ==================== FOURNISSEURS COMPATIBLES OPENAI ====================
+// Format "chat/completions" ({ base }/chat/completions) : meme corps et meme
+// reponse que l'API OpenAI. Couvre Groq, OpenRouter, Ollama, LM Studio, etc.
+function baseOpenAI() {
+  let u = String(config.api_url || '').trim().replace(/\/+$/, '');
+  if (!u) return 'https://api.openai.com/v1';
+  return u.replace(/\/chat\/completions$/i, '');
+}
+
+function optionsOpenAI() {
+  const headers = { 'Content-Type': 'application/json' };
+  // Ollama en local n'exige pas de cle : on n'envoie pas d'en-tete vide.
+  if (config.api_key) headers['Authorization'] = 'Bearer ' + config.api_key;
+  return { method: 'POST', headers, timeout: 30000 };
+}
+
+function construireMessages(histo, imageParts) {
+  const messages = [];
+  for (const h of histo) {
+    if (!h || !h.content) continue; // system vide du mode normal BLAMUNE
+    const role = h.role === 'assistant' ? 'assistant'
+      : (h.role === 'system' ? 'system' : 'user');
+    messages.push({ role, content: h.content });
+  }
+  if (imageParts) {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        messages[i] = { role: 'user', content: [
+          { type: 'text', text: messages[i].content || '(photo)' },
+          { type: 'image_url', image_url: { url: 'data:' + imageParts.mime_type + ';base64,' + imageParts.data } }
+        ] };
+        break;
+      }
+    }
+  }
+  return messages;
+}
+
+// Un appel unique. onDelta optionnel : fourni = reponse en flux (SSE).
+function openAIRequete(modele, messages, onDelta) {
+  const url = baseOpenAI() + '/chat/completions';
+  const enFlux = typeof onDelta === 'function';
+  const corps = JSON.stringify({
+    model: modele, messages,
+    max_tokens: config.api_max_tokens,
+    temperature: config.api_temperature,
+    stream: enFlux
+  });
+  return new Promise((resolve, reject) => {
+    const req = requeter(url, optionsOpenAI(), (res) => {
+      if (res.statusCode !== 200) {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => {
+          const err = new Error('HTTP ' + res.statusCode + ' ' + data.substring(0, 200));
+          err.statusCode = res.statusCode;
+          reject(err);
+        });
+        res.resume();
+        return;
+      }
+      if (!enFlux) {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(data);
+            if (json.error) throw new Error(json.error.message || 'erreur API');
+            const choix = (json.choices && json.choices[0]) || {};
+            resolve((choix.message && choix.message.content) || choix.text || '');
+          } catch (e) { reject(e); }
+        });
+        return;
+      }
+      let tampon = ''; let texte = ''; let fini = false;
+      res.setEncoding('utf8');
+      res.on('data', morceau => {
+        if (fini) return;
+        tampon += morceau;
+        const lignes = tampon.split('\n');
+        tampon = lignes.pop();
+        for (const ligne of lignes) {
+          if (ligne.substring(0, 5) !== 'data:') continue;
+          const brut = ligne.substring(5).trim();
+          if (!brut || brut === '[DONE]') continue;
+          let json;
+          try { json = JSON.parse(brut); } catch (e) { continue; }
+          if (json.error) { fini = true; reject(new Error(json.error.message || 'erreur API')); return; }
+          const delta = (json.choices && json.choices[0] && json.choices[0].delta) || {};
+          if (delta.content) { texte += delta.content; try { onDelta(texte); } catch (e) {} }
+        }
+      });
+      res.on('end', () => { if (!fini) { fini = true; resolve(texte); } });
+      res.on('error', (e) => { if (!fini) { fini = true; reject(e); } });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+    req.write(corps);
+    req.end();
+  });
+}
+
+// Cascade de modeles pour le mode compatible OpenAI (principal puis secours).
+async function appelerOpenAI(message, histo, onDelta, imageParts) {
+  const messages = construireMessages(limiterHisto(histo, HISTO_API_MAX), imageParts);
+  const modeles = ordreModeles();
+  let derniereErreur = null;
+  for (const modele of modeles) {
+    try {
+      const texte = await openAIRequete(modele, messages, onDelta);
+      if (texte) { memoriserModeleOk(modele); resoudreAlertes(); return texte; }
+      derniereErreur = new Error('Reponse vide');
+    } catch (e) {
+      derniereErreur = e;
+      const delai = delaiIndique(e);
+      if (delai || (e && e.statusCode === 429)) dernierQuota = Date.now();
+      loggerErreur('ia', modele + ' KO: ' + e.message);
+    }
+  }
+  const echec = derniereErreur ? derniereErreur.message : 'Tous les modeles ont echoue';
+  alerter(estQuota(derniereErreur) ? 'quota' : 'technique', echec);
+  throw new Error(echec);
+}
+
+// Question ponctuelle (resume, extraction) : un seul message, sans flux.
+async function questionModele(consigne) {
+  if (providerOpenAI()) {
+    return openAIRequete(modeleActif(), [{ role: 'user', content: consigne }], null);
+  }
+  return modeleClassique(modeleActif(),
+    [{ role: 'user', parts: [{ text: consigne }] }], { n: 1 }, true);
 }
 
 function nettoyerReponse(texte) {
@@ -1985,8 +2137,7 @@ async function majResume(uid, mode) {
       'en francais, 60 mots maximum, sans liste a puces, sans guillemets, sans phrase d\'intro.\n' +
       (anterieur ? 'Resume deja etabli (le completer sans rien perdre d\'important) :\n' + anterieur + '\n\n' : '') +
       'Suite de la conversation :\n' + donnees;
-    const brut = await modeleClassique(modeleActif(),
-      [{ role: 'user', parts: [{ text: consigne }] }], { n: 1 }, true);
+    const brut = await questionModele(consigne);
     const propre = nettoyerReponse(String(brut || '')).trim();
     if (propre && propre !== '...') {
       ecrireResume(uid, mode, { texte: propre, couverts: debut + bout.length });
@@ -2045,8 +2196,7 @@ async function extraireFileExtraction(uid) {
       'Regles : valeur courte (30 caracteres max), sans ponctuation finale ; motsFavoris est un tableau de mots ; ' +
       'si une information est deja connue et identique, ne la repets pas ; si le message ne contient aucun fait, reponds {}.\n' +
       'Deja connu :\n' + (connu.length ? connu.join('\n') : '(rien)') + '\n\nMessage :\n' + lot.join('\n');
-    const brut = await modeleClassique(modeleActif(),
-      [{ role: 'user', parts: [{ text: consigne }] }], { n: 1 }, true);
+    const brut = await questionModele(consigne);
     const texte = String(brut || '').trim();
     const debut = texte.indexOf('{');
     const fin = texte.lastIndexOf('}');
@@ -2109,10 +2259,16 @@ app.get('/health', (req, res) => {
   res.json({ ok: true, timestamp: Date.now(), uptime: process.uptime() });
 });
 
-// Helper: check if user is admin
+// Helper: check if user is admin.
+// ADMIN_PSEUDO (defaut "admin") et, en option, ADMIN_UID pour figer l'uid.
+const ADMIN_PSEUDO = String(process.env.ADMIN_PSEUDO || 'admin').toLowerCase();
+const ADMIN_UID = String(process.env.ADMIN_UID || '');
 function isAdminUid(uid) {
   for (const cle of Object.keys(comptes)) {
-    if (comptes[cle].uid === uid && comptes[cle].pseudo?.toLowerCase() === 'admin') return true;
+    const c = comptes[cle];
+    if (c.uid !== uid) continue;
+    if (ADMIN_UID && c.uid !== ADMIN_UID) return false;
+    return String(c.pseudo || '').toLowerCase() === ADMIN_PSEUDO;
   }
   return false;
 }
@@ -2309,7 +2465,7 @@ app.get('/tous-les-messages', (req, res) => {
   if (!auth.uid) return res.status(401).json({ ok: false, error: 'Non autorise' });
   let isAdmin = false;
   for (const cle of Object.keys(comptes)) {
-    if (comptes[cle].uid === auth.uid && comptes[cle].pseudo?.toLowerCase() === 'admin') {
+    if (isAdminUid(auth.uid)) {
       isAdmin = true; break;
     }
   }
@@ -2830,7 +2986,7 @@ app.get('/stats', (req, res) => {
   if (!auth.uid) return res.status(403).json({ ok: false, message: 'Non autorise' });
   let isAdmin = false;
   for (const cle of Object.keys(comptes)) {
-    if (comptes[cle].uid === auth.uid && comptes[cle].pseudo?.toLowerCase() === 'admin') { isAdmin = true; break; }
+    isAdmin = isAdminUid(auth.uid); break;
   }
   if (!isAdmin) return res.status(403).json({ ok: false, message: 'Non autorise' });
   res.json({

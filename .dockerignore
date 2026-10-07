@@ -1,0 +1,37 @@
+# Rien de tout ceci n'a besoin d'entrer dans l'image Docker.
+node_modules
+npm-debug.log*
+
+.git
+.github
+.gitignore
+
+# Donnees locales / secrets : jamais dans l'image.
+.env
+config.json
+comptes.json
+historique.json
+invites.json
+stats.json
+.protection_hash.json
+.blamune_session
+users/
+backups/
+logs/
+*.log
+
+# Bot local (C++) : non utilise par le serveur Node.
+bot.exe
+bot.cpp
+cloudflared.exe
+*.exe
+*.dll
+
+# Gros fichiers generes.
+themes.txt
+themes_manquants.txt
+curl_out.txt
+curl_output.txt
+*.zip
+*.bak
+*.bak_*
