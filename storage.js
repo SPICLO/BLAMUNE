@@ -14,6 +14,10 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+if (process.env.NODE_ENV !== 'test') {
+  require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true });
+}
+
 const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY || '';
 // Surchageable pour les tests (faux JSONBin local).
 const JSONBIN_API_URL = process.env.JSONBIN_API_URL || 'https://api.jsonbin.io';

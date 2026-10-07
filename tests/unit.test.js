@@ -54,6 +54,13 @@ test('.env.example documente toutes les variables process.env du code', () => {
   assert.deepStrictEqual(manquants, [], 'variables non documentees : ' + manquants.join(', '));
 });
 
+test('configuration locale : .env est pris en compte dans server.js', () => {
+  const code = lire('server.js');
+  const pkg = JSON.parse(lire('package.json'));
+  assert.ok(code.includes("require('dotenv').config"), 'server.js ne charge pas .env');
+  assert.ok(pkg.dependencies?.dotenv, 'dotenv absent de package.json');
+});
+
 test('.gitignore ignore les sorties volumineuses et les secrets', () => {
   const gi = lire('.gitignore');
   for (const f of ['themes.txt', 'themes_manquants.txt', 'node_modules/', 'config.json']) {

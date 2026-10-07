@@ -69,7 +69,7 @@ copy .env.example .env   # puis ajuster si besoin
 npm start
 ```
 
-Le serveur ecoute sur `http://localhost:8080` (ou `PORT`).
+Le serveur ecoute sur `http://localhost:8080` (ou `PORT`). Au demarrage, il charge automatiquement le fichier `.env` (sauf lorsque `NODE_ENV=test`).
 
 ## Configuration de l'IA
 

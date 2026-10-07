@@ -209,6 +209,7 @@ async function main() {
     API_MODEL: 'modele-test',
     API_URL: BASE_MOCK,
     BLAMUNE_DATA_DIR: dataDir,
+    NODE_ENV: 'test',
     // Les limites d'envoi (30/min/IP, 20/min/compte) sont le vrai comportement
     // produit, mais la suite envoie beaucoup en peu de temps : on les leve ici.
     RATE_SEND_IP: '1000',

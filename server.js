@@ -2,6 +2,11 @@ const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+// Charge d'abord l'eventuel fichier .env : il peut modifier process.env
+// avant que storage.js et server.js ne lisent les variables de configuration.
+if (process.env.NODE_ENV !== 'test') {
+  require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true });
+}
 const http = require('http');
 const https = require('https');
 const storage = require('./storage');
