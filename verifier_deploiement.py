@@ -85,6 +85,7 @@ for f in ["server.js", "storage.js", "package.json", "package-lock.json",
           ".prettierrc.json", "eslint.config.mjs", "verifier_deploiement.py",
           ".github/workflows/ci.yml", "tests/unit.test.js",
           "build_bot.ps1", "build_bot.bat",
+          "requirements.txt",
           "site/manifest.json", "site/app.js", "site/sw.js",
           "site/apple-touch-icon.png", "site/favicon.ico",
           "site/icon-192.png", "site/icon-512.png"]:

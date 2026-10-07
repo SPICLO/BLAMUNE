@@ -57,7 +57,7 @@ PROJET/
 
 - **Node.js >= 18** (voir `.nvmrc` : 20).
 - npm.
-- (optionnel) Python 3 pour `verifier_deploiement.py` et les outils `*.py`.
+- (optionnel) Python 3 et `pip install -r requirements.txt` pour les outils `*.py`.
 
 ## Installation
 

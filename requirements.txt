@@ -1,0 +1,6 @@
+# Dependances des outils Python locaux.
+#
+# extraire_savoir.py lit les fichiers parquet avec pyarrow.
+# fusionner_vocabulaire.py et verifier_deploiement.py n'utilisent que la
+# bibliotheque standard de Python.
+pyarrow>=16.0.0
