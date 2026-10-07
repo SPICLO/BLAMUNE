@@ -71,15 +71,22 @@ for root, dirs, files in os.walk(P):
 check("aucune cle API commitee", not trouve)
 
 gitign = open(".gitignore", encoding="utf-8").read()
-for f in ["config.json", "comptes.json", "users/", ".blamune_session", "bot.exe"]:
+for f in ["config.json", "comptes.json", "users/", ".blamune_session", "bot.exe", ".env"]:
     check(f"{f} ignore par git", f in gitign)
 
 section("3. Fichiers necessaires au serveur")
 
 lignes = subprocess.run(["git", "ls-files"], capture_output=True, text=True).stdout.split()
 suivis = set(lignes)
-for f in ["server.js", "storage.js", "package.json", "savoir.txt",
-          "personnalite.txt", "vocabulaire.txt"]:
+for f in ["server.js", "storage.js", "package.json", "package-lock.json",
+          "savoir.txt", "personnalite.txt", "vocabulaire.txt",
+          "README.md", "LICENSE", "CHANGELOG.md", ".env.example",
+          "Dockerfile", ".dockerignore", ".editorconfig", ".nvmrc",
+          ".prettierrc.json", "eslint.config.mjs", "verifier_deploiement.py",
+          ".github/workflows/ci.yml", "tests/unit.test.js",
+          "site/manifest.json", "site/app.js", "site/sw.js",
+          "site/apple-touch-icon.png", "site/favicon.ico",
+          "site/icon-192.png", "site/icon-512.png"]:
     check(f"{f} present et suivi par git",
           os.path.exists(f) and f in suivis)
 
