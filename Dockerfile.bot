@@ -40,4 +40,5 @@ EXPOSE 8090
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD python3 -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8090/health',timeout=4)" || exit 1
 
-CMD ["python3", "bot_service.py", "--bot", "./bot", "--repertoire", ".", "--port", "8090"]
+CMD ["python3", "bot_service.py", "--bot", "./bot", "--repertoire", ".", \
+     "--port", "8090", "--savoir-dossier", "/savoir"]

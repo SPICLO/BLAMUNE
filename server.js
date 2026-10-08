@@ -381,9 +381,15 @@ function enregistrerJetonInvite(uid, jeton) {
 // users/ (memoire, historique, etat, resumes, extractions). Servie en
 // telechargement par /admin/backup, restauree par /admin/restore, et
 // poussee dans le cloud quand JSONBIN_API_KEY est defini.
+// La source de verite du savoir (SQLite) est sauvegardee sous forme de DUMP
+// SQL dans l'entree "savoir.sql" (voir creerSauvegarde) : un fichier SQLite
+// est binaire et la sauvegarde applicative ne manipule que du texte. Le
+// fichier savoir.txt reste dans la liste : c'est l'export lisible par le bot
+// Windows local et par git.
 const FICHIERS_RACINE = ['comptes.json', 'invites.json', 'savoir.txt', 'vocabulaire.txt', 'stats.json'];
+const CLE_SAVOIR_SQL = 'savoir.sql';
 // config.json (cle API) et logs/ ne quittent jamais le serveur.
-const CHEMIN_SAUVEGARDE = /^(comptes\.json|invites\.json|savoir\.txt|vocabulaire\.txt|stats\.json|users\/[A-Za-z0-9_\-]{1,64}\/[A-Za-z0-9_.\-]{1,64})$/;
+const CHEMIN_SAUVEGARDE = /^(comptes\.json|invites\.json|savoir\.sql|savoir\.txt|vocabulaire\.txt|stats\.json|users\/[A-Za-z0-9_\-]{1,64}\/[A-Za-z0-9_.\-]{1,64})$/;
 const TAILLE_MAX_FICHIER = 2 * 1024 * 1024;
 const TAILLE_MAX_TOTALE = 40 * 1024 * 1024;
 
@@ -395,6 +401,8 @@ function creerSauvegarde() {
       if (fs.existsSync(f)) fichiers[nom] = fs.readFileSync(f, 'utf8');
     } catch (e) {}
   }
+  // Source de verite du savoir : dump SQL (texte), pas le fichier binaire.
+  try { fichiers[CLE_SAVOIR_SQL] = savoirDb.exporterSql(); } catch (e) {}
   let total = 0;
   try {
     if (fs.existsSync(USERS_DIR)) {
@@ -440,6 +448,7 @@ function appliquerSauvegarde(snap) {
   const racine = path.resolve(RACINE);
   let ecrits = 0;
   for (const rel of cles) {
+    if (rel === CLE_SAVOIR_SQL) continue;   // dump SQL : applique en base, pas ecrit sur disque
     const abs = path.resolve(racine, rel);
     if (abs.indexOf(racine + path.sep) !== 0) throw new Error('hors racine: ' + rel);
     try {
@@ -448,6 +457,29 @@ function appliquerSauvegarde(snap) {
       ecrits++;
     } catch (e) { throw new Error('ecriture impossible (' + rel + '): ' + e.message); }
   }
+  // Restauration du savoir. Deux cas :
+  //  - le dump SQL est present : c'est la source de verite, on rejoue
+  //    exactement son contenu (les suppressions sont donc appliquees) ;
+  //  - seul savoir.txt est present (sauvegarde ancienne, edition manuelle) :
+  //    on fusionne, pour ne jamais perdre une connaissance.
+  let savoirRestaure = false;
+  if (typeof snap.fichiers[CLE_SAVOIR_SQL] === 'string') {
+    try {
+      const n = savoirDb.importerSql(snap.fichiers[CLE_SAVOIR_SQL]);
+      savoirRestaure = true;
+      console.log('[BLAMUNE] Savoir restaure depuis le dump SQL : ' + n + ' entrees');
+    } catch (e) { loggerErreur('savoir-db', 'import SQL: ' + e.message); }
+  }
+  if (cles.indexOf('savoir.txt') >= 0) {
+    try {
+      const n = savoirDb.importerFichier(path.join(RACINE, 'savoir.txt'));
+      console.log('[BLAMUNE] Savoir : ' + n + ' lignes fusionnees depuis savoir.txt');
+    } catch (e) { loggerErreur('savoir-db', 'reimport: ' + e.message); }
+  }
+  if (savoirRestaure) {
+    exporterSavoir();
+  }
+  if (savoirRestaure || cles.indexOf('savoir.txt') >= 0) chargerSavoirSecours();
   // Rechargement immediat : aucun redemarrage necessaire.
   try { comptes = JSON.parse(fs.readFileSync(COMPTES_PATH, 'utf8')); } catch (e) {}
   invitesJeton = chargerInvites();
@@ -1150,50 +1182,89 @@ function messageTechnique(e) {
   return 'Desole, j\'ai eu un probleme technique. Reessaie.';
 }
 
-// ==================== SAVOIR.TXT : SECOURS QUAND GEMINI EST EN PANNE ========
-// savoir.txt ("cle|reponse" par ligne) est partage avec le bot local bot.exe.
-// Quand le modele est inaccessible (quota sature, coupure, erreur), on cherche
-// la cle dans le message et on repond avec le fichier plutot qu'avec un
-// message d'erreur. Les deux exemplaires possibles sont FUSIONNES (le depot
-// du code d'abord, la copie du dossier de donnees par-dessus : elle gagne),
-// et le fichier est relu automatiquement s'il change pendant la session.
-let savoirSecours = null;
-let savoirSecoursCache = '';
+// ==================== SAVOIR : SECOURS QUAND L'IA EST EN PANNE ====================
+// Source de verite : SQLite (savoir_db.js). Le fichier savoir.txt n'est plus
+// qu'un EXPORT : il sert au bot Windows local, a git et a la sauvegarde
+// JSONBin. On lit donc toujours la base, ce qui evite les pertes de donnees
+//liees aux ecritures concurrentes sur un fichier plat.
+const { SavoirDB, sansAccents: sansAccentsDB } = require('./savoir_db');
+
+const CHEMIN_SAVOIR_DB = path.join(RACINE, 'savoir.db');
+const CHEMIN_SAVOIR_EXPORT = path.join(RACINE, 'savoir.txt');
+// Sur le cloud, un dossier d'export partage (volume Docker) permet au bot C++
+// de lire le meme savoir que le serveur. Sinon tout se passe dans RACINE.
+const DOSSIER_EXPORT_SAVOIR = process.env.SAVOIR_EXPORT_DIR || '';
+const savoirDb = new SavoirDB(RACINE, CHEMIN_SAVOIR_DB);
+
+function exporterSavoir() {
+  try {
+    if (DOSSIER_EXPORT_SAVOIR) {
+      // Volume partage : le bot y lit le savoir le plus recent.
+      savoirDb.exporter(path.join(DOSSIER_EXPORT_SAVOIR, 'savoir.txt'));
+    }
+    if (path.resolve(CHEMIN_SAVOIR_EXPORT) !== path.resolve(
+        DOSSIER_EXPORT_SAVOIR ? path.join(DOSSIER_EXPORT_SAVOIR, 'savoir.txt') : '')) {
+      savoirDb.exporter(CHEMIN_SAVOIR_EXPORT);
+    }
+  } catch (e) {
+    loggerErreur('savoir-db', 'export: ' + e.message);
+  }
+}
+
+// Migration unique : si la base est vide, on importe le fichier livre avec le
+// depot. Les imports ulterieurs (route POST /savoir, apprentissage) passent
+// desormais par la base.
+(function migrerSavoirSiVide() {
+  try {
+    if (savoirDb.total() === 0) {
+      // Deux emplacements possibles : la copie du depot (__dirname) et celle
+      // du dossier de donnees (RACINE). On importe celui du depot en premier.
+      const candidats = [path.join(__dirname, 'savoir.txt'), CHEMIN_SAVOIR_EXPORT];
+      for (const f of candidats) {
+        if (!fs.existsSync(f)) continue;
+        const n = savoirDb.importerFichier(f);
+        if (n > 0) {
+          console.log('[BLAMUNE] Savoir : ' + n + ' entrees importees dans SQLite');
+          break;
+        }
+      }
+    }
+    // L'export savoir.txt doit toujours exister dans le dossier de donnees :
+    // c'est lui que lisent le bot Windows local, git et la sauvegarde JSONBin.
+    // S'il est absent (BLAMUNE_DATA_DIR vide au premier lancement), on le
+    // genere, sinon la sauvegarde ne contiendrait pas le savoir.
+    exporterSavoir();
+  } catch (e) { loggerErreur('savoir-db', 'migration: ' + e.message); }
+})();
+
+// Reflet en memoire du savoir, reconstruit a partir de la base.
+// On garde une Map pour ne pas interroger SQLite a chaque mot d'un message
+// (le parcours de reponse teste beaucoup de cles).
+let savoirSecours = new Map();
 
 function chargerSavoirSecours() {
   try {
-    const vus = [];
-    const fichiers = [];
-    const candidats = [path.join(__dirname, 'savoir.txt'), path.join(RACINE, 'savoir.txt')];
-    for (const f of candidats) {
-      try {
-        const abs = path.resolve(f);
-        if (vus.indexOf(abs) >= 0) continue;
-        const st = fs.statSync(abs);
-        if (!st.isFile()) continue;
-        vus.push(abs);
-        fichiers.push({ f: abs, mtime: st.mtimeMs });
-      } catch (e) {}
-    }
-    const cleCache = fichiers.map(x => x.f + '@' + x.mtime).join('|');
-    if (savoirSecours && cleCache === savoirSecoursCache) return;
     const carte = new Map();
-    for (const info of fichiers) {
-      for (const l of fs.readFileSync(info.f, 'utf8').split('\n')) {
-        const pos = l.indexOf('|');
-        if (pos <= 0) continue;
-        const cle = sansAccents(l.substring(0, pos).trim().toLowerCase());
-        const rep = l.substring(pos + 1).trim();
-        if (cle && rep) carte.set(cle, rep);
-      }
+    for (const e of savoirDb.toutes()) {
+      carte.set(sansAccentsDB(e.cle), e.reponse);
     }
     savoirSecours = carte;
-    savoirSecoursCache = cleCache;
   } catch (e) {
     if (!savoirSecours) savoirSecours = new Map();
   }
 }
 chargerSavoirSecours();
+
+// Apres toute ecriture, on rafraichit le reflet en memoire et on regenere
+// l'export (pour git / bot local), sans bloquer la reponse.
+function savoirEnregistrer(cle, reponse, categorie, source) {
+  const ok = savoirDb.repondre(cle, reponse, categorie);
+  if (ok) {
+    chargerSavoirSecours();
+    exporterSavoir();
+  }
+  return ok;
+}
 
 // La cle est-elle presente comme mot entier ? "un ordi" est dans "c est quoi
 // un ordi", mais "ordi" n'est pas dans "ordinateur" ni "match" dans "matche".
@@ -2449,12 +2520,8 @@ app.get('/admin/data', (req, res) => {
   const messagesLimite = messages.slice(0, 100);
   const savoirTotal = [];
   try {
-    const f = path.join(RACINE, 'savoir.txt');
-    if (fs.existsSync(f)) {
-      fs.readFileSync(f, 'utf8').split('\n').filter(l => l.trim()).forEach(l => {
-        const pos = l.indexOf('|');
-        if (pos >= 0) savoirTotal.push({ topic: l.substring(0, pos).trim(), contenu: l.substring(pos + 1).trim() });
-      });
+    for (const e of savoirDb.toutesAvecCategorie()) {
+      savoirTotal.push({ topic: e.cle, contenu: e.reponse, categorie: e.categorie });
     }
   } catch (e) {}
   const vocabTotal = [];
@@ -2731,40 +2798,10 @@ app.post('/savoir', (req, res) => {
   if (cle.length > 100 || reponse.length > 500)
     return res.status(400).json({ ok: false, message: 'Entree trop longue.' });
   try {
-    const f = path.join(RACINE, 'savoir.txt');
-    let contenu = '';
-    try { contenu = fs.readFileSync(f, 'utf8'); } catch (e) {}
-    const cleNorm = sansAccents(cle.toLowerCase());
-    const lignes = contenu ? contenu.split('\n') : [];
-    let remplace = false;
-    for (let i = 0; i < lignes.length; i++) {
-      const pos = lignes[i].indexOf('|');
-      if (pos <= 0) continue;
-      if (sansAccents(lignes[i].substring(0, pos).trim().toLowerCase()) === cleNorm) {
-        lignes[i] = cle + '|' + reponse;
-        remplace = true;
-      }
-    }
-    if (!remplace) {
-      // Ajout simple : on ecrit a la FIN du fichier (append) plutot que de
-      // reecrire les 1200 lignes. Pas de fenetre de perte si le serveur
-      // s'arrete au milieu, et pas de course entre deux requetes.
-      const prefixe = contenu && !contenu.endsWith('\n') ? '\n' : '';
-      fs.appendFileSync(f, prefixe + cle + '|' + reponse + '\n', 'utf8');
-      storage.declencherSauvegarde();
-      return res.json({ ok: true, remplace: false });
-    }
-    // Remplacement : reecriture complete, donc ECRITURE ATOMIQUE
-    // (fichier temporaire puis rename). Une ecriture directe tronquerait
-    // savoir.txt et perdrait toutes les connaissances si le processus
-    // s'arretait pendant l'ecriture.
-    let sortie = lignes.join('\n');
-    if (sortie.charAt(sortie.length - 1) !== '\n') sortie += '\n';
-    const tmp = f + '.tmp';
-    fs.writeFileSync(tmp, sortie, 'utf8');
-    try { fs.renameSync(tmp, f); } catch (e) { fs.writeFileSync(f, sortie, 'utf8'); }
+    const dejaConnue = !!savoirDb.parCle(sansAccentsDB(cle));
+    savoirEnregistrer(cle, reponse, null, 'bot-local');
     storage.declencherSauvegarde();
-    res.json({ ok: true, remplace });
+    res.json({ ok: true, remplace: dejaConnue });
   } catch (e) {
     res.status(500).json({ ok: false, message: 'Ecriture impossible.' });
   }
@@ -3101,13 +3138,7 @@ app.get('/profil', (req, res) => {
   const memoire = lireMemoire(auth.uid);
   let savoir = [];
   try {
-    const f = path.join(RACINE, 'savoir.txt');
-    if (fs.existsSync(f)) {
-      savoir = fs.readFileSync(f, 'utf8').split('\n').filter(l => l.trim()).map(l => {
-        const pos = l.indexOf('|');
-        return pos >= 0 ? { cle: l.substring(0, pos).trim(), reponse: l.substring(pos + 1).trim() } : null;
-      }).filter(Boolean);
-    }
+    savoir = savoirDb.toutes().map(e => ({ cle: e.cle, reponse: e.reponse, categorie: e.categorie }));
   } catch (e) {}
   res.json({ profil: memoire, savoir });
 });

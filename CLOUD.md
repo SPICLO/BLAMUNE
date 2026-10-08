@@ -120,26 +120,46 @@ docker compose up -d ollama-init
 
 ## 7. Persistance des connaissances
 
-`savoir.txt` est un fichier vivant partagé entre `server.js` et `bot.cpp`.
-Trois protections ont été mises en place :
+La source de vérité est **SQLite** (`savoir.db`, module `savoir_db.js`).
+`savoir.txt` n'est plus qu'un **export** : il reste versionné dans git, lu par
+le bot Windows local, et inclus dans la sauvegarde.
 
-| Risque | Protection |
+| Risque | Ce qui le règle |
 |---|---|
-| Un arrêt pendant l'écriture tronque le fichier | écriture atomique : temporaire + `rename` |
-| Le bot écrase ce que le serveur vient d'ajouter | rechargement `stat()` avant réécriture |
-| Deux requêtes concurrentes perdent une entrée | ajout par `appendFileSync` (pas de réécriture) |
-| Clé en double après fusion serveur + locale | déduplication au chargement |
+| Deux visiteurs apprennent en même temps | transactions + `busy_timeout`, mode `WAL` |
+| Un arrêt tronque le fichier | transactions atomiques (SQLite) |
+| Clé en double | `cle_norm` en `PRIMARY KEY` |
+| Un export qui réordonne tout le fichier | colonne `rang` (ordre préservé) |
+| Sauvegarde applicative (texte) d'une base binaire | la base est sauvegardée en **dump SQL** |
 
-Si tu veux aller plus loin, la vraie évolution est de **sortir du fichier plat** :
+Commandes utiles :
 
-| Option | Avantage | Inconvénient |
-|---|---|---|
-| **SQLite** (`bot.cpp` + `server.js` sur la même base) | transactions, index UNIQUE sur la clé, validation au niveau du schéma, vrai multi-écrivain | `sqlite3` à lier dans le C++, migration des 1 266 entrées |
-| Journal append-only + compactage | jamais de réécriture complète, historique des événements | compactage à écrire, fichier toujours volumineux |
-| Quarantaine + validation admin | `savoir.txt` reste propre, réversibilité totale | les connaissances ne sont actives qu'après validation |
+```bash
+node migrer_savoir_sqlite.js --rapport   # diagnostic, aucune écriture
+node migrer_savoir_sqlite.js             # migre savoir.txt -> savoir.db
+```
 
-Le JSONBin déjà en place sert de sauvegarde cloud : il reste utile dans les
-trois options, mais ne remplace pas une source de vérité unique.
+Le serveur migre automatiquement au premier démarrage si la base est vide.
+
+### Limite à connaître
+
+SQLite ne se partage pas sur un système de fichiers réseau. Les conteneurs
+`bot` et `server` sont donc sur le **même hôte Docker** et partagent un volume
+nommé (`savoir_export`), pas la base elle-même :
+
+- le serveur est le **seul écrivain** de la base ;
+- il régénère `savoir.txt` dans le volume après chaque apprentissage ;
+- le bot **lit** cet export au démarrage (`--savoir-dossier`).
+
+Conséquence : le bot ne voit les nouvelles connaissances qu'après un
+redémarrage de son conteneur :
+
+```bash
+docker compose restart bot
+```
+
+Le bot Windows local pousse ses connaissances vers `/savoir` (route
+`POST /savoir`), donc son apprentissage arrive bien dans la base.
 
 ## 8. Sécurité
 

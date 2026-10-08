@@ -1,5 +1,7 @@
 node_modules/
 .env
+__pycache__/
+*.pyc
 *.exe
 bot
 bot_linux
@@ -9,6 +11,11 @@ bot_linux
 config.json
 comptes.json
 historique.json
+# Source de verite du savoir : regeneree depuis savoir.txt par
+# migrer_savoir_sqlite.js. On ne versionne pas une base binaire.
+savoir.db
+savoir.db-wal
+savoir.db-shm
 users/
 backups/
 *.log

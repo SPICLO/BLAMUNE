@@ -68,4 +68,20 @@ versions antérieures sont visibles dans `git log`.
     remplacement.
   - `chargerSavoirFichier()` déduplique les clés (le fichier peut contenir la
     même clé deux fois après une fusion serveur + locale).
+- **Migration du savoir vers SQLite** (`savoir.db`). `savoir.txt` n'est plus la
+  source de vérité : c'est un **export** (git, bot Windows local, JSONBin),
+  régénéré depuis la base. Ce que cela corrige :
+  - **écritures concurrentes** : plusieurs visiteurs apprenaient en même temps
+    et s'écrasaient mutuellement sur le fichier plat ;
+  - **corruption** : la sauvegarde lisait le binaire SQLite en `utf8` et le
+    réécrivait en `utf8` (« database disk image is malformed »). La source de
+    vérité est donc sauvegardée sous forme de **dump SQL** (texte) ;
+  - **doublons** : la clé normalisée est une `PRIMARY KEY`, donc l'unicité est
+    garantie par la base et non par une comparaison de lignes ;
+  - **ordre** : la colonne `rang` préserve l'ordre du fichier, donc chaque
+    export est stable et le diff git ne montre que de vraies modifications ;
+  - transactions atomiques en mode `WAL` (lecteurs et écrivain coexistent).
+  `migrer_savoir_sqlite.js` migre les 1 266 entrées existantes (`--rapport`
+  pour un diagnostic sans écriture). `server.js` migre automatiquement au
+  premier démarrage si la base est vide.
 - Contrôle admin factorisé (`isAdminUid`) et paramétrable par l'environnement.

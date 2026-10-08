@@ -59,6 +59,10 @@ services:
     restart: "no"
 
   # ------------------------------------------------ Bot C++ (service HTTP)
+  # Le bot lit le savoir via un volume NOMME partage avec le serveur (meme
+  # hote Docker, donc systeme de fichiers local : c'est ce qui rend le
+  # partage possible, contrairement a SQLite qui ne se partage pas sur un
+  # systeme de fichiers reseau).
   bot:
     build:
       context: .
@@ -74,6 +78,8 @@ services:
       BOT_NOM_BOT: "BLAMUNE"
     volumes:
       - bot_data:/app
+      # savoir.txt en LECTURE SEULE : le serveur est le seul ecrivain.
+      - savoir_export:/savoir:ro
 
   # ---------------------------------------------------- Serveur Node (API)
   server:
@@ -100,6 +106,8 @@ services:
 
       # --- Bot C++ local (secours regles + apprentissage) ---
       BOT_SERVICE_URL: "http://bot:8090"
+      # Dossier d'export du savoir partage avec le bot (volume Docker).
+      SAVOIR_EXPORT_DIR: "/savoir"
 
       # --- Opt-in ---
       MEMOIRE_EXTRACTION: "${MEMOIRE_EXTRACTION:-1}"
@@ -113,8 +121,14 @@ services:
       JSONBIN_BIN_ID: "${JSONBIN_BIN_ID:-}"
     volumes:
       - server_data:/app
+      # Export du savoir partage avec le bot (lecture seule pour le bot).
+      - savoir_export:/savoir
 
 volumes:
   ollama_data:
   bot_data:
   server_data:
+  # Export du savoir (savoir.txt) partage entre le serveur (ecrivain) et
+  # le bot (lecteur). Le serveur le regenere depuis SQLite a chaque
+  # apprentissage.
+  savoir_export:

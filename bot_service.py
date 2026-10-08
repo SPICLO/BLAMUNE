@@ -196,7 +196,29 @@ def main():
     ap.add_argument("--genre", default="feminin")
     ap.add_argument("--nom", default="Visiteur")
     ap.add_argument("--nom-bot", default="BLAMUNE")
+    ap.add_argument("--savoir-dossier", default="",
+                    help="dossier contenant l'export savoir.txt partage par le serveur")
     args = ap.parse_args()
+
+    # Sur le cloud, le serveur regenere en continu savoir.txt (export de la
+    # base SQLite) dans un volume partage. On le copie dans le repertoire de
+    # travail du bot, qui le lit au demarrage. Sans ce dossier, on garde la
+    # copie embarquee dans l'image.
+    if args.savoir_dossier:
+        source = os.path.join(args.savoir_dossier, "savoir.txt")
+        if os.path.exists(source):
+            try:
+                with open(source, "rb") as fsrc, \
+                     open(os.path.join(args.repertoire, "savoir.txt"), "wb") as fdst:
+                    fdst.write(fsrc.read())
+                sys.stderr.write("[bot] savoir.txt partage charge depuis %s\n" % args.savoir_dossier)
+                sys.stderr.flush()
+            except OSError as e:
+                sys.stderr.write("[bot] copie du savoir impossible : %s\n" % e)
+        else:
+            sys.stderr.write("[bot] aucun savoir.txt dans %s : copie embarquee conservee\n"
+                             % args.savoir_dossier)
+            sys.stderr.flush()
 
     BOT = BotLocal(args.bot, args.repertoire)
     BOT.demarrer(args.mode, args.genre, args.nom, args.nom_bot)

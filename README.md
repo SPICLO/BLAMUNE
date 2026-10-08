@@ -43,7 +43,9 @@ PROJET/
 |- server.js          Serveur Express (routes, IA, comptes, admin)
 |- storage.js         Persistance cloud JSONBin
 |- bot.cpp / bot.exe  Bot local C++ (moteur de regles)
-|- savoir.txt         Connaissances du bot
+|- savoir.txt         Connaissances du bot (export lisible ; source : savoir.db)
+|- savoir_db.js       Source de verite SQLite des connaissances
+|- migrer_savoir_sqlite.js  Migration savoir.txt -> savoir.db
 |- personnalite.txt   Personnalite du bot
 |- vocabulaire.txt    Vocabulaire du composeur de phrases
 |- site/              Front PWA (index.html, app.js, style.css, sw.js, manifest.json)
@@ -184,9 +186,15 @@ docker run -p 8080:8080 --env-file .env blamune
 
 ## Persistance
 
-Le disque Render est **ephemere**. `storage.js` pousse comptes, memoires et
-historiques vers **JSONBin.io** ~3 s apres chaque ecriture et restaure tout au
-demarrage. Sans `JSONBIN_API_KEY`, les donnees sont perdues a chaque redeploiement.
+Deux couches indépendantes :
+
+- **SQLite** (`savoir.db`) : source de vérité des connaissances. Clé
+  normalisée en `PRIMARY KEY` (unicité garantie), transactions atomiques,
+  mode `WAL`. `savoir.txt` n'est plus qu'un export lisible (git, bot local).
+  Migration : `node migrer_savoir_sqlite.js` (automatique au 1er démarrage).
+- **JSONBin.io** (`storage.js`) : comptes, mémoires, historiques et
+  sauvegarde cloud. Sans `JSONBIN_API_KEY`, ces données sont perdues à chaque
+  redéploiement.
 
 ## Securite
 
