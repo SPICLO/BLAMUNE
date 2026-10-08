@@ -1,0 +1,24 @@
+# Normalisation des fins de ligne.
+#
+# Sans ce fichier, core.autocrlf peut varier selon la machine : sur une
+# config Windows, git veut reecrire les fichiers en CRLF alors que les
+# exports (savoir.txt, themes.txt...) sont ecrits en LF par les scripts.
+# Chaque ecriture faisait alors apparaitre une fausse modification.
+#
+# Regles alignees sur .editorconfig : LF partout, sauf les scripts Windows.
+* text=auto eol=lf
+
+# Scripts Windows : le CMD attend du CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Fichiers binaries : jamais de transformation.
+*.png binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.zip binary
+*.exe binary
+*.db binary
