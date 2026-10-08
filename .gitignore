@@ -32,6 +32,7 @@ savoir_nouvelles.txt
 # --- Sorties generees localement (non necessaires au deploiement) ---
 themes.txt
 themes_manquants.txt
+vocabulaire_ajouts.txt
 
 # --- Artefacts divers ---
 serveur_errors.log

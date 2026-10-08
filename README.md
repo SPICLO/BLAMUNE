@@ -59,6 +59,15 @@ PROJET/
 - npm.
 - (optionnel) Python 3 et `pip install -r requirements.txt` pour les outils `*.py`.
 
+Pour régénérer le vocabulaire depuis des personas parquet :
+
+```powershell
+pip install -r requirements.txt
+python extraire_savoir.py --ecrire --dossier "D:\donne pour fair apprendre a un ia"
+python fusionner_vocabulaire.py --ecrire
+Get-Content vocabulaire_ajouts.txt | Where-Object { $_ -and -not $_.StartsWith('#') } | Add-Content vocabulaire.txt
+```
+
 ## Installation
 
 ```powershell

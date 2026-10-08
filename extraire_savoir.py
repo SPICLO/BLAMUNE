@@ -93,7 +93,12 @@ def est_propre(s: str) -> bool:
 
 if __name__ == "__main__":
     ecrire = "--ecrire" in sys.argv
-    fichiers = sorted(glob.glob(os.path.join(DOWNLOADS, "*.parquet")))
+    dossier_donnees = DOWNLOADS
+    if "--dossier" in sys.argv:
+        i = sys.argv.index("--dossier")
+        if i + 1 < len(sys.argv):
+            dossier_donnees = sys.argv[i + 1]
+    fichiers = sorted(glob.glob(os.path.join(dossier_donnees, "*.parquet")))
     themes = {}   # cle norm -> [affichage le plus frequent, count]
     stats = collections.Counter()
 
