@@ -121,6 +121,11 @@ Voir `.env.example` (commentaires complets). Principales :
 
 ## Utilisation
 
+Deux entrées existent :
+
+- **Version web IA externe / serveur Node** : `npm start` ; fonctionne sans clé en mode local limité, mais l'IA conversationnelle complète nécessite `API_KEY`.
+- **Version locale C++ sans clé** : `ouvrir_bot.bat` ou `.\serveur_bot.ps1` ; utilise `bot.exe` et `site/`.
+
 - Site : `http://localhost:8080/`
 - Admin : `http://localhost:8080/admin`
 - Endpoints : `/ping`, `/health` (health check), `/send`, `/historique`,

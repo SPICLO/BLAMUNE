@@ -10,6 +10,7 @@ versions antérieures sont visibles dans `git log`.
 - `README.md` : point d'entrée du projet (installation, variables, tests, déploiement).
 - `build_bot.ps1` / `build_bot.bat` : scripts reproductibles pour recompiler `bot.exe`.
 - `requirements.txt` : dépendances Python des scripts locaux.
+- README clarifie `npm start` vs `serveur_bot.ps1`.
 - `LICENSE` (MIT) et champs `license` / `author` / `repository` / `keywords` dans `package.json`.
 - `.env.example` : documentation de **toutes** les variables d'environnement.
 - Prise en charge des fournisseurs **compatibles OpenAI** (Groq, OpenRouter,
