@@ -2074,12 +2074,56 @@ bool enregistrerSavoir(std::string cle, std::string rep, int categorie,
     // Synchronisation : la nouvelle connaissance part vers le site en ligne
     // (le serveur l'utilise comme secours pendant les pannes de Gemini).
     // Silencieux : sans reseau ou en hors_ligne, le fichier local reste la
-    // source unique. Le placeholder d'apprentissage ne sert pas de secours.
-    if (rep != "Je ne sais pas encore...") pousserSavoir(cle, rep);
+    // source unique. Ni un placeholder d'apprentissage ni une reponse vide
+    // ne sont poussés : ils ne sont pas de vraies connaissances.
+    if (!rep.empty() && rep != "Je ne sais pas encore...") pousserSavoir(cle, rep);
     return true;
 }
 
 // ============ HELPERS DE L'APPRENTISSAGE EVOLUTIF ============
+
+// ============ VALIDATION DE L'APPRENTISSAGE EVOLUTIF ============
+// Le bot peut promouvoir en mot-cle un mot que l'utilisateur repete 3 fois
+// dans une conversation. Sans filtre, une phrase banale comme
+// "je m'appelle Thomas" promouvait "appelle" (morceau de "m'appelle") en
+// mot-cle de la categorie en cours, et ecrivait une fausse connaissance
+// "appelle|Je ne sais pas encore..." dans savoir.txt.
+// Ces fonctions bloquent les candidats qui ne sont pas de vrais sujets.
+
+// Verbes et actions qui parlent de l'utilisateur, jamais d'un sujet.
+// "je m'appelle", "j'habite a", "j'aime", "je travaille" : le mot qui suit
+// ne designe pas un theme.
+bool estVerbeDeLUtilisateur(const std::string& mot) {
+    static const char* verbes[] = {
+        "appelle", "appelles", "habite", "habites", "aime", "aimes",
+        "adore", "adores", "prefere", "preferes", "travaille", "travailles",
+        "etudie", "etudies", "etudis", "joue", "joues", "vis", "visites",
+        "fais", "faites", "suis", "es", "sommes", "serez", "ai", "as",
+        "avons", "avez", "ont", "viens", "viens", "vient", "viennent",
+        "bouge", "manges", "mange", "bois", "dors", "visage", "cherche",
+        "regarde", "ecoute", "ecoutes", "comprends", "comprenne",
+        "connais", "connaissez", "souviens", "souviens", "appartiens",
+        "debut", "commence", "finis", "termine", "reviens", "reviens",
+        "ete", "etais", "etait", "etions", "etes", "etaient", "seras",
+        "0"
+    };
+    for (int i = 0; verbes[i] != 0; i++) {
+        if (mot == verbes[i]) return true;
+    }
+    return false;
+}
+
+// Le mot etait-il precede d'une apostrophe d'elision dans la phrase d'origine ?
+// C'est le cas de "j'aime" -> "aime", "m'appelle" -> "appelle", "d'accord" ->
+// "accord" : ces morceaux ne sont pas des mots, ils sont la queue d'une
+// contraction et ne doivent jamais devenir des sujets.
+// `avant` est le caractere qui precede le mot dans la phrase brute.
+bool suitUneElision(char avant) {
+    return avant == '\'';
+}
+
+// Un candidat est-il apprenable comme mot-cle de sujet ?
+// (defini apres estMotCourant, en dessous)
 
 // Mot courant (article, pronom, liaison...) qu'on ne retient pas comme mot-cle.
 bool estMotCourant(const std::string& mot) {
@@ -2105,6 +2149,26 @@ bool estMotCourant(const std::string& mot) {
         if (mot == courants[i]) return true;
     }
     return false;
+}
+
+// Un candidat est-il apprenable comme mot-cle de sujet ?
+// `precedent` est le caractere qui precede le mot dans la phrase d'origine :
+// il permet de detecter les fragments de contraction ("j'aime" -> "aime").
+bool motApprenable(const std::string& mot, char precedent) {
+    if (mot.size() < 4) return false;               // trop court
+    if (suitUneElision(precedent)) return false;    // fragment de contraction
+    if (estPetitMot(mot)) return false;             // mot-outil
+    if (estMotCourant(mot)) return false;           // article, pronom, liaison
+    if (estVerbeDeLUtilisateur(mot)) return false;  // verbe d'etat / presentation
+    // Un mot-cle de sujet ne contient ni chiffre ni ponctuation interne.
+    for (unsigned int i = 0; i < mot.size(); i++) {
+        char c = mot[i];
+        if ((c >= '0' && c <= '9') || c == ',' || c == ';' || c == ':' ||
+            c == '!' || c == '.' || c == '?' || c == '\'' || c == '-') {
+            return false;
+        }
+    }
+    return true;
 }
 
 // Reecrit tout savoir.txt depuis la memoire (cles / reponses / mots-cles appris).
@@ -8398,12 +8462,15 @@ int main() {
         bool motPromu = false;
         if (categorieActuelle >= 0 && categorieActuelle < 13) {
             std::string motObs;
+            char precedent = ' ';   // caractere precedant le mot courant
             for (unsigned int i = 0; i <= p.size(); i++) {
                 char ch = (i < p.size()) ? p[i] : ' ';
                 if (ch == ' ' || ch == '?' || ch == '.' || ch == '!' || ch == ',' || ch == ';' || ch == ':') {
-                    // on ignore aussi les contractions avec apostrophe ("j'aime", "c'est"...) :
-                    // ce ne sont pas de bons mots-cles de sujet.
-                    if (!estPetitMot(motObs) && !estMotCourant(motObs)) {
+                    // Validation complete : contraction ("j'aime" -> "aime"),
+                    // mot-outil, verbe d'etat ("j'habite" -> "habite"),
+                    // chiffre ou ponctuation interne. Un candidat qui echoue
+                    // n'est meme pas compte, donc ne peut pas etre promu.
+                    if (motApprenable(motObs, precedent)) {
                         bool dejaCle = false;
                         for (int m = 0; m < 30; m++) {
                             if (motsCategories[categorieActuelle][m].empty()) break;
@@ -8421,7 +8488,14 @@ int main() {
                                     bool dejaConnu = false;
                                     for (unsigned int k = 0; k < cles.size(); k++) if (cles[k] == motObs) dejaConnu = true;
                                     if (!dejaConnu) {
-                                        enregistrerSavoir(motObs, "Je ne sais pas encore...", categorieActuelle,
+                                        // Reponse VOLONTAIREMENT vide : on persiste le
+                                        // mot-cle et sa categorie, mais on n'ecrit
+                                        // aucune affirmation dans savoir.txt.
+                                        // Une entree vide est ignoree par le serveur
+                                        // (il exige une reponse non vide), et le bot
+                                        // ne peut donc pas la lire a voix haute :
+                                        // fini les "appelle|Je ne sais pas encore...".
+                                        enregistrerSavoir(motObs, "", categorieActuelle,
                                                          cles, reponses, motsClesAppris);
                                     }
                                     std::cout << botNom + " : Tiens, tu reparles souvent de \"" << motObs
@@ -8438,8 +8512,14 @@ int main() {
                         }
                     }
                     motObs = "";
+                    precedent = ' ';
                 }
-                else motObs += ch;
+                else {
+                    // On memorise le separateur precedent : c'est lui qui
+                    // permet de savoir si le mot suivait une apostrophe.
+                    if (motObs.empty()) precedent = ch;
+                    motObs += ch;
+                }
             }
         }
         if (motPromu) continue;
@@ -9553,6 +9633,9 @@ int main() {
                 int meilleurChoix = 0;
                 bool meilleurExact = false;
                 for (unsigned int i = 0; i < cles.size(); i++) {
+                    // Une entree sans reponse n'est qu'un mot-cle de categorie :
+                    // elle ne se dit jamais a voix haute.
+                    if (reponses[i].empty()) continue;
                     if (phraseContientCle(p, cles[i])) {
                         bool exact = phraseContientCleExact(p, cles[i]);
                         if (cles[i].size() > meilleureTaille ||
@@ -9589,6 +9672,9 @@ int main() {
         int meilleurChoix = 0;
         bool meilleurExact = false;
         for (unsigned int i = 0; i < cles.size(); i++) {
+            // Une entree sans reponse n'est qu'un mot-cle de categorie :
+            // elle ne se dit jamais a voix haute.
+            if (reponses[i].empty()) continue;
             if (phraseContientCle(p, cles[i])) {
                 // Le mot est-il present en toutes lettres ? A taille egale, un
                 // match exact gagne sur un match flou (ex. "nager" doit etre
@@ -9629,6 +9715,7 @@ int main() {
                 bool dejaConnu = false;
                 std::string defConnu;
                 for (unsigned int i = 0; i < cles.size() && !dejaConnu; i++) {
+                    if (reponses[i].empty()) continue; // mot-cle sans reponse
                     if (phraseContientCle(p, cles[i])) {
                         dejaConnu = true;
                         defConnu = reponses[i];
@@ -9686,6 +9773,7 @@ int main() {
             bool repondu = false;
             // 1. Une reponse dans les connaissances partagees
             for (unsigned int i = 0; i < cles.size() && !repondu; i++) {
+                if (reponses[i].empty()) continue; // mot-cle sans reponse
                 if (phraseContientCle(p, cles[i])) {
                     std::cout << botNom + " : " << reponses[i] << "\n";
                     repondu = true;
@@ -9988,6 +10076,7 @@ int main() {
                 // Connaissances partagees (savoir.txt) : on repond avec ce qui a ete appris.
                 // Le mot ecrit en toutes lettres gagne sur un mot simplement proche.
                 for (unsigned int i = 0; i < cles.size() && !repondu; i++) {
+                    if (reponses[i].empty()) continue; // mot-cle sans reponse
                     if (phraseContientCleExact(p, cles[i])) {
                         std::cout << botNom + " : " << reponses[i] << "\n";
                         repondu = true;
@@ -9995,6 +10084,7 @@ int main() {
                     }
                 }
                 for (unsigned int i = 0; i < cles.size() && !repondu; i++) {
+                    if (reponses[i].empty()) continue; // mot-cle sans reponse
                     if (phraseContientCle(p, cles[i])) {
                         std::cout << botNom + " : " << reponses[i] << "\n";
                         repondu = true;
@@ -10030,6 +10120,7 @@ int main() {
                 // Pas une question : on repond avec les connaissances partagees.
                 // Le mot ecrit en toutes lettres gagne sur un mot simplement proche.
                 for (unsigned int i = 0; i < cles.size() && !repondu; i++) {
+                    if (reponses[i].empty()) continue; // mot-cle sans reponse
                     if (phraseContientCleExact(p, cles[i])) {
                         std::cout << botNom + " : " << reponses[i] << "\n";
                         repondu = true;
@@ -10037,6 +10128,7 @@ int main() {
                     }
                 }
                 for (unsigned int i = 0; i < cles.size() && !repondu; i++) {
+                    if (reponses[i].empty()) continue; // mot-cle sans reponse
                     if (phraseContientCle(p, cles[i])) {
                         std::cout << botNom + " : " << reponses[i] << "\n";
                         repondu = true;

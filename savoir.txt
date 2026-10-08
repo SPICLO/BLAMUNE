@@ -1106,11 +1106,8 @@ synthèse|Combinaison d'éléments en un tout cohérent.|9
 talent|Aptitude naturelle.|9
 vive intelligence|Intelligence rapide et alerte.|9
 temperature elevee|Quelqu'un qui a de la fièvre.|6
-salut|Je ne sais pas encore...|3
 le python|L'utilisateur connait ce sujet.|5
 la lune|L'utilisateur connait ce sujet.
-connais|Je ne sais pas encore...|10
-suite|Je ne sais pas encore...|6
 rex|c'est mon chien prefere
 foot|c'est un sport|0
 basketball|Cinq joueurs de chaque equipe jouent sur un parquet. On marque en encaissant le ballon dans un panier haut a 3,05 metres. La rencontre dure 48 minutes, en quatre quarts de 12 minutes. Un lancer franc vaut 1 point, un tir a l'exterieur du panneau vaut 3 points.|0

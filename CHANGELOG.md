@@ -47,5 +47,12 @@ versions antérieures sont visibles dans `git log`.
   Le binaire compile et repond desormais sous Linux.
 - `themes.txt` / `themes_manquants.txt` (sorties générées, ~7 Mo) désormais ignorés par git.
 - Suppression des fichiers parasites : `config.json.placeholder`, `curl_out.txt`, `curl_output.txt`, `serveur_errors.log`.
-- Nettoyage des artefacts temporaires (`_g*.txt`, `_grep_perso.txt`, `fichiers_cpp.txt`, `signatures_cpp.txt`).
+- **Apprentissage du bot C++ non validé** : une phrase banale comme
+  « je m'appelle Thomas » suffisait à promouvoir « appelle » en mot-clé et
+  à écrire la fausse connaissance `appelle|Je ne sais pas encore...` dans
+  `savoir.txt`. Ajout de `motApprenable()` (bloque les fragments de
+  contraction, les verbes d'état, les chiffres et la ponctuation) ; la
+  promotion n'écrit plus qu'une entrée `mot||categorie` sans réponse, que le
+  serveur ignore et que le bot ne prononce pas. Les 3 entrées polluées
+  héritées (`salut`, `connais`, `suite`) ont été supprimées de `savoir.txt`.
 - Contrôle admin factorisé (`isAdminUid`) et paramétrable par l'environnement.

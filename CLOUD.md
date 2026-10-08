@@ -129,10 +129,15 @@ docker compose up -d ollama-init
 
 ## 8. Limites connues
 
-- **Le bot C++ apprend sans validation.** Il peut écrire dans `savoir.txt` des
-  entrées de faible qualité à partir d'un message maladroit (par exemple
-  « je m'appelle X » devient un mot-clé). Sur le cloud, monte `bot_data` en
-  volume et supervise `savoir.txt`, ou désactive la poussée de savoir.
+- **Le bot C++ apprend, mais uniquement des sujets valides.** Un mot n'est
+  promu « mot-clé de catégorie » que s'il passe la validation
+  (`motApprenable`) : longueur ≥ 4, pas de fragment de contraction
+  (« j'aime » → « aime »), pas de verbe d'état (« j'habite » → « habite »),
+  pas de chiffre ni de ponctuation. La promotion n'écrit **aucune
+  affirmation** dans `savoir.txt` : l'entrée est persistée sous la forme
+  `mot||categorie` (réponse vide), que le serveur ignore et que le bot ne
+  prononce jamais. Une correction ultérieure
+  (« non, X c'est Y ») vient la compléter normalement.
 - **`bot.cpp` ne parle pas au réseau sous Linux.** La branche `appelerEnLigne`
   est un stub qui renvoie `""` : sur le cloud, c'est `server.js` qui gère le
   réseau, pas le bot.
