@@ -2745,10 +2745,24 @@ app.post('/savoir', (req, res) => {
         remplace = true;
       }
     }
-    if (!remplace) lignes.push(cle + '|' + reponse);
+    if (!remplace) {
+      // Ajout simple : on ecrit a la FIN du fichier (append) plutot que de
+      // reecrire les 1200 lignes. Pas de fenetre de perte si le serveur
+      // s'arrete au milieu, et pas de course entre deux requetes.
+      const prefixe = contenu && !contenu.endsWith('\n') ? '\n' : '';
+      fs.appendFileSync(f, prefixe + cle + '|' + reponse + '\n', 'utf8');
+      storage.declencherSauvegarde();
+      return res.json({ ok: true, remplace: false });
+    }
+    // Remplacement : reecriture complete, donc ECRITURE ATOMIQUE
+    // (fichier temporaire puis rename). Une ecriture directe tronquerait
+    // savoir.txt et perdrait toutes les connaissances si le processus
+    // s'arretait pendant l'ecriture.
     let sortie = lignes.join('\n');
     if (sortie.charAt(sortie.length - 1) !== '\n') sortie += '\n';
-    fs.writeFileSync(f, sortie, 'utf8');
+    const tmp = f + '.tmp';
+    fs.writeFileSync(tmp, sortie, 'utf8');
+    try { fs.renameSync(tmp, f); } catch (e) { fs.writeFileSync(f, sortie, 'utf8'); }
     storage.declencherSauvegarde();
     res.json({ ok: true, remplace });
   } catch (e) {

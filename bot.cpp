@@ -13,6 +13,8 @@
 #include <sstream>
 #include <climits>
 #include <limits>
+#include <cstdio>
+#include <sys/stat.h>
 #ifdef _WIN32
 #include <windows.h>
 #include <wininet.h>
@@ -2171,12 +2173,105 @@ bool motApprenable(const std::string& mot, char precedent) {
     return true;
 }
 
-// Reecrit tout savoir.txt depuis la memoire (cles / reponses / mots-cles appris).
-// Utile quand on remplace une reponse (correction ou definition plus complete).
-void sauvegarderSavoir(const std::vector<std::string>& cles,
-                       const std::vector<std::string>& reponses,
-                       const std::map<std::string, int>& motsClesAppris) {
-    std::ofstream f("savoir.txt", std::ios::binary);
+// Definie plus bas : on la declare ici pour que le chargeur de savoir.txt
+// puisse s'en servir.
+std::string nettoyerLigne(std::string s);
+
+// Charge les entrees de savoir.txt dans les vecteurs du bot.
+// Facteur commun au demarrage et a la recharge a chaud (voir
+// rechargerSavoirSiChange) : une seule implementation du format de fichier,
+// donc pas de divergence entre les deux chemins.
+// `ecraser` : si vrai, vide d'abord les structures (chargement initial).
+void chargerSavoirFichier(std::vector<std::string>& cles,
+                          std::vector<std::string>& reponses,
+                          std::map<std::string, int>& motsClesAppris,
+                          bool ecraser) {
+    if (ecraser) {
+        cles.clear();
+        reponses.clear();
+    }
+    std::ifstream savoir("savoir.txt");
+    if (!savoir.is_open()) return;
+    std::string ligne;
+    while (std::getline(savoir, ligne)) {
+        ligne = nettoyerLigne(ligne);
+        std::size_t pos = ligne.find('|');
+        if (pos == std::string::npos) continue;
+        std::string cleSavoir = ligne.substr(0, pos);
+        std::string repSavoir = ligne.substr(pos + 1);
+        int catSavoir = -1;
+        std::size_t pos2 = repSavoir.find('|');
+        if (pos2 != std::string::npos) {
+            std::string numCat = repSavoir.substr(pos2 + 1);
+            repSavoir = repSavoir.substr(0, pos2);
+            // atoi renvoyait silencieusement 0 si le numero n'est pas un nombre :
+            // on valide la lecture pour ne jamais classer une connaissance au hasard.
+            std::istringstream ss(numCat);
+            if (!(ss >> catSavoir)) catSavoir = -1;
+        }
+        // Deduplication : le fichier peut contenir la meme cle en double
+        // (fusion d'une version serveur et d'une version locale). On garde
+        // la derniere occurrence, qui est la plus recente.
+        int trouve = -1;
+        for (unsigned int i = 0; i < cles.size(); i++) {
+            if (sansAccents(cles[i]) == sansAccents(cleSavoir)) { trouve = (int)i; break; }
+        }
+        if (trouve >= 0) {
+            reponses[trouve] = repSavoir;
+        } else {
+            cles.push_back(cleSavoir);
+            reponses.push_back(repSavoir);
+        }
+        if (catSavoir >= 0) motsClesAppris[cleSavoir] = catSavoir;
+    }
+    savoir.close();
+}
+
+// Date de derniere modification du fichier au moment du chargement : sert a
+// detecter que le serveur (ou un autre processus) a ecrit entre-temps.
+long long savoirMtimeAuChargement = -1;
+long long tailleAuChargement = -1;
+
+// Taille + date de modification du fichier, lues par stat() (portable MinGW
+// et Linux). Renvoie false si le fichier n'existe pas.
+bool statistiquesSavoir(long long& taille, long long& mtime) {
+    struct stat st;
+    if (stat("savoir.txt", &st) != 0) return false;
+    taille = (long long)st.st_size;
+    mtime = (long long)st.st_mtime;
+    return true;
+}
+
+bool savoirChangeSurDisque() {
+    long long taille = 0, mtime = 0;
+    if (!statistiquesSavoir(taille, mtime)) return false;
+    if (savoirMtimeAuChargement < 0) return false;   // jamais charge : rien a comparer
+    return taille != tailleAuChargement || mtime != savoirMtimeAuChargement;
+}
+
+void marquerSavoirCharge() {
+    long long taille = 0, mtime = 0;
+    if (statistiquesSavoir(taille, mtime)) {
+        tailleAuChargement = taille;
+        savoirMtimeAuChargement = mtime;
+    }
+}
+
+// Recharge savoir.txt si le serveur y a ecrit depuis le dernier chargement,
+// PUIS sauvegarde. Sans cette recharge, le bot reecrivait le fichier depuis
+// son instantane de demarrage et effacait toutes les connaissances ajoutees
+// par le site entre-temps (pertes de donnees silencieuses).
+void sauvegarderSavoir(std::vector<std::string>& cles,
+                       std::vector<std::string>& reponses,
+                       std::map<std::string, int>& motsClesAppris) {
+    if (savoirChangeSurDisque()) {
+        chargerSavoirFichier(cles, reponses, motsClesAppris, true);
+        marquerSavoirCharge();
+    }
+    // Ecriture ATOMIQUE : on remplit un fichier temporaire puis on le renomme.
+    // Une ecriture directe tronquerait savoir.txt et le laisserait corrompu
+    // si le processus s'arrete (panne, redemarrage) au milieu.
+    std::ofstream f("savoir.txt.tmp", std::ios::binary | std::ios::trunc);
     if (!f.is_open()) return;
     for (unsigned int i = 0; i < cles.size(); i++) {
         std::string cle = cles[i], rep = reponses[i];
@@ -2188,6 +2283,13 @@ void sauvegarderSavoir(const std::vector<std::string>& cles,
         f << "\r\n";
     }
     f.close();
+    std::remove("savoir.txt");
+    if (std::rename("savoir.txt.tmp", "savoir.txt") != 0) {
+        // Le renommage a echoue : on ne laisse pas le fichier sans contenu.
+        std::remove("savoir.txt.tmp");
+    } else {
+        marquerSavoirCharge();
+    }
 }
 
 // Reecrit tout profil.txt depuis la memoire (une ligne par fait sur l'utilisateur).
@@ -4126,32 +4228,8 @@ int main() {
     }
 
     // Charger les connaissances partagees (savoir.txt)
-    std::ifstream savoir("savoir.txt");
-    if (savoir.is_open()) {
-        std::string ligne;
-        while (std::getline(savoir, ligne)) {
-            ligne = nettoyerLigne(ligne);
-            std::size_t pos = ligne.find('|');
-            if (pos != std::string::npos) {
-                std::string cleSavoir = ligne.substr(0, pos);
-                std::string repSavoir = ligne.substr(pos + 1);
-                int catSavoir = -1;
-                std::size_t pos2 = repSavoir.find('|');
-                if (pos2 != std::string::npos) {
-                    std::string numCat = repSavoir.substr(pos2 + 1);
-                    repSavoir = repSavoir.substr(0, pos2);
-                    // atoi renvoyait silencieusement 0 si le numero n'est pas un nombre :
-                    // on valide la lecture pour ne jamais classer une connaissance au hasard.
-                    std::istringstream ss(numCat);
-                    if (!(ss >> catSavoir)) catSavoir = -1;
-                }
-                cles.push_back(cleSavoir);
-                reponses.push_back(repSavoir);
-                if (catSavoir >= 0) motsClesAppris[cleSavoir] = catSavoir;
-            }
-        }
-        savoir.close();
-    }
+    chargerSavoirFichier(cles, reponses, motsClesAppris, true);
+    marquerSavoirCharge();
 
     // Charger la personnalite (personnalite.txt : trait|facette|phrase) :
     // le bot repond "de lui-meme" avec ces phrases, en local, avant tout

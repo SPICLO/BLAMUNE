@@ -55,4 +55,17 @@ versions antérieures sont visibles dans `git log`.
   promotion n'écrit plus qu'une entrée `mot||categorie` sans réponse, que le
   serveur ignore et que le bot ne prononce pas. Les 3 entrées polluées
   héritées (`salut`, `connais`, `suite`) ont été supprimées de `savoir.txt`.
+- **Pertes de données silencieuses sur `savoir.txt`** : le bot et le serveur
+  écrivaient le même fichier sans coordination. Le bot réécrivait le fichier
+  depuis son instantané de démarrage et effaçait tout ce que le serveur avait
+  ajouté entre-temps ; les deux écrivaient par troncature directe, donc un
+  arrêt de processus laissait un fichier corrompu.
+  - `bot.cpp` recharge désormais `savoir.txt` s'il a changé sur disque
+    (`stat()`) avant de réécrire, et écrit via un fichier temporaire +
+    `rename` (écriture atomique).
+  - `server.js` ajoute une nouvelle entrée par `appendFileSync` (au lieu de
+    réécrire 1 200 lignes) et utilise temporaire + `rename` pour un
+    remplacement.
+  - `chargerSavoirFichier()` déduplique les clés (le fichier peut contenir la
+    même clé deux fois après une fusion serveur + locale).
 - Contrôle admin factorisé (`isAdminUid`) et paramétrable par l'environnement.
