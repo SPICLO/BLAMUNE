@@ -1,6 +1,8 @@
 node_modules/
 .env
 *.exe
+bot
+bot_linux
 *.dll
 *.bak
 *.zip

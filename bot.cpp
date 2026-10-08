@@ -3473,32 +3473,10 @@ void enregistrerVocabulairePartage(const std::string& mot, const std::string& de
 #define HOTE_BLAMUNE "blamune.onrender.com"
 #define CHEMIN_SESSION ".blamune_session"
 
-#ifdef _WIN32
-
-std::string encoderUrl(const std::string& s) {
-    static const char* hex = "0123456789ABCDEF";
-    std::string out;
-    for (unsigned int i = 0; i < s.size(); i++) {
-        unsigned char c = (unsigned char)s[i];
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-            (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~') {
-            out += (char)c;
-        } else {
-            out += '%';
-            out += hex[c >> 4];
-            out += hex[c & 15];
-        }
-    }
-    return out;
-}
-
-bool horsLigneActive() {
-    std::ifstream f("hors_ligne");
-    return f.good();
-}
-
 // Session invite locale : uid + jeton recuperes une seule fois sur le
 // serveur (fichier .blamune_session a la racine, jamais commite).
+// Ce bloc est en I/O fichier pur : il doit etre compile sur TOUTES les
+// plateformes, car cheminFichierUtilisateur() l'utilise aussi sous Linux.
 static std::string ligneUid = "", ligneJeton = "";
 static bool ligneSessionTestee = false;
 
@@ -3530,6 +3508,30 @@ void sauverSessionLigne(const std::string& uid, const std::string& jeton) {
     ligneUid = uid;
     ligneJeton = jeton;
     ligneSessionTestee = true;
+}
+
+#ifdef _WIN32
+
+std::string encoderUrl(const std::string& s) {
+    static const char* hex = "0123456789ABCDEF";
+    std::string out;
+    for (unsigned int i = 0; i < s.size(); i++) {
+        unsigned char c = (unsigned char)s[i];
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+            (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~') {
+            out += (char)c;
+        } else {
+            out += '%';
+            out += hex[c >> 4];
+            out += hex[c & 15];
+        }
+    }
+    return out;
+}
+
+bool horsLigneActive() {
+    std::ifstream f("hors_ligne");
+    return f.good();
 }
 
 // POST HTTPS vers blamune.onrender.com (WinINet). Retourne vrai si la

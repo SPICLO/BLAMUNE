@@ -155,6 +155,20 @@ python verifier_deploiement.py
 
 ## Deploiement
 
+### Stack cloud unifiee (latence minimale)
+
+`docker-compose.yml` fait tourner **server.js + Ollama + bot.cpp sur un seul
+serveur**. Les composants se parlent via le reseau Docker interne, donc aucun
+aller-retour public n'est ajoute. Modele recommande : `qwen2.5:3b`, garde
+chaud via `OLLAMA_KEEP_ALIVE=-1`.
+
+```powershell
+docker compose up -d
+```
+
+Voir [CLOUD.md](./CLOUD.md) pour le detail (choix du serveur, GPU, latence,
+securite, limites).
+
 ### Render
 
 `render.yaml` decrit le service (runtime Node, plan free). Renseigne

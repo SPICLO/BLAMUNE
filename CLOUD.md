@@ -1,0 +1,143 @@
+# BLAMUNE — Stack cloud unifiée (server.js + Ollama + bot.cpp)
+
+Ce document décrit la déploiement où **les trois composants tournent sur un
+seul serveur cloud**, ce qui est la configuration qui minimise la latence.
+
+---
+
+## 1. Architecture
+
+```
+Navigateur
+    ↓  (1 seul aller-retour public)
+┌──────────────────────────────────────────┐
+│  Serveur cloud unique                     │
+│                                          │
+│   server.js  ──HTTP interne──►  Ollama   │  (qwen2.5:3b, GPU, modèle chaud)
+│       │                                  │
+│       └────HTTP interne──►  bot.cpp      │  (règles locales + apprentissage)
+│                      (service sur :8090)│
+└──────────────────────────────────────────┘
+```
+
+Tout est dans un seul `docker compose` : les conteneurs se parlent via le
+réseau Docker interne. Aucun aller-retour ne sort de la machine.
+
+`server.js` interroge **Ollama en priorité**. Si l'IA est indisponible ou trop
+lente, il bascule sur le bot C++ local, puis sur `savoir.txt`. Le service bot
+n'est donc appelé **qu'après un échec réel** : aucune latence ajoutée sur le
+chemin nominal.
+
+---
+
+## 2. Ce qu'il faut pour le serveur
+
+| Modèle 3b | RAM мини | GPU | Sans GPU (CPU) |
+|---|---|---|---|
+| `qwen2.5:3b` (recommandé) | 8 Go | 4 Go VRAM | possible, 2 à 6 s/réponse |
+| `llama3.2:3b` | 8 Go | 4 Go VRAM | possible, 2 à 6 s/réponse |
+| `qwen2.5:7b` | 16 Go | 8 Go VRAM | 10 à 25 s/réponse |
+
+Sans GPU, un modèle 3b reste utilisable mais la latence augmente fortement.
+
+---
+
+## 3. Mise en place
+
+```bash
+# Sur le serveur cloud (Ubuntu avec GPU)
+git clone <ton-depot> blamune
+cd blamune
+
+# 1. Vérifier que le GPU est visible par Docker
+nvidia-smi
+docker run --rm --gpus all ubuntu nvidia-smi
+
+# 2. Démarrer toute la stack
+docker compose up -d
+
+# 3. Suivre les logs
+docker compose logs -f
+```
+
+Au premier démarrage, `ollama-init` télécharge `qwen2.5:3b` et le préchauffe.
+Le site répond sur le port `8080`.
+
+---
+
+## 4. Optimisations de latence déjà appliquées
+
+| Optimisation | Effet |
+|---|---|
+| `OLLAMA_KEEP_ALIVE=-1` | le modèle ne se décharge jamais (sinon 5 à 20 s au premier message) |
+| `ollama-init` | modèle téléchargé et chauffé avant le premier usage |
+| réseau Docker interne | pas d'aller-retour public entre composants |
+| `API_MAX_TOKENS=512` | réponses courtes = moins de tokens à générer |
+| `OLLAMA_NUM_PARALLEL=1` | évite de saturer une petite GPU |
+| cache LRU 5 min | les messages récurrents (« salut », « merci ») ne relancent pas l'IA |
+| bot local en secours | si l'IA tombe, la réponse vient du C++ en quelques ms |
+| streaming SSE | le visiteur voit le début de la réponse sans attendre la fin |
+| `RECHERCHE_WEB=0` par défaut | évite un appel outil inutile sur chaque message |
+
+---
+
+## 5. Variables d'environnement
+
+Voir `.env.example`. Les essentielles côté cloud :
+
+```env
+API_PROVIDER=ollama
+API_URL=http://ollama:11434/v1
+API_MODEL=qwen2.5:3b
+BOT_SERVICE_URL=http://bot:8090
+JSONBIN_API_KEY=...
+JSONBIN_BIN_ID=...
+```
+
+---
+
+## 6. Commandes utiles
+
+```bash
+docker compose ps                      # état des services
+docker compose logs -f server          # journal du serveur
+docker compose logs -f bot             # journal du bot C++
+docker compose restart bot             # redémarrer le bot
+docker compose down                    # tout arrêter
+docker compose up -d --build           # reconstruire après modification
+curl localhost:8080/ping               # test serveur
+curl localhost:8099/health             # test bot (via docker exec)
+```
+
+Changer de modèle sans tout reconstruire :
+
+```bash
+# dans .env : OLLAMA_MODEL=llama3.2:3b
+docker compose up -d ollama-init
+```
+
+---
+
+## 7. Sécurité
+
+- Ollama est lié sur `127.0.0.1` : il **n'est jamais public**.
+- Seul `server.js` est exposé sur le port `8080`.
+- Le bot (`8090`) n'est joignable que depuis le réseau Docker interne.
+- Si tu mets un reverse proxy devant `server.js`, ajoute HTTPS.
+
+---
+
+## 8. Limites connues
+
+- **Le bot C++ apprend sans validation.** Il peut écrire dans `savoir.txt` des
+  entrées de faible qualité à partir d'un message maladroit (par exemple
+  « je m'appelle X » devient un mot-clé). Sur le cloud, monte `bot_data` en
+  volume et supervise `savoir.txt`, ou désactive la poussée de savoir.
+- **`bot.cpp` ne parle pas au réseau sous Linux.** La branche `appelerEnLigne`
+  est un stub qui renvoie `""` : sur le cloud, c'est `server.js` qui gère le
+  réseau, pas le bot.
+- **Le bot est mono-utilisateur par instance.** Une seule session dexchange à
+  la fois (un `stdin` / un `stdout`). Pour plusieurs utilisateurs simultanés,
+  il faudrait une instance par session ou une refonte en bibliothèque.
+- **512 Mo de RAM ne suffit pas.** Le plan gratuit Render ne peut pas faire
+  tourner Ollama.

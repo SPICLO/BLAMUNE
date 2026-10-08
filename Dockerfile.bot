@@ -1,0 +1,43 @@
+# Image du bot C++ pour Linux (cloud).
+# Etape 1 : compilation de bot.cpp (portable Linux, gardes #ifdef _WIN32).
+# Etape 2 : image finale minimale avec le binaire, les donnees du bot et
+#           bot_service.py qui l'expose en HTTP.
+FROM debian:bookworm-slim AS build
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends g++ \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY bot.cpp .
+# -std=c++14 : meme standard que le build Windows (Dev-C++ refuse c++17).
+RUN g++ -std=c++14 -O2 -o bot bot.cpp
+
+
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Binaire compile.
+COPY --from=build /src/bot /app/bot
+
+# Service HTTP + donnees du bot.
+COPY bot_service.py /app/bot_service.py
+COPY savoir.txt /app/savoir.txt
+COPY personnalite.txt /app/personnalite.txt
+COPY vocabulaire.txt /app/vocabulaire.txt
+COPY vocabulaire_partage.txt /app/vocabulaire_partage.txt
+
+# Repertoire des donnees apprises (monte en volume).
+RUN mkdir -p /app/users
+
+EXPOSE 8090
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD python3 -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8090/health',timeout=4)" || exit 1
+
+CMD ["python3", "bot_service.py", "--bot", "./bot", "--repertoire", ".", "--port", "8090"]

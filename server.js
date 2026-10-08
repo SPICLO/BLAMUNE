@@ -853,10 +853,32 @@ function construireContenus(histo, imageParts) {
   return contents;
 }
 
+// Support plusieurs cles Gemini : API_KEYS=cle1,cle2,...
+// On bascule automatiquement sur la suivante quand une cle est en quota.
+let cleGeminiIndex = 0;
+function clesGemini() {
+  const raw = process.env.API_KEYS || process.env.API_KEY || '';
+  const splittes = String(raw).split(',').map(s => s.trim()).filter(Boolean);
+  if (splittes.length) return splittes;
+  if (config.api_key) return [config.api_key];
+  return [];
+}
+function cleGeminiActive() {
+  const cles = clesGemini();
+  if (!cles.length) return '';
+  return cles[cleGeminiIndex % cles.length];
+}
+function noterErreurGemini(e) {
+  if ((e && e.statusCode === 429) || (e && /quota|429|rate limit/i.test(e.message || ''))) {
+    const cles = clesGemini();
+    if (cles.length > 1) cleGeminiIndex++;
+  }
+}
+
 function optionsGemini() {
   return {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.api_key },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cleGeminiActive() },
     timeout: 30000
   };
 }
@@ -1008,6 +1030,93 @@ function reporterTache(lancer) {
 
 function attendre(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+// ============ SERVICE BOT C++ (LOCAL / CLOUD) ============
+// Sur le serveur cloud, le bot C++ tourne dans un conteneur voisin expose
+// sur BOT_SERVICE_URL. Il repond avec son moteur de regles local quand
+// l'IA (Ollama ou fournisseur en ligne) est indisponible ou trop lente.
+// Communication en HTTP direct sur le reseau Docker interne : aucun
+// aller-retour public, donc aucune latence ajoutee.
+const BOT_SERVICE_URL = String(process.env.BOT_SERVICE_URL || '').replace(/\/+$/, '');
+const BOT_SERVICE_TIMEOUT = parseInt(process.env.BOT_SERVICE_TIMEOUT_MS || '', 10) || 6000;
+
+// Petit cache : les messages identiques recurrents (salut, merci, ca va)
+// redemandent systematiquement la meme reponse au bot local.
+const cacheBot = new Map();
+const CACHE_BOT_MAX = 500;
+
+function cacheBotLire(cle) {
+  const entree = cacheBot.get(cle);
+  if (!entree) return '';
+  if (Date.now() - entree.date > 300000) { cacheBot.delete(cle); return ''; }
+  cacheBot.set(cle, { date: Date.now(), rep: entree.rep }); // rafraichit le LRU
+  return entree.rep;
+}
+
+function cacheBotEcrire(cle, rep) {
+  if (!cle || !rep) return;
+  if (cacheBot.size >= CACHE_BOT_MAX) {
+    // Eviction du plus ancien inserction (la Map garde l'ordre d'insertion).
+    const premier = cacheBot.keys().next().value;
+    cacheBot.delete(premier);
+  }
+  cacheBot.set(cle, { date: Date.now(), rep: rep });
+}
+
+function requeterHttp(url, options, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const cible = new URL(url);
+    const mod = cible.protocol === 'https:' ? https : http;
+    const req = mod.request({
+      protocol: cible.protocol,
+      hostname: cible.hostname,
+      port: cible.port || (cible.protocol === 'https:' ? 443 : 80),
+      path: cible.pathname + cible.search,
+      method: options.method || 'GET',
+      headers: options.headers || {}
+    }, (res) => {
+      let data = '';
+      res.setEncoding('utf8');
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        if (res.statusCode !== 200) {
+          const err = new Error('HTTP ' + res.statusCode);
+          err.statusCode = res.statusCode;
+          return reject(err);
+        }
+        resolve(data);
+      });
+    });
+    req.setTimeout(timeoutMs, () => { req.destroy(new Error('Timeout')); });
+    req.on('error', reject);
+    if (options.body) req.write(options.body);
+    req.end();
+  });
+}
+
+// Interroge le bot C++ local. Renvoie "" si le service est absent ou muet :
+// l'appelant garde alors son propre repli.
+async function appelerBotLocal(message) {
+  if (!BOT_SERVICE_URL || !message) return '';
+  const cle = String(message).toLowerCase().trim().slice(0, 300);
+  const cache = cacheBotLire(cle);
+  if (cache) return cache;
+  try {
+    const corps = JSON.stringify({ message: String(message).slice(0, 2000) });
+    const brut = await requeterHttp(BOT_SERVICE_URL + '/respond', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(corps) },
+      body: corps
+    }, BOT_SERVICE_TIMEOUT);
+    const json = JSON.parse(brut);
+    const rep = json && typeof json.reponse === 'string' ? json.reponse.trim() : '';
+    if (rep) cacheBotEcrire(cle, rep);
+    return rep;
+  } catch (e) {
+    loggerErreur('bot-local', e.message);
+    return '';
+  }
+}
+
 // Tous les modeles en meme temps (vu en live a 22h10) : la cascade rend la
 // main et l'utilisateur a droit a "probleme technique". On prefere attendre le
 // rechargement de la fenetre gratuite puis repasser la cascade UNE fois.
@@ -1120,9 +1229,13 @@ function chercherSavoir(msg) {
   return meilleureRep;
 }
 
-// Ce que l'utilisateur voit quand Gemini echoue : la reponse connue de
-// savoir.txt d'abord, sinon le message d'erreur habituel.
-function reponseSecours(msg, e) {
+// Ce que l'utilisateur voit quand l'IA echoue : on essaie d'abord le bot
+// C++ local (reponse immediate, hors ligne), ensuite savoir.txt, enfin le
+// message d'erreur habituel. Le service distant n'est interroge qu'apres un
+// echec reel de l'IA : aucune latence ajoutee sur le chemin nominal.
+async function reponseSecours(msg, e) {
+  const local = await appelerBotLocal(msg);
+  if (local) return local;
   const rep = chercherSavoir(msg);
   return rep || messageTechnique(e);
 }
@@ -1146,7 +1259,7 @@ async function modeleClassique(modele, contents, budget, patient, avecOutils) {
     const delai = delaiIndique(e);
     // Tout 429 remet les taches de fond en veille, meme sans "retry in"
     // ("Resource has been exhausted" n'en indique pas).
-    if (delai || (e && e.statusCode === 429)) dernierQuota = Date.now();
+    if (delai || (e && e.statusCode === 429)) { dernierQuota = Date.now(); noterErreurGemini(e); }
     if (erreurRetentable(e)) {
       if (!patient && delai > 3000) throw e; // quota long : autre modele
       if (tentable(b)) {
@@ -1200,7 +1313,7 @@ async function modeleEnFlux(modele, contents, onDelta, budget, avecOutils) {
     const delai = delaiIndique(e);
     // Tout 429 remet les taches de fond en veille, meme sans "retry in"
     // ("Resource has been exhausted" n'en indique pas).
-    if (delai || (e && e.statusCode === 429)) dernierQuota = Date.now();
+    if (delai || (e && e.statusCode === 429)) { dernierQuota = Date.now(); noterErreurGemini(e); }
     if (!envoyaDuTexte && erreurRetentable(e)) {
       if (delai > 3000) throw e; // quota long : la cascade change de modele
       if (tentable(b)) {
@@ -2757,7 +2870,7 @@ app.post('/send', async (req, res) => {
       reponses = [texte];
     } catch (e) {
       loggerErreur('EGO', e.message);
-      reponses = [reponseSecours(msg, e)];
+      reponses = [await reponseSecours(msg, e)];
     }
   } else {
     // BLAMUNE mode - Gemini with different personality
@@ -2839,7 +2952,7 @@ app.post('/send', async (req, res) => {
       reponses = [texte];
     } catch (e) {
       loggerErreur('BLAMUNE', e.message);
-      reponses = [reponseSecours(msg, e)];
+      reponses = [await reponseSecours(msg, e)];
     }
   }
 

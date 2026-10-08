@@ -1,0 +1,120 @@
+# BLAMUNE - stack cloud complete sur UN SEUL serveur.
+#
+#   navigateur -> server.js (Node) -> Ollama  (3b, GPU)
+#                              \\-> bot.cpp  (service HTTP, regles locales)
+#
+# Les trois composants tourneNt sur la meme machine et partagent le reseau
+# Docker interne : aucun aller-retour public, donc latence minimale.
+#
+# Demarrage :  docker compose up -d
+# Journal :    docker compose logs -f
+# Arret :      docker compose down
+
+services:
+  # ---------------------------------------------------------------- Ollama
+  ollama:
+    image: ollama/ollama:latest
+    container_name: blamune-ollama
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:11434:11434"   # binds sur localhost : pas public
+    environment:
+      # Modele charge dans la GPU et JAMAIS decharge : c'est le principal
+      # gain de latence (un modele froid met 5 a 20 s a repondre).
+      OLLAMA_KEEP_ALIVE: "-1"
+      # Une seule requete a la fois : evite de saturer une petite GPU.
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # ------------------------------------------------- Preparation du modele
+  # Telecharge et Chauffe le modele une fois, puis sort. Sans ca, la
+  # premiere conversation partirait d'un modele froid.
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: blamune-ollama-init
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        echo "Telechargement de qwen2.5:3b..."
+        ollama pull ${MODEL:-qwen2.5:3b}
+        echo "Préchauffage..."
+        ollama run ${MODEL:-qwen2.5:3b} "dis ok" >/dev/null 2>&1 || true
+        echo "Modele pret."
+    restart: "no"
+
+  # ------------------------------------------------ Bot C++ (service HTTP)
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    container_name: blamune-bot
+    restart: unless-stopped
+    depends_on:
+      - ollama-init
+    environment:
+      BOT_MODE: "2"
+      BOT_GENRE: "feminin"
+      BOT_NOM: "Visiteur"
+      BOT_NOM_BOT: "BLAMUNE"
+    volumes:
+      - bot_data:/app
+
+  # ---------------------------------------------------- Serveur Node (API)
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: blamune-server
+    restart: unless-stopped
+    depends_on:
+      - bot
+      - ollama
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      NODE_ENV: "production"
+
+      # --- Ollama local (primaire, illimite) ---
+      API_PROVIDER: "ollama"
+      API_URL: "http://ollama:11434/v1"
+      API_MODEL: "${OLLAMA_MODEL:-qwen2.5:3b}"
+      API_MAX_TOKENS: "${API_MAX_TOKENS:-512}"
+      API_TEMPERATURE: "0.7"
+
+      # --- Bot C++ local (secours regles + apprentissage) ---
+      BOT_SERVICE_URL: "http://bot:8090"
+
+      # --- Opt-in ---
+      MEMOIRE_EXTRACTION: "${MEMOIRE_EXTRACTION:-1}"
+      RECHERCHE_WEB: "${RECHERCHE_WEB:-0}"
+      RATE_SEND_IP: "${RATE_SEND_IP:-30}"
+      RATE_SEND_UID: "${RATE_SEND_UID:-20}"
+      ADMIN_PSEUDO: "${ADMIN_PSEUDO:-admin}"
+
+      # --- Persistance cloud (a definir si besoin) ---
+      JSONBIN_API_KEY: "${JSONBIN_API_KEY:-}"
+      JSONBIN_BIN_ID: "${JSONBIN_BIN_ID:-}"
+    volumes:
+      - server_data:/app
+
+volumes:
+  ollama_data:
+  bot_data:
+  server_data:

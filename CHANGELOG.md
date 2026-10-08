@@ -22,6 +22,17 @@ versions antérieures sont visibles dans `git log`.
 - Tests unitaires `tests/unit.test.js` (runner natif `node:test`) et script `npm run test:unit`.
 - Icônes PWA complètes : `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `favicon.ico`.
 - ESLint maintenant installé en dépendance de développement et exécuté par `npm run lint`.
+- `Dockerfile.bot` : image Linux du bot C++ (compilation multi-étape + service).
+- `bot_service.py` : service HTTP (stdlib) autour du bot interactif —
+  `GET /health`, `POST /respond`, avec lecture non bloquante des invites.
+- `docker-compose.yml` : stack unifiée Ollama (modèle 3b, GPU) + bot + serveur,
+  modèle pré-téléchargé et préchauffé, Ollama non exposé publiquement.
+- `CLOUD.md` : guide de déploiement cloud unifié et optimisations de latence.
+- `server.js` : bascule automatique sur le bot C++ local via `BOT_SERVICE_URL`
+  quand l'IA échoue, avec cache LRU de 5 min sur les messages récurrents.
+- Rotation automatique entre plusieurs clés Gemini (`API_KEYS`).
+- `.env.example` : documentation de `API_KEYS`, `BOT_SERVICE_URL`,
+  `BOT_SERVICE_TIMEOUT_MS`.
 
 ### Modifié
 - `config.json.example` : modèle aligné sur le défaut du serveur (`gemini-3.5-flash`).
@@ -30,6 +41,10 @@ versions antérieures sont visibles dans `git log`.
 - `site/index.html` : liens d'icônes (favicon + apple-touch-icon) et apple-mobile-web-app.
 
 ### Corrigé
+- **Portage Linux de `bot.cpp`** : les helpers de session (`.blamune_session`)
+  étaient Defined dans un bloc `#ifdef _WIN32` alors que
+  `cheminFichierUtilisateur()` les utilise — la compilation Linux échouait.
+  Le binaire compile et repond desormais sous Linux.
 - `themes.txt` / `themes_manquants.txt` (sorties générées, ~7 Mo) désormais ignorés par git.
 - Suppression des fichiers parasites : `config.json.placeholder`, `curl_out.txt`, `curl_output.txt`, `serveur_errors.log`.
 - Nettoyage des artefacts temporaires (`_g*.txt`, `_grep_perso.txt`, `fichiers_cpp.txt`, `signatures_cpp.txt`).
