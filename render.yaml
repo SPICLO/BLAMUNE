@@ -3,7 +3,7 @@ services:
     name: blamune
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm ci --omit=dev
     startCommand: node server.js
     # PAS DE DISQUE PERSISTANT ICI, et c'est volontaire.
     # Render reserve les disques persistants aux plans payants (~0,25 $/Go/mois)

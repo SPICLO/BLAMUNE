@@ -95,4 +95,11 @@ versions antérieures sont visibles dans `git log`.
   Principe : sur une question factuelle, BLAMUNE **avoue son ignorance** plutôt
   que d'inventer une réponse.
   Chaîne de repli : bot C++ local → savoir connu → banque → message d'erreur.
+- **Build cassé sur une installation propre** : `better-sqlite3` était sans
+  binaire précompilé et lançait une compilation `node-gyp` exigeant Visual
+  Studio — `npm ci` échouait, donc **le build Render aurait échoué aussi**.
+  Remplacé par **`node:sqlite`**, le module natif de Node : zéro dépendance
+  à installer. `better-sqlite3` reste accepté comme repli si installé
+  volontairement (Node 18/20). Node minimum porté à **22.5**, CI alignée
+  sur Node 22.
 - Contrôle admin factorisé (`isAdminUid`) et paramétrable par l'environnement.

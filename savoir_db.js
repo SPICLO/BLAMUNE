@@ -15,7 +15,63 @@
 // (il declenche le sujet) mais le bot n'affirme rien dessus.
 const fs = require('fs');
 const path = require('path');
-const Database = require('better-sqlite3');
+
+// ---------- Choix du moteur SQLite ----------
+//
+// On preferne `node:sqlite`, le module natif de Node (>= 22.5) : aucune
+// dependance a installer, donc `npm ci` ne peut jamais echouer sur une
+// machine sans compilateur C++ (c'etait le cas de better-sqlite3, qui
+// tentait une compilation node-gyp exigeant Visual Studio).
+//
+// `better-sqlite3` reste accepte comme solution de repli si quelqu'un
+// l'installe volontairement (utile sur Node 18/20). Les deux API sont
+// compatibles pour ce que nous faisons, aux rares differences pres ci-dessous.
+function ouvrirBase(fichier) {
+  try {
+    const { DatabaseSync } = require('node:sqlite');
+    return { db: new DatabaseSync(fichier), moteur: 'node:sqlite' };
+  } catch (e) {
+    try {
+      const Database = require('better-sqlite3');
+      return { db: new Database(fichier), moteur: 'better-sqlite3' };
+    } catch (e2) {
+      throw new Error(
+        'SQLite indisponible. Utilise Node >= 22.5 (module natif node:sqlite) ' +
+        'ou installe better-sqlite3. Node detecte : ' + process.version
+      );
+    }
+  }
+}
+
+// PRAGMA : better-sqlite3 expose db.pragma(), node:sqlite non (exec seulement).
+function pragma(db, sql) {
+  if (typeof db.pragma === 'function') {
+    try { db.pragma(sql); return; } catch (e) { /* on tente en exec */ }
+  }
+  db.exec('PRAGMA ' + sql);
+}
+
+// Propriete d'ouverture : `isOpen` sur node:sqlite, `open` sur better-sqlite3.
+function estOuvert(db) {
+  if (!db) return false;
+  if (typeof db.isOpen === 'boolean') return db.isOpen;
+  return !!db.open;
+}
+
+// Transaction : better-sqlite3 fournit db.transaction(fn)(args...), node:sqlite
+// non. On reproduit la meme signature dans les deux cas.
+function dansTransaction(db, fn, ...args) {
+  if (typeof db.transaction === 'function') return db.transaction(fn)(...args);
+  db.exec('BEGIN');
+  try {
+    const resultat = fn(...args);
+    db.exec('COMMIT');
+    return resultat;
+  } catch (e) {
+    try { db.exec('ROLLBACK'); } catch (e2) { /* deja annulee */ }
+    throw e;
+  }
+}
 
 // Meme normalisation que le reste du projet / que le bot C++ : minuscules
 // et sans accents, pour que "Café" et "cafe" soient la meme cle.
@@ -29,7 +85,7 @@ class SavoirDB {
   constructor(repertoire, fichier) {
     this.repertoire = repertoire;
     this.fichier = fichier || path.join(repertoire, 'savoir.db');
-    this.db = new Database(this.fichier);
+    this.db = ouvrirBase(this.fichier).db;
     this._init();
   }
 
@@ -38,12 +94,12 @@ class SavoirDB {
   _init() {
     // WAL : lecteurs et ecrivain coexistent sans se bloquer. Le bot et le
     // serveur peuvent lire pendant qu'une transaction ecrit.
-    this.db.pragma('journal_mode = WAL');
+    pragma(this.db, 'journal_mode = WAL');
     // Si une autre instance tient le verrou, on attend au lieu d'echouer.
-    this.db.pragma('busy_timeout = 5000');
+    pragma(this.db, 'busy_timeout = 5000');
     // Integrite referentielle : ces PRAGMA sont securitaires par defaut, on
     // les ecrit explicitement pour qu'un changement futur soit assume.
-    this.db.pragma('foreign_keys = ON');
+    pragma(this.db, 'foreign_keys = ON');
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS savoir (
         cle_norm  TEXT PRIMARY KEY,
@@ -137,7 +193,7 @@ class SavoirDB {
   importerFichier(fichier) {
     let contenu = '';
     try { contenu = fs.readFileSync(fichier, 'utf8'); } catch (e) { return 0; }
-    const tx = this.db.transaction((lignes) => {
+    const n = dansTransaction(this.db, (lignes) => {
       let n = 0;
       for (const l of lignes) {
         const pos = l.indexOf('|');
@@ -159,9 +215,7 @@ class SavoirDB {
         n++;
       }
       return n;
-    });
-    const lignes = contenu.split('\n').map(x => x.replace(/\r$/, '')).filter(x => x.trim());
-    const n = tx(lignes);
+    }, contenu.split('\n').map(x => x.replace(/\r$/, '')).filter(x => x.trim()));
     this._prep.meta.run('import_le', new Date().toISOString());
     return n;
   }
@@ -257,7 +311,7 @@ importerSql(dump) {
       });
     }
   }
-  const tx = this.db.transaction((entrees) => {
+  return dansTransaction(this.db, (entrees) => {
     this.db.prepare('DELETE FROM savoir').run();
     const stmt = this.db.prepare(`
       INSERT INTO savoir (cle_norm, cle, reponse, categorie, rang, source, maj_le)
@@ -268,8 +322,7 @@ importerSql(dump) {
       stmt.run(e);
     }
     return entrees.length;
-  });
-  return tx(lignes);
+  }, lignes);
 }
 
 fermer() {
@@ -280,10 +333,10 @@ fermer() {
   // dessus (indispensable sous Windows, ou SQLite garde un verrou).
   // Apres ecriture du fichier, appeler rouvrir().
   rouvrir() {
-    if (this.db && this.db.open) {
+    if (estOuvert(this.db)) {
       try { return this.total(); } catch (e) {}
     }
-    this.db = new Database(this.fichier);
+    this.db = ouvrirBase(this.fichier).db;
     this._init();
     return this.total();
   }

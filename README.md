@@ -59,7 +59,9 @@ PROJET/
 
 ## Prerequis
 
-- **Node.js >= 18** (voir `.nvmrc` : 20).
+- **Node.js >= 22.5** (voir `.nvmrc` : 22). Requis pour le module natif
+  `node:sqlite`, qui stocke les connaissances. Aucune dépendance native à
+  compiler, donc `npm install` fonctionne partout.
 - npm.
 - (optionnel) Python 3 et `pip install -r requirements.txt` pour les outils `*.py`.
 
