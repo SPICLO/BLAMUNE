@@ -1,1 +1,12 @@
+# Version de Node utilisee par Render.
+#
+# Priorite de lecture cote Render (doc officielle) :
+#   1. variable d'environnement NODE_VERSION (dashboard Render)
+#   2. fichier .node-version      <-- absent ici
+#   3. fichier .nvmrc             <-- CE FICHIER
+#   4. engines.node dans package.json (secours)
+#
+# Node 22 est le minimum : le savoir est stocke via node:sqlite, disponible
+# a partir de Node 22.5. Sans base, le serveur refuse de demarrer avec un
+# message explicite plutot que de tourner degrade.
 22
