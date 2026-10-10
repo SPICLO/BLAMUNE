@@ -84,4 +84,15 @@ versions antérieures sont visibles dans `git log`.
   `migrer_savoir_sqlite.js` migre les 1 266 entrées existantes (`--rapport`
   pour un diagnostic sans écriture). `server.js` migre automatiquement au
   premier démarrage si la base est vide.
+- **Banque de repli hors ligne** (`replis.txt` + `replis.js`). Quand l'IA est
+  injoignable (quota, coupure, clé absente), le serveur ne renvoie plus
+  « Désolé, j'ai eu un problème technique » mais une réponse de BLAMUNE tirée
+  dans un fichier de données français. Zéro latence, zéro quota, aucune panne
+  possible (le fichier est versionné et déployé avec le reste, donc disponible
+  24 h/24 même si le PC du créateur est éteint). 20 situations, détection par
+  motifs, tirage aléatoire avec mémorisation des 3 dernières réponses pour éviter
+  les répétitions, variantes selon le moment de la journée.
+  Principe : sur une question factuelle, BLAMUNE **avoue son ignorance** plutôt
+  que d'inventer une réponse.
+  Chaîne de repli : bot C++ local → savoir connu → banque → message d'erreur.
 - Contrôle admin factorisé (`isAdminUid`) et paramétrable par l'environnement.

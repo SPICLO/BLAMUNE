@@ -386,10 +386,10 @@ function enregistrerJetonInvite(uid, jeton) {
 // est binaire et la sauvegarde applicative ne manipule que du texte. Le
 // fichier savoir.txt reste dans la liste : c'est l'export lisible par le bot
 // Windows local et par git.
-const FICHIERS_RACINE = ['comptes.json', 'invites.json', 'savoir.txt', 'vocabulaire.txt', 'stats.json'];
+const FICHIERS_RACINE = ['comptes.json', 'invites.json', 'savoir.txt', 'vocabulaire.txt', 'replis.txt', 'stats.json'];
 const CLE_SAVOIR_SQL = 'savoir.sql';
 // config.json (cle API) et logs/ ne quittent jamais le serveur.
-const CHEMIN_SAUVEGARDE = /^(comptes\.json|invites\.json|savoir\.sql|savoir\.txt|vocabulaire\.txt|stats\.json|users\/[A-Za-z0-9_\-]{1,64}\/[A-Za-z0-9_.\-]{1,64})$/;
+const CHEMIN_SAUVEGARDE = /^(comptes\.json|invites\.json|savoir\.sql|savoir\.txt|vocabulaire\.txt|replis\.txt|stats\.json|users\/[A-Za-z0-9_\-]{1,64}\/[A-Za-z0-9_.\-]{1,64})$/;
 const TAILLE_MAX_FICHIER = 2 * 1024 * 1024;
 const TAILLE_MAX_TOTALE = 40 * 1024 * 1024;
 
@@ -1300,15 +1300,24 @@ function chercherSavoir(msg) {
   return meilleureRep;
 }
 
-// Ce que l'utilisateur voit quand l'IA echoue : on essaie d'abord le bot
-// C++ local (reponse immediate, hors ligne), ensuite savoir.txt, enfin le
-// message d'erreur habituel. Le service distant n'est interroge qu'apres un
-// echec reel de l'IA : aucune latence ajoutee sur le chemin nominal.
+// Ce que l'utilisateur voit quand l'IA echoue, dans l'ordre :
+//   1. le bot C++ local      (regles BLAMUNE, hors ligne, francais)
+//   2. le savoir connu       (reponse factuelle, si on l'a)
+//   3. la banque repli.txt   (ton de BLAMUNE, francais, hors ligne)
+//   4. le message d'erreur   ( dernier recours )
+// Aucune latence ajoutee sur le chemin nominal : tout est local, et le
+// service bot n'est interroge qu'apres un echec reel de l'IA.
+const { BanqueReplis } = require('./replis');
+const banqueReplis = new BanqueReplis(RACINE, path.join(RACINE, 'replis.txt'));
+
 async function reponseSecours(msg, e) {
   const local = await appelerBotLocal(msg);
   if (local) return local;
   const rep = chercherSavoir(msg);
-  return rep || messageTechnique(e);
+  if (rep) return rep;
+  const repli = banqueReplis.repli(msg);
+  if (repli) return repli;
+  return messageTechnique(e);
 }
 
 // --- Reponse classique : tout d'un coup (repli si le flux echoue) ---
@@ -3316,6 +3325,7 @@ server.listen(PORT, () => {
   console.log(`[BLAMUNE] Serveur pret sur le port ${PORT}`);
   console.log(`[BLAMUNE] Provider: ${config.api_provider}, Model: ${config.api_model}`);
   console.log(`[BLAMUNE] API Key: ${config.api_key ? 'Configuree' : 'NON CONFIGUREE'}`);
+  console.log(`[BLAMUNE] Banque de repli : ${banqueReplis.taille()} situations`);
   console.log(`[BLAMUNE] Cloud: ${storage.estConfigure() ? 'JSONBin.io' : 'Local'}`);
 });
 }

@@ -86,7 +86,7 @@ for f in ["server.js", "storage.js", "package.json", "package-lock.json",
           ".github/workflows/ci.yml", "tests/unit.test.js",
           "build_bot.ps1", "build_bot.bat", "requirements.txt",
           "CLOUD.md", "Dockerfile.bot", "docker-compose.yml", "bot_service.py",
-          "savoir_db.js", "migrer_savoir_sqlite.js",
+          "savoir_db.js", "migrer_savoir_sqlite.js", "replis.js", "replis.txt",
           "site/manifest.json", "site/app.js", "site/sw.js",
           "site/apple-touch-icon.png", "site/favicon.ico",
           "site/icon-192.png", "site/icon-512.png"]:

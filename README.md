@@ -46,6 +46,8 @@ PROJET/
 |- savoir.txt         Connaissances du bot (export lisible ; source : savoir.db)
 |- savoir_db.js       Source de verite SQLite des connaissances
 |- migrer_savoir_sqlite.js  Migration savoir.txt -> savoir.db
+|- replis.txt         Banque de repli francaise quand l'IA est injoignable
+|- replis.js          Detection de situation + tirage anti-repetition
 |- personnalite.txt   Personnalite du bot
 |- vocabulaire.txt    Vocabulaire du composeur de phrases
 |- site/              Front PWA (index.html, app.js, style.css, sw.js, manifest.json)

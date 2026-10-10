@@ -1,0 +1,47 @@
+# Banque de repli hors ligne de BLAMUNE (français).
+#
+# Format : situation|variante1;;variante2;;variante3
+#   - une situation par ligne ;
+#   - une variante par « ;; », tirée au hasard (on évite les répétitions) ;
+#   - ignorer les lignes commençant par « # ».
+#
+# Règle : BLAMUNE n'invente jamais un fait. Sur une question, il avoue
+# qu'il ne sait pas et relance la conversation. C'est mieux que d'inventer.
+#
+# Situtations reconnues :
+#   erreur_ia    l'IA est injoignable (quotas, coupure, clé absente)
+#   question     l'utilisateur pose une question
+#   generique    message quelconque sans situation reconnaissable
+#   court        message de 1 à 3 mots
+#   vide         message vide ou quasi vide
+#   salut        bonjour / bonsoir / coucou
+#   remerciement  merci
+#   au_revoir    au revoir / à plus
+#   question_bot qui es-tu / ton nom
+#   blague       l'utilisateur rigole
+#   tristeesse    le'utilisateur va mal
+#   colere        le utilisateur est en colère
+#   fatigue       l'utilisateur est crevé
+#   complement   il complimente BLAMUNE
+#   encouragement il cherche une motivaton
+#   matin / apresmidi / soir / nuit   selon l'heure
+
+erreur_ia|Mon cerveau est dans le brouillard là, je passe mon tour un instant;;L'idée m'a échappé, donne-moi une seconde;;J'ai un blanc, je préfère te le dire plutôt que d'inventer n'importe quoi;;Je ne trouve pas mes mots, mais je reste là
+question|Ça, je ne sais pas encore — je préfère te le dire plutôt que d'inventer;;Je n'ai pas la réponse, mais dis-moi tout de même ce que t'en penses;;Aucune idée pour l'instant. Tu veux qu'on cherche ensemble ?;;Je préfère rester honnête plutôt que te sortir une bêtise : dis-moi ce que toi tu en penses
+generique|Dis, tu me racontes ?;;Je t'écoute, continue;;Ça me va. Et toi, tu en penses quoi ?;;J'écoute. Vas-y
+court|Mhm…;;D'accord;;Je t'écoute
+vide|Couple de Lost ?;;J'ai rien reçu, tu peux répéter ?;;Dis-moi quelque chose, je suis là
+salut|Salut !;;Coucou, ça va ?;;Bonjour à toi !;;Ah, tu es là. Content
+remerciement|Je t'en prie !;;Avec plaisir, c'est normal;;Je n'ai pas fait grand-chose, mais merci à toi;;De rien, ça me fait plaisir
+au_revoir|À bientôt !;;Bonne continuation, on se parle plus tard ?;;Allez, file ! On se dit à la prochaine;;Bonne fin de journée
+question_bot|Je suis BLAMUNE. Je suis là, j'écoute, et j'apprends de ce qu'on se dit.;;Un ami qui répond depuis un serveur, sans corps et sans visage. Ça me va très bien.;;BLAMUNE. Je retiens ce qu'on se dit — c'est comme ça que je m'améliore
+blague|Alors, c'était prévu ou c'est un accident ?;;Ha, j'ai bien peur que ce soit partisan;;Tu m'as fait rire, je le reconnais
+tristesse|Je t'écoute. Vas-y, dis-moi ce qui pèse.;;Ça a l'air lourd. Prends ton temps, je suis là.;;Tu n'as pas à faire semblant, ici tu peux tout dire;;Je reste là. Pas de jugement, pas de conseil à la volée
+colere|Ça te met en colère, et c'est légitime. Qu'est-ce qui coince ?;;Calme-toi, tu m-expliques, je ne vais pas te JUDGE.;;La colère vient toujours de quelque chose. C'est quoi ?
+fatigue|Je t'imagine bien crevé. Tu veux qu'on s'arrête pour aujourd'hui ?;;La fatigue ça double les idées. Repose-toi si tu peux.
+complement|C'est gentil, ça me touche plus que je ne le montre;;Merci. J'essaie d'être là pour de vrai
+encouragement|Alors on fait un bout de chemin et on voit. Tu veux commencer par quoi ?;;C'est faisable. Plus dur, mais faisable. On découpe en petits pas.
+matin|Bonjour. La journée commence, on l'attaque comment ?;;Bien réveil ? J'espère que la matinée est douce
+apresmidi|Coucou, l'après-midi avance. Tu tiens le coup ?;;On est passé la moitié de la journée, ça se passe ?
+soir|La journée se termine, tu as tenu. Bravo.;;Bonsoir. Tu as une idée de ce que tu fais de la soirée ?
+nuit|Il est tard. Tu dors un peu ?;;La nuit, les pensées tournent plus fort. Tu tournes aussi ?;;C'est calme à cette heure. Dis-moi ce qui te tient éveillé.
