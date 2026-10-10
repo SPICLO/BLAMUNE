@@ -118,10 +118,18 @@ Le bot fonctionne **sans cle**. Pour activer la conversation intelligente :
 | Groq | `groq` | `https://api.groq.com/openai/v1` | `llama-3.1-8b-instant` |
 | OpenRouter | `openrouter` | `https://openrouter.ai/api/v1` | `meta-llama/llama-3.1-8b-instruct:free` |
 | Ollama (local, illimite) | `ollama` | `http://127.0.0.1:11434/v1` | `llama3.1` |
+| NVIDIA NIM (credits gratuits) | `nvidia` | `https://integrate.api.nvidia.com/v1` | `meta/llama-3.1-8b-instruct` |
+| Eden AI (passerelle, ~1 100 modeles) | `edenai` | `https://api.edenai.run/v3` | `openai/gpt-4o-mini` |
 
 Tous les fournisseurs `groq`, `openrouter`, `ollama`, `lmstudio`, `vllm`,
-`mistral`, `deepseek`, `openai` utilisent le format **OpenAI**
-(`POST {API_URL}/chat/completions`). Renseigne `API_KEY` (sauf Ollama local).
+`mistral`, `deepseek`, `openai`, `nvidia`, `edenai` utilisent le format
+**OpenAI** (`POST {API_URL}/chat/completions`). Renseigne `API_KEY` (sauf Ollama local).
+
+Pour lister les modeles disponibles d'un fournisseur compatible OpenAI :
+
+```bash
+curl -s "{API_URL}/models" -H "Authorization: Bearer {API_KEY}"
+```
 
 ## Variables d'environnement
 

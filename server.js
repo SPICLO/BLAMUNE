@@ -113,8 +113,14 @@ const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.7-fla
 // donne acces a 1 100+ modeles (OpenAI, Anthropic, Google, Meta...) via
 // https://api.edenai.run/v3. Attention : c'est un service PAYANT, la cle doit
 // etre accompagnee de credits sur le compte Eden.
+//
+// NVIDIA (`nvidia`, NIM) heberge des modeles open-source via
+// https://integrate.api.nvidia.com/v1 et offre des credits gratuits a
+// l'inscription sur build.nvidia.com. Les identifiants de modele sont de la
+// forme "nom_editeur/nom_modele" (ex. "meta/llama-3.1-8b-instruct").
 const PROVIDERS_OPENAI = ['openai', 'groq', 'openrouter', 'ollama', 'lmstudio',
-  'vllm', 'together', 'mistral', 'deepseek', 'perplexity', 'edenai', 'eden'];
+  'vllm', 'together', 'mistral', 'deepseek', 'perplexity', 'edenai', 'eden',
+  'nvidia', 'nim'];
 function providerOpenAI() {
   return PROVIDERS_OPENAI.indexOf(String(config.api_provider || '').toLowerCase()) >= 0;
 }
