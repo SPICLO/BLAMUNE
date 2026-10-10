@@ -106,10 +106,15 @@ const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.7-fla
 
 // Fournisseurs "compatibles OpenAI" : ils exposent POST {base}/chat/completions
 // avec le meme format de messages que l'API OpenAI. Brancher Groq, OpenRouter,
-// Ollama, LM Studio, vLLM, Mistral ou DeepSeek ne demande alors aucun code :
-// il suffit de regler API_PROVIDER / API_URL / API_MODEL.
+// Ollama, LM Studio, vLLM, Mistral, DeepSeek ou Eden AI ne demande alors aucun
+// code : il suffit de regler API_PROVIDER / API_URL / API_MODEL.
+//
+// Eden AI (`edenai`) est une passerelle multi-fournisseurs : une seule cle
+// donne acces a 1 100+ modeles (OpenAI, Anthropic, Google, Meta...) via
+// https://api.edenai.run/v3. Attention : c'est un service PAYANT, la cle doit
+// etre accompagnee de credits sur le compte Eden.
 const PROVIDERS_OPENAI = ['openai', 'groq', 'openrouter', 'ollama', 'lmstudio',
-  'vllm', 'together', 'mistral', 'deepseek', 'perplexity'];
+  'vllm', 'together', 'mistral', 'deepseek', 'perplexity', 'edenai', 'eden'];
 function providerOpenAI() {
   return PROVIDERS_OPENAI.indexOf(String(config.api_provider || '').toLowerCase()) >= 0;
 }
@@ -888,7 +893,12 @@ function construireContenus(histo, imageParts) {
 // Support plusieurs cles Gemini : API_KEYS=cle1,cle2,...
 // On bascule automatiquement sur la suivante quand une cle est en quota.
 let cleGeminiIndex = 0;
+// Rotation reservee au fournisseur Gemini. Si le fournisseur actif est
+// compatible OpenAI (Eden AI, Groq, Ollama...), on ne retourne RIEN : la
+// cle principale appartient a un autre service et ne doit jamais etre
+// envoyee en x-goog-api-key a l'API Google.
 function clesGemini() {
+  if (providerOpenAI()) return [];
   const raw = process.env.API_KEYS || process.env.API_KEY || '';
   const splittes = String(raw).split(',').map(s => s.trim()).filter(Boolean);
   if (splittes.length) return splittes;
@@ -1315,7 +1325,13 @@ function chercherSavoir(msg) {
 // Aucune latence ajoutee sur le chemin nominal : tout est local, et le
 // service bot n'est interroge qu'apres un echec reel de l'IA.
 const { BanqueReplis } = require('./replis');
-const banqueReplis = new BanqueReplis(RACINE, path.join(RACINE, 'replis.txt'));
+// Comme pour savoir.txt : on cherche d'abord dans le dossier de donnees, puis
+// dans le depot. Sans ce repli, un BLAMUNE_DATA_DIR vide (tests, cloud)
+// demarre sans banque et retombe sur le message d'erreur technique.
+const CHEMIN_REPLIS = fs.existsSync(path.join(RACINE, 'replis.txt'))
+  ? path.join(RACINE, 'replis.txt')
+  : path.join(__dirname, 'replis.txt');
+const banqueReplis = new BanqueReplis(RACINE, CHEMIN_REPLIS);
 
 async function reponseSecours(msg, e) {
   const local = await appelerBotLocal(msg);

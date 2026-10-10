@@ -111,4 +111,15 @@ versions antérieures sont visibles dans `git log`.
   le fichier fait autorité sur les connaissances *éditées* (une ligne retirée
   disparaît), tandis que les connaissances *apprises* en cours d'usage
   (`source` ≠ `migration`) sont conservées.
+- **Fournisseur `edenai` ajouté** : Eden AI est une passerelle
+  OpenAI-compatible (`https://api.edenai.run/v3`) donnant accès à 1 100+
+  modèles avec une seule clé. C'est un service **payant** : sans crédit sur
+  le compte, les appels renvoient `HTTP 402 insufficient_quota`.
+  La rotation `API_KEYS` est désormais restreinte au fournisseur Gemini :
+  la clé principale d'un fournisseur compatible OpenAI ne peut plus être
+  envoyée en `x-goog-api-key` à l'API Google.
+- **Banque de repli vide avec `BLAMUNE_DATA_DIR`** : `replis.txt` était
+  cherché uniquement dans le dossier de données. Un dossier vide (tests,
+  cloud) démarrait donc sans banque et retombait sur le message technique.
+  Repli sur le fichier du dépôt, comme pour `savoir.txt`.
 - Contrôle admin factorisé (`isAdminUid`) et paramétrable par l'environnement.
