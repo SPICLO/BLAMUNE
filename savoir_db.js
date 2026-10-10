@@ -188,34 +188,89 @@ class SavoirDB {
     return this._prep.allRang.all();
   }
 
-  // Import du fichier plat (migration initiale). Ne remplace pas une
-  // reponse deja presente en base si la ligne du fichier est vide.
-  importerFichier(fichier) {
-    let contenu = '';
-    try { contenu = fs.readFileSync(fichier, 'utf8'); } catch (e) { return 0; }
-    const n = dansTransaction(this.db, (lignes) => {
+  // Analyse un fichier plat en lignes structures.
+_analyserFichier(fichier) {
+  let contenu = '';
+  try { contenu = fs.readFileSync(fichier, 'utf8'); } catch (e) { return []; }
+  const lignes = [];
+  for (const l of contenu.split('\n')) {
+    const pos = l.indexOf('|');
+    if (pos <= 0) continue;
+    const cle = l.substring(0, pos).trim();
+    let rep = l.substring(pos + 1).trim();
+    if (!cle) continue;
+    let cat = null;
+    const pos2 = rep.indexOf('|');
+    if (pos2 >= 0) {
+      const num = rep.substring(pos2 + 1).trim();
+      rep = rep.substring(0, pos2).trim();
+      if (/^\d+$/.test(num)) cat = parseInt(num, 10);
+    }
+    lignes.push({ cle_norm: sansAccents(cle), cle, reponse: rep, categorie: cat, source: 'migration' });
+  }
+  return lignes;
+}
+
+// Synchronise le fichier plat ET la base, dans les deux sens.
+//
+// Pourquoi pas seulement un import a froid : la premiere version de la base
+// a ete creee a partir d'un savoir.txt encore pollue. Avec un import unique
+// ("si la base est vide"), les entrees supprimees du depot restaient en base
+// indefiniment — c'est exactement ce qui s'est produit en production.
+//
+// Regle de propriete des donnees :
+//   - le FICHIER versionne fait autorite sur les connaissances EDITEES
+//     (source 'migration') : une ligne retiree du fichier disparait de la base ;
+//   - les connaissances APPRISES en cours d'usage (source 'apprentissage',
+//     'bot-local', 'serveur') ne sont jamais supprimees, meme absentes du
+//     fichier : elles n'ont pas de contrepartie dans le depot.
+synchroniserFichier(fichier) {
+  const lignes = this._analyserFichier(fichier);
+  const dansFichier = new Set(lignes.map(l => l.cle_norm));
+  const resultat = dansTransaction(this.db, () => {
+    const stmt = this.db.prepare(`
+      INSERT INTO savoir (cle_norm, cle, reponse, categorie, rang, source, maj_le)
+      VALUES (@cle_norm, @cle, @reponse, @categorie, @rang, @source, datetime('now'))
+      ON CONFLICT(cle_norm) DO UPDATE SET
+        cle = excluded.cle,
+        reponse = CASE WHEN excluded.reponse <> '' THEN excluded.reponse ELSE savoir.reponse END,
+        categorie = COALESCE(excluded.categorie, savoir.categorie),
+        rang = COALESCE(savoir.rang, excluded.rang),
+        source = excluded.source,
+        maj_le = excluded.maj_le
+    `);
+    lignes.forEach((e, i) => stmt.run(Object.assign({ rang: i }, e)));
+
+    // Purge : uniquement les entrees issues du fichier, devenues absentes.
+    const toutes = this.db.prepare('SELECT cle_norm, source FROM savoir').all();
+    const del = this.db.prepare('DELETE FROM savoir WHERE cle_norm = ?');
+    let purges = 0;
+    for (const t of toutes) {
+      if (t.source === 'migration' && !dansFichier.has(t.cle_norm)) {
+        del.run(t.cle_norm);
+        purges++;
+      }
+    }
+    return { importes: lignes.length, purges: purges };
+  });
+  this._prep.meta.run('sync_le', new Date().toISOString());
+  return resultat;
+}
+
+// Import simple, sans purge (restauration d'une sauvegarde ancienne).
+// Ne remplace pas une reponse deja presente en base si la ligne du fichier
+// est vide.
+importerFichier(fichier) {
+    const lignes = this._analyserFichier(fichier);
+    if (!lignes.length) return 0;
+    const n = dansTransaction(this.db, (entrees) => {
       let n = 0;
-      for (const l of lignes) {
-        const pos = l.indexOf('|');
-        if (pos <= 0) continue;
-        const cle = l.substring(0, pos).trim();
-        let rep = l.substring(pos + 1).trim();
-        if (!cle) continue;
-        let cat = null;
-        const pos2 = rep.indexOf('|');
-        if (pos2 >= 0) {
-          const num = rep.substring(pos2 + 1).trim();
-          rep = rep.substring(0, pos2).trim();
-          if (/^\d+$/.test(num)) cat = parseInt(num, 10);
-        }
-        this._prep.upsert.run({
-          cle_norm: sansAccents(cle), cle, reponse: rep, categorie: cat,
-          rang: n, source: 'migration'
-        });
+      for (const e of entrees) {
+        this._prep.upsert.run(Object.assign({ rang: n }, e));
         n++;
       }
       return n;
-    }, contenu.split('\n').map(x => x.replace(/\r$/, '')).filter(x => x.trim()));
+    }, lignes);
     this._prep.meta.run('import_le', new Date().toISOString());
     return n;
   }

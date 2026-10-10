@@ -1211,30 +1211,37 @@ function exporterSavoir() {
   }
 }
 
-// Migration unique : si la base est vide, on importe le fichier livre avec le
-// depot. Les imports ulterieurs (route POST /savoir, apprentissage) passent
-// desormais par la base.
-(function migrerSavoirSiVide() {
+// Synchronisation au demarrage : le savoir.txt du depot fait autorite sur
+// les connaissances EDITEES (il est relu a chaque demarrage, et une ligne
+// retiree du fichier disparait de la base). Les connaissances apprises en
+// cours d'usage ne sont jamais supprimees.
+//
+// Pourquoi a chaque demarrage et seulement au premier : avec un import
+// unique (« si la base est vide »), une base deja creee conserve
+// indefiniment le contenu d'un savoir.txt ancien. C'est ce qui a garde en
+// production des entrees polluees retirees du depot.
+(function synchroniserSavoirAuDemarrage() {
   try {
-    if (savoirDb.total() === 0) {
-      // Deux emplacements possibles : la copie du depot (__dirname) et celle
-      // du dossier de donnees (RACINE). On importe celui du depot en premier.
-      const candidats = [path.join(__dirname, 'savoir.txt'), CHEMIN_SAVOIR_EXPORT];
-      for (const f of candidats) {
-        if (!fs.existsSync(f)) continue;
-        const n = savoirDb.importerFichier(f);
-        if (n > 0) {
-          console.log('[BLAMUNE] Savoir : ' + n + ' entrees importees dans SQLite');
-          break;
-        }
-      }
+    const avant = savoirDb.total();
+    // Deux emplacements : la copie du depot (__dirname) et celle du dossier de
+    // donnees (RACINE). Le depot gagne, c'est lui qui est versionne.
+    const candidats = [path.join(__dirname, 'savoir.txt'), CHEMIN_SAVOIR_EXPORT];
+    let r = null;
+    for (const f of candidats) {
+      if (!fs.existsSync(f)) continue;
+      r = savoirDb.synchroniserFichier(f);
+      break;
+    }
+    if (r && (r.purges || avant !== savoirDb.total())) {
+      console.log('[BLAMUNE] Savoir synchronise : ' + r.importes + ' lignes du fichier, ' +
+        r.purges + ' retiree(s), ' + savoirDb.total() + ' entrees en base');
+    } else if (avant === 0) {
+      console.log('[BLAMUNE] Savoir : base vide et aucun fichier trouve');
     }
     // L'export savoir.txt doit toujours exister dans le dossier de donnees :
     // c'est lui que lisent le bot Windows local, git et la sauvegarde JSONBin.
-    // S'il est absent (BLAMUNE_DATA_DIR vide au premier lancement), on le
-    // genere, sinon la sauvegarde ne contiendrait pas le savoir.
     exporterSavoir();
-  } catch (e) { loggerErreur('savoir-db', 'migration: ' + e.message); }
+  } catch (e) { loggerErreur('savoir-db', 'synchronisation: ' + e.message); }
 })();
 
 // Reflet en memoire du savoir, reconstruit a partir de la base.

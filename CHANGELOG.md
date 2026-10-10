@@ -102,4 +102,13 @@ versions antérieures sont visibles dans `git log`.
   à installer. `better-sqlite3` reste accepté comme repli si installé
   volontairement (Node 18/20). Node minimum porté à **22.5**, CI alignée
   sur Node 22.
+- **Savoir obsolète jamais corrigé en production** : la base SQLite n'importait
+  `savoir.txt` que si elle était **vide**. Une base déjà créée gardait donc
+  indéfiniment le contenu d'un `savoir.txt` ancien — les entrées polluées
+  (`salut`, `connais`, `suite`) retirées du dépôt continuaient de répondre
+  « Je ne sais pas encore... » en ligne. Vérifié sur le déploiement réel.
+  `savoirDb.synchroniserFichier()` rejoue le dépôt à **chaque démarrage** :
+  le fichier fait autorité sur les connaissances *éditées* (une ligne retirée
+  disparaît), tandis que les connaissances *apprises* en cours d'usage
+  (`source` ≠ `migration`) sont conservées.
 - Contrôle admin factorisé (`isAdminUid`) et paramétrable par l'environnement.
