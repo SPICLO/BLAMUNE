@@ -68,13 +68,16 @@ jobs:
       - name: Installer le cross-compilateur Windows (mingw-w64)
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++-mingw-w64-x86-64
+          sudo apt-get install -y g++-mingw-w64-x86-64-posix
 
-      # Meme toolchain que build_bot.ps1 (MinGW g++). -fsyntax-only ne lie
-      # pas, donc -lwininet n'est pas necessaire : les en-tetes wininet.h
-      # suffisent a valider les appels.
+      # Meme toolchain que build_bot.ps1 (MinGW g++). On appelle le binaire
+      # -posix explicitement plutot que x86_64-w64-mingw32-g++ : ce nom-la
+      # n'existe que via update-alternatives (posinst du metapaquet), donc
+      # on evite une dependance implicite.
+      # -fsyntax-only ne lie pas : -lwininet est inutile, les en-tetes
+      # wininet.h suffisent a valider les appels.
       - name: Branche _WIN32 (locale, WinINet, appel en ligne)
-        run: x86_64-w64-mingw32-g++ -std=c++14 -fsyntax-only bot.cpp
+        run: x86_64-w64-mingw32-g++-posix -std=c++14 -fsyntax-only bot.cpp
 
       # Branche POSIX : c'est celle que compile Dockerfile.bot.
       - name: Branche POSIX (build Docker)

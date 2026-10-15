@@ -22,6 +22,7 @@ s'executent partout.
 import io
 import json
 import os
+import socket
 import sys
 import threading
 import time
@@ -33,8 +34,10 @@ from http.server import ThreadingHTTPServer
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import bot_service  # noqa: E402
 
-# Le service ne lit que sur POSIX (select() + tubes). Sous Windows on ne teste
-# que la couche HTTP, qui n'utilise pas select().
+# bot_service._lire_jusqu_a() fait select() puis os.read() sur le descripteur
+# du stdout du bot. Sous POSIX un tube convient. Sous Windows, select() n'accepte
+# QUE des sockets et os.read() echoue sur un socket : on passe donc par
+# socket.socketpair() et on shimme os.read le temps des tests concernes.
 POSIX = os.name == "posix"
 
 PROMPT_CHOIX = "Ton choix :"
@@ -43,12 +46,103 @@ PROMPT_GENRE = "(masculin/feminin)"
 PROMPT_NOM = "ton nom ?"
 ATTENTE = bot_service.PROMPT_ATTENTE
 
+# fd -> socket, pour le shim os.read() sous Windows
+_SOCKETS = {}
+_os_read_reel = os.read
+
+
+def _os_read_compat(fd, taille):
+    sock = _SOCKETS.get(fd)
+    if sock is not None:
+        return sock.recv(taille)
+    return _os_read_reel(fd, taille)
+
+
+class _Lecture(object):
+    """Adaptateur de lecture : .read(n) + .fileno(), que ce soit tube ou socket."""
+
+    def __init__(self, flux, est_socket):
+        self._f = flux
+        self._est_socket = est_socket
+
+    def fileno(self):
+        return self._f.fileno()
+
+    def read(self, n):
+        if self._est_socket:
+            try:
+                return self._f.recv(n)
+            except OSError:
+                # Le test a fini et a ferme le canal : on se comporte comme
+                # une fin de flux pour que le thread se termine proprement.
+                return b""
+        return self._f.read(n)
+
+    def close(self):
+        try:
+            self._f.close()
+        except OSError:
+            pass
+
+
+class _Ecriture(object):
+    """Adaptateur d'ecriture : .write(bytes) + .flush(), tube ou socket."""
+
+    def __init__(self, flux, est_socket):
+        self._f = flux
+        self._est_socket = est_socket
+
+    def write(self, data):
+        if self._est_socket:
+            return self._f.sendall(data)
+        return self._f.write(data)
+
+    def flush(self):
+        if not self._est_socket:
+            self._f.flush()
+
+    def close(self):
+        try:
+            self._f.close()
+        except OSError:
+            pass
+
+
+def _canaux():
+    """(lecture du service, ecriture du service, lecture du bot, ecriture du bot).
+
+    Chaque tube relie le bot AU SERVICE dans un seul sens :
+      - le bot ecrit l'invite, le service la lit  -> ce tube-la
+      - le service ecrit la reponse, le bot la lit -> l'autre tube
+    """
+    if POSIX:
+        sr, sw = os.pipe()   # bot -> service
+        er, ew = os.pipe()   # service -> bot
+        return (os.fdopen(sr, "rb", buffering=0), os.fdopen(ew, "wb", buffering=0),
+                os.fdopen(er, "rb", buffering=0), os.fdopen(sw, "wb", buffering=0))
+    # socketpair : bidirectionnel, le service prend 'a', le bot 'b'.
+    a, b = socket.socketpair()
+    _SOCKETS[a.fileno()] = a
+    _SOCKETS[b.fileno()] = b
+    return (_Lecture(a, True), _Ecriture(a, True), _Lecture(b, True), _Ecriture(b, True))
+
+
+class _SelectCompatible(unittest.TestCase):
+    """Active le shim os.read() quand la lecture passe par un socket."""
+
+    def setUp(self):
+        super(_SelectCompatible, self).setUp()
+        if not POSIX:
+            reel = os.read
+            os.read = _os_read_compat
+            self.addCleanup(setattr, os, "read", reel)
+
 
 class _TubeEcriture(object):
     """Fait semblant d'etre le stdin d'un processus : collecte ce qui est ecrit."""
 
-    def __init__(self, fd):
-        self._f = os.fdopen(fd, "wb", buffering=0)
+    def __init__(self, ecrivure):
+        self._f = ecrivure
         self.lignes = []
 
     def write(self, data):
@@ -59,10 +153,7 @@ class _TubeEcriture(object):
         self._f.flush()
 
     def close(self):
-        try:
-            self._f.close()
-        except OSError:
-            pass
+        self._f.close()
 
 
 class FauxProcess(object):
@@ -73,24 +164,30 @@ class FauxProcess(object):
     """
 
     def __init__(self, invites, reponse="BLAMUNE : salut !", defiler=False):
-        sortie_r, sortie_w = os.pipe()   # faux bot -> service
-        entree_r, entree_w = os.pipe()   # service -> faux bot
-        self._sortie_w = sortie_w
-        self.stdout = os.fdopen(sortie_r, "rb", buffering=0)
-        self.stdin = _TubeEcriture(entree_w)
+        lecture_srv, ecrit_srv, lecture_bot, ecrit_bot = _canaux()
+        self._lecture = lecture_srv
+        self._ecriture = ecrit_srv
+        self._lecture_bot = lecture_bot
+        self._ecriture_bot = ecrit_bot
+        self.stdout = lecture_srv
+        self.stdin = _TubeEcriture(ecrit_srv)
         self.lignes_recues = []
         self.message_recu = None
         self.poll = lambda: None
         self._defiler = defiler
         self._thread = threading.Thread(
-            target=self._boucle, args=(invites, reponse, entree_r), daemon=True
+            target=self._boucle, args=(invites, reponse, lecture_bot),
+            daemon=True,
         )
         self._thread.start()
 
     # -- helpers --
     def _ecrire(self, texte):
         try:
-            os.write(self._sortie_w, texte.encode("utf-8"))
+            if POSIX:
+                os.write(self._ecriture_bot.fileno(), texte.encode("utf-8"))
+            else:
+                self._ecriture_bot.write(texte.encode("utf-8"))
         except OSError:
             # Le test a fini (close() a ferme le tube) alors que ce thread
             # daemon s'executait encore : rien a signaler.
@@ -103,8 +200,7 @@ class FauxProcess(object):
         if self._defiler and condition:
             time.sleep(8)
 
-    def _boucle(self, invites, reponse, entree_r):
-        f = os.fdopen(entree_r, "rb", buffering=0)
+    def _boucle(self, invites, reponse, f):
         try:
             self._ecrire(invites[0])
             for invite in invites[1:]:
@@ -113,13 +209,10 @@ class FauxProcess(object):
             self.message_recu = self._lire_ligne(f)
             self._bloquer_si(True)
             self._ecrire(reponse + ATTENTE)
-            while True:  # garde le tube ouvert, comme un vrai bot
+            while True:  # garde le canal ouvert, comme un vrai bot
                 time.sleep(0.05)
         finally:
-            try:
-                f.close()
-            except OSError:
-                pass
+            f.close()
 
     @staticmethod
     def _lire_ligne(f):
@@ -134,22 +227,20 @@ class FauxProcess(object):
             morceaux += c
 
     def close(self):
-        for f in (self.stdout, self.stdin):
+        for f in (self.stdout, self.stdin, self._lecture, self._ecriture,
+                  self._lecture_bot, self._ecriture_bot):
             try:
                 f.close()
             except OSError:
                 pass
-        try:
-            os.close(self._sortie_w)
-        except OSError:
-            pass
+        _SOCKETS.clear()
 
 
-@unittest.skipUnless(POSIX, "select() sur tubes : POSIX uniquement")
-class TestLectureNonBloquante(unittest.TestCase):
+class TestLectureNonBloquante(_SelectCompatible):
     """_lire_jusqu_a : lecture par marqueur, tolerant aux invites coupees."""
 
     def setUp(self):
+        super(TestLectureNonBloquante, self).setUp()
         self.proc = FauxProcess([PROMPT_CHOIX])
         self.addCleanup(self.proc.close)
         self.bot = bot_service.BotLocal.__new__(bot_service.BotLocal)
@@ -165,7 +256,7 @@ class TestLectureNonBloquante(unittest.TestCase):
         # setUp a deja fait ecrire "Ton choix : " : on le consomme d'abord,
         # sinon il traine dans le buffer et pollue le resultat.
         self.bot._lire_jusqu_a(PROMPT_CHOIX, delai=5)
-        os.write(self.proc._sortie_w, ("avant " + ATTENTE + " apres").encode("utf-8"))
+        self.proc._ecrire("avant " + ATTENTE + " apres")
         self.assertEqual(self.bot._lire_jusqu_a(ATTENTE, delai=5), "avant ")
 
     def test_timeout_leve_timeouterror(self):
@@ -207,8 +298,7 @@ class TestNettoyage(unittest.TestCase):
         self.assertEqual(self.bot._nettoyer("\n\nToi :\n"), "")
 
 
-@unittest.skipUnless(POSIX, "select() sur tubes : POSIX uniquement")
-class TestPoigneeDeMain(unittest.TestCase):
+class TestPoigneeDeMain(_SelectCompatible):
     """demarrer() : l'ordre exact des invites est le contrat avec bot.cpp."""
 
     def _bot(self, invites, mode="2", **kw):

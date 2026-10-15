@@ -25,6 +25,16 @@ services:
       # Une seule requete a la fois : evite de saturer une petite GPU.
       OLLAMA_MAX_LOADED_MODELS: "1"
       OLLAMA_NUM_PARALLEL: "1"
+    # L'image ollama ne declare aucun HEALTHCHECK. Sans celui-ci,
+    # depend_on ne peut pas attendre que le serveur soit reellement pret :
+    # le serveur Node demarrerait pendant que le modele se charge encore et
+    # les premieres conversations partiraient en repli.
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
     volumes:
       - ollama_data:/root/.ollama
     deploy:
@@ -42,7 +52,8 @@ services:
     image: ollama/ollama:latest
     container_name: blamune-ollama-init
     depends_on:
-      - ollama
+      ollama:
+        condition: service_healthy
     environment:
       OLLAMA_HOST: http://ollama:11434
     volumes:
@@ -69,8 +80,13 @@ services:
       dockerfile: Dockerfile.bot
     container_name: blamune-bot
     restart: unless-stopped
+    # ollama-init est un conteneur one-shot : il SORT une fois le modele
+    # telecharge et chauffe. Attendre "service_healthy" sur un service qui
+    # se termine bloquerait le demarrage indefiniment ; la condition
+    # correcte est "service_completed_successfully".
     depends_on:
-      - ollama-init
+      ollama-init:
+        condition: service_completed_successfully
     environment:
       BOT_MODE: "2"
       BOT_GENRE: "feminin"
@@ -88,9 +104,14 @@ services:
       dockerfile: Dockerfile
     container_name: blamune-server
     restart: unless-stopped
+    # Le serveur n'ecoute correctement qu'une fois le bot et Ollama pret.
+    # Sans ces conditions, il demarre des le lancement de la stack et les
+    # premiers messages tombent dans le repli hors ligne.
     depends_on:
-      - bot
-      - ollama
+      bot:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:

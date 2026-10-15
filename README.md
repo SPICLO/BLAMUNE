@@ -180,7 +180,7 @@ Le bot C++ est compile par la CI, pas par les tests ci-dessus. Le job
 
 | Branche | Commande | Ce qu'elle couvre |
 |---|---|---|
-| `_WIN32` | `x86_64-w64-mingw32-g++ -std=c++14 -fsyntax-only bot.cpp` | toute l'implementation reelle : WinINet, appel en ligne, `pousserSavoir` |
+| `_WIN32` | `x86_64-w64-mingw32-g++-posix -std=c++14 -fsyntax-only bot.cpp` | toute l'implementation reelle : WinINet, appel en ligne, `pousserSavoir` |
 | POSIX | `g++ -std=c++14 -fsyntax-only bot.cpp` | ce que compile `Dockerfile.bot` |
 
 La branche POSIX ne contient que des stubs (`pousserSavoir` et
@@ -188,9 +188,10 @@ La branche POSIX ne contient que des stubs (`pousserSavoir` et
 passer la moitie du fichier.
 
 `tests/bot_service.test.py` reproduit le protocole d'invites de `bot.cpp`
-avec un faux processus, sans avoir besoin du binaire. Les tests qui
-utilisent `select()` ne tournent que sous POSIX (le service ne tourne que
-dans le conteneur Linux) ; les tests HTTP s'executent partout.
+avec un faux processus, sans avoir besoin du binaire. Les 24 tests
+s'executent sous Windows et sous Linux : la couche de transport utilise
+`socket.socketpair()` là où `select()` n'accepte pas les tubes, et shimme
+`os.read()` le temps des tests qui lisent.
 
 Verification du dossier de deploiement :
 
