@@ -42,10 +42,11 @@ fournisseur compatible OpenAI) pour la conversation intelligente.
 PROJET/
 |- server.js          Serveur Express (routes, IA, comptes, admin)
 |- storage.js         Persistance cloud JSONBin
+|- savoir_db.js       Source de verite SQLite des connaissances
+|- lib/               Modules extraits de server.js (voir plus bas)
 |- bot.cpp / bot.exe  Bot local C++ (moteur de regles)
 |- bot_service.py     Service HTTP qui enveloppe bot.cpp (cloud)
 |- savoir.txt         Connaissances du bot (export lisible ; source : savoir.db)
-|- savoir_db.js       Source de verite SQLite des connaissances
 |- migrer_savoir_sqlite.js  Migration savoir.txt -> savoir.db
 |- replis.txt         Banque de repli francaise quand l'IA est injoignable
 |- replis.js          Detection de situation + tirage anti-repetition
@@ -53,9 +54,29 @@ PROJET/
 |- vocabulaire.txt    Vocabulaire du composeur de phrases
 |- site/              Front PWA (index.html, app.js, style.css, sw.js, manifest.json)
 |- admin/             Panneau d'administration
-|- tests/             Tests (run.js + unit.test.js + bot_service.test.py)
+|- tests/             Tests (run.js + unit.test.js + lib.test.js + bot_service.test.py)
 |- users/             Donnees par utilisateur (ignore par git)
 |- logs/ backups/     Journaux et sauvegardes (ignores par git)
+```
+
+### Modules extraits de `server.js`
+
+`server.js` fait encore ~2 990 lignes (routes et couche IA). Les briques
+sans etat partage ont ete sorties dans `lib/`, chacune **injectant ses
+dependances** (`dossierUser`, `storage`, `questionModele`...) plutot que de
+les importer. Consequence directe : elles sont testables sans demarrer le
+serveur — voir `tests/lib.test.js`.
+
+| Module | Role | Dependances injectees |
+|---|---|---|
+| `lib/rate_limit.js` | Fenetre glissante par IP et par utilisateur, purge periodique | aucune |
+| `lib/memoire.js` | `users/<uid>/`, `memoire.txt` (format plat partage avec le bot C++) | `usersDir`, `storage` |
+| `lib/historique.js` | `historique_mode<1\|2>.json`, push cloud | `dossierUser`, `storage` |
+| `lib/resume.js` | Repliage des anciens echanges en tache de fond | `dossierUser`, `cheminHistorique`, `questionModele`, `nettoyerReponse`, `loggerErreur` |
+
+Le reste (routes, couche IA multi-fournisseurs, quotas) est encore dans
+`server.js` : ces briques partagent un etat commun et doivent etre
+extraites ensemble, pas une par une.
 ```
 
 ## Prerequis
@@ -170,8 +191,8 @@ Deux entrées existent :
 ## Tests
 
 ```powershell
-npm test                      # tests d'integration (lance un vrai server.js + faux modele)
-npm run test:unit             # tests unitaires (node:test)
+npm test                          # tests d'integration (lance un vrai server.js + faux modele)
+npm run test:unit                 # tests unitaires (node:test) : coherence + modules de lib/
 python tests\bot_service.test.py  # service HTTP du bot (poignee de main, /health, /respond)
 ```
 

@@ -10,6 +10,12 @@ if (process.env.NODE_ENV !== 'test') {
 const http = require('http');
 const https = require('https');
 const storage = require('./storage');
+// Modules extraits de server.js (voir lib/). Chaque etat reste dans son
+// module : ici on ne fait que brancher les appels.
+const { checkRateLimit, checkUserRateLimit, purger: purgerRateLimits } = require('./lib/rate_limit');
+const { creerHistorique } = require('./lib/historique');
+const { creerMemoire } = require('./lib/memoire');
+const { creerResume } = require('./lib/resume');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -283,24 +289,7 @@ function etatModele() {
 }
 
 // ==================== RATE LIMITING ====================
-const rateLimits = {};
-const userRateLimits = {};
-function checkRateLimit(key, limit = 30) {
-  const now = Date.now();
-  if (!rateLimits[key]) rateLimits[key] = [];
-  rateLimits[key] = rateLimits[key].filter(t => now - t < 60000);
-  if (rateLimits[key].length >= limit) return false;
-  rateLimits[key].push(now);
-  return true;
-}
-function checkUserRateLimit(uid, limit = 20) {
-  const now = Date.now();
-  if (!userRateLimits[uid]) userRateLimits[uid] = [];
-  userRateLimits[uid] = userRateLimits[uid].filter(t => now - t < 60000);
-  if (userRateLimits[uid].length >= limit) return false;
-  userRateLimits[uid].push(now);
-  return true;
-}
+// Implementation dans lib/rate_limit.js (fenetre glissante, purge periodique).
 
 // ==================== AUTH ====================
 function getIp(req) {
@@ -560,67 +549,10 @@ function extraireChamp(req, champ) {
 }
 
 // ==================== USER DIR ====================
-function dossierUser(uid) {
-  if (!uid || uid.length < 3) return path.join(USERS_DIR, '_invalid');
-  const d = path.join(USERS_DIR, uid);
-  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-  return d;
-}
-
-// Memoire de BLAMUNE : une ligne par champ, dans cet ordre.
-// Les fichiers ancians (9 lignes) restent lisibles : les champs manquants
-// valent '' et sont simplement ignores.
-const CHAMPS_MEMOIRE = ['nom', 'plat', 'hobby', 'motsFavoris', 'genre', 'aime', 'aimePas', 'age',
-  'humeur',        // 9 : etat interne de BLAMUNE (commandes "sois joyeux", "mode triste")
-  'humeurUser',    // 10 : humeur detectee chez l'utilisateur (a ne pas confondre)
-  'ville', 'travail', 'musique', 'serie', 'sport', 'reve',
-  'anniversaire',  // 16 : "12 mai" ou "12 mai 2005"
-  'promesses'];    // 17 : ce qu'il a demande de ne pas oublier (separes par |)
-
-function lireMemoire(uid) {
-  const mem = {};
-  CHAMPS_MEMOIRE.forEach(c => { mem[c] = c === 'motsFavoris' ? [] : ''; });
-  try {
-    const f = path.join(dossierUser(uid), 'memoire.txt');
-    if (!fs.existsSync(f)) return mem;
-    const lignes = fs.readFileSync(f, 'utf8').split('\n').map(l => l.trim());
-    CHAMPS_MEMOIRE.forEach((c, i) => {
-      if (!lignes[i]) return;
-      if (c === 'motsFavoris') mem[c] = lignes[i].split(',').map(s => s.trim()).filter(Boolean);
-      else mem[c] = lignes[i];
-    });
-  } catch (e) {}
-  return mem;
-}
-
-function ecrireMemoire(uid, champ, valeur) {
-  if (!valeur || !valeur.trim()) return false;
-  const mem = lireMemoire(uid);
-  const idx = CHAMPS_MEMOIRE.indexOf(champ);
-  if (idx < 0) return false;
-  const lignes = CHAMPS_MEMOIRE.map(c => c === 'motsFavoris' ? mem[c].join(',') : (mem[c] || ''));
-  lignes[idx] = valeur;
-  try { fs.writeFileSync(path.join(dossierUser(uid), 'memoire.txt'), lignes.join('\n'), 'utf8'); } catch (e) {}
-  if (storage.estConfigure()) storage.setMemoire(uid, memoireDepuisLignes(lignes));
-  return true;
-}
-
-function memoireDepuisLignes(lignes) {
-  const mem = {};
-  CHAMPS_MEMOIRE.forEach((c, i) => {
-    const v = lignes[i] || '';
-    mem[c] = c === 'motsFavoris' ? v.split(',').filter(Boolean) : v;
-  });
-  return mem;
-}
-
-function sauvegarderMemoireComplete(uid, mem) {
-  const lignes = CHAMPS_MEMOIRE.map(c => c === 'motsFavoris'
-    ? (Array.isArray(mem[c]) ? mem[c].join(',') : (mem[c] || ''))
-    : (mem[c] || ''));
-  try { fs.writeFileSync(path.join(dossierUser(uid), 'memoire.txt'), lignes.join('\n'), 'utf8'); } catch (e) {}
-  if (storage.estConfigure()) storage.setMemoire(uid, memoireDepuisLignes(lignes));
-}
+// Implementation dans lib/memoire.js. USERS_DIR est defini plus haut, dans
+// CONFIG : c'est le seul point de contact avec le disque.
+const { dossierUser, lireMemoire, ecrireMemoire,
+        sauvegarderMemoireComplete } = creerMemoire({ usersDir: USERS_DIR, storage });
 
 // ==================== AUTO-APPRENTISSAGE BLAMUNE ====================
 // Une capture regex est gourmande : "je joue au foot et j'ecoute du rap"
@@ -828,26 +760,10 @@ function autoApprentissage(uid, msg) {
 }
 
 // ==================== HISTORIQUE ====================
-function cheminHistorique(uid, mode) {
-  const d = dossierUser(uid);
-  if (mode === '1' || mode === '2') return path.join(d, `historique_mode${mode}.json`);
-  return path.join(d, 'historique.json');
-}
-
-function chargerHistorique(uid, mode) {
-  if (!uid) return [];
-  try {
-    const f = cheminHistorique(uid, mode);
-    if (!fs.existsSync(f)) return [];
-    return JSON.parse(fs.readFileSync(f, 'utf8'));
-  } catch (e) { return []; }
-}
-
-function sauvegarderHistorique(uid, mode, historique) {
-  // Ecriture compacte : meme contenu, fichiers 3 a 4 fois plus legers.
-  try { fs.writeFileSync(cheminHistorique(uid, mode), JSON.stringify(historique), 'utf8'); } catch (e) {}
-  if (storage.estConfigure()) storage.setHistorique(uid, mode, historique);
-}
+// Implementation dans lib/historique.js, cablee ici parce qu'elle a besoin
+// de dossierUser() ci-dessus.
+const { cheminHistorique, chargerHistorique, sauvegarderHistorique } =
+  creerHistorique({ dossierUser, storage });
 
 // ==================== APPEL GEMINI ====================
 // Deux points qui font gagner du temps :
@@ -2305,76 +2221,11 @@ function livrerProactif(uid) {
 }
 
 // ==================== RESUME DE CONVERSATION ====================
-// L'API ne recoit que les 16 derniers echanges : au-dela, le debut de la
-// discussion etait perdu pour toujours. On replie donc de temps en temps les
-// anciens echanges dans un resume persistant (resume_mode2.json), relu a
-// chaque message. L'appel est fait APRES la reponse, en tache de fond :
-// zero latence ajoutee pour l'utilisateur.
-const RESUME_SEUIL = 10; // echanges non couverts avant de plier
-const RESUME_BLOC = 10;  // taille d'un pliage
-const resumeEnCours = {};
-
-function cheminResume(uid, mode) {
-  return path.join(dossierUser(uid), 'resume_mode' + mode + '.json');
-}
-
-function lireResume(uid, mode) {
-  try {
-    const f = cheminResume(uid, mode);
-    if (!fs.existsSync(f)) return { texte: '', couverts: 0 };
-    const d = JSON.parse(fs.readFileSync(f, 'utf8'));
-    return {
-      texte: typeof d.texte === 'string' ? d.texte : '',
-      couverts: typeof d.couverts === 'number' ? d.couverts : 0
-    };
-  } catch (e) { return { texte: '', couverts: 0 }; }
-}
-
-function ecrireResume(uid, mode, r) {
-  try { fs.writeFileSync(cheminResume(uid, mode), JSON.stringify(r), 'utf8'); } catch (e) {}
-}
-
-function supprimerResume(uid, mode) {
-  try { fs.unlinkSync(cheminResume(uid, mode)); } catch (e) {}
-}
-
-async function majResume(uid, mode) {
-  const cle = uid + '_' + mode;
-  if (resumeEnCours[cle]) return;
-  resumeEnCours[cle] = true;
-  try {
-    const f = cheminHistorique(uid, mode);
-    if (!fs.existsSync(f)) return;
-    const hist = JSON.parse(fs.readFileSync(f, 'utf8'));
-    if (!Array.isArray(hist)) return;
-    const resume = lireResume(uid, mode);
-    // Historique efface entre temps : le resume n'a plus de sens.
-    if (resume.couverts > hist.length) {
-      supprimerResume(uid, mode);
-      return;
-    }
-    if (hist.length - resume.couverts < RESUME_SEUIL) return;
-    const debut = resume.couverts;
-    const bout = hist.slice(debut, debut + RESUME_BLOC);
-    if (bout.length < RESUME_BLOC) return;
-    const anterieur = resume.texte ? resume.texte + '\n\n' : '';
-    const donnees = bout.map(e => (e && e.qui === 'moi' ? 'Utilisateur : ' : 'BLAMUNE : ') + ((e && e.texte) || '')).join('\n');
-    const consigne = 'RESUME-CONVERSATION\n' +
-      'Tu resumes une conversation entre BLAMUNE et un utilisateur. Reponds UNIQUEMENT par le resume, ' +
-      'en francais, 60 mots maximum, sans liste a puces, sans guillemets, sans phrase d\'intro.\n' +
-      (anterieur ? 'Resume deja etabli (le completer sans rien perdre d\'important) :\n' + anterieur + '\n\n' : '') +
-      'Suite de la conversation :\n' + donnees;
-    const brut = await questionModele(consigne);
-    const propre = nettoyerReponse(String(brut || '')).trim();
-    if (propre && propre !== '...') {
-      ecrireResume(uid, mode, { texte: propre, couverts: debut + bout.length });
-    }
-  } catch (e) {
-    loggerErreur('resume', e.message);
-  } finally {
-    resumeEnCours[cle] = false;
-  }
-}
+// Implementation dans lib/resume.js, cablee ici parce qu'elle depend de
+// l'historique et de questionModele() ci-dessus.
+const { lireResume, supprimerResume, majResume } = creerResume({
+  dossierUser, cheminHistorique, questionModele, nettoyerReponse, loggerErreur
+});
 
 // ==================== EXTRACTION PAR LE MODELE ====================
 // Les regex attrapent les formes classiques ("je m'appelle Theo") et ratent
@@ -3374,14 +3225,7 @@ setInterval(() => {
     if (now - c.derniereActivite > 300000) delete connexionsActives[uid];
   }
   // Cleanup rate limits memory leak
-  for (const key of Object.keys(rateLimits)) {
-    rateLimits[key] = rateLimits[key].filter(t => now - t < 60000);
-    if (rateLimits[key].length === 0) delete rateLimits[key];
-  }
-  for (const uid of Object.keys(userRateLimits)) {
-    userRateLimits[uid] = userRateLimits[uid].filter(t => now - t < 60000);
-    if (userRateLimits[uid].length === 0) delete userRateLimits[uid];
-  }
+  purgerRateLimits();
   // Cleanup inactive api histories (no activity for 30 min)
   for (const key of Object.keys(apiHistoriqueParUser)) {
     const hist = apiHistoriqueParUser[key];

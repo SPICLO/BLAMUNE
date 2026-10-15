@@ -30,6 +30,8 @@ jobs:
       - name: Verifier la syntaxe JavaScript
         run: |
           for f in server.js storage.js tests/run.js tests/unit.test.js \
+                   tests/lib.test.js lib/rate_limit.js lib/memoire.js \
+                   lib/historique.js lib/resume.js \
                    site/app.js site/sw.js admin/admin.js; do
             echo "check $f"
             node --check "$f"

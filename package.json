@@ -21,7 +21,7 @@
     "start": "node server.js",
     "dev": "node server.js",
     "test": "node tests/run.js",
-    "test:unit": "node --test tests/unit.test.js",
+    "test:unit": "node --test tests/unit.test.js tests/lib.test.js",
     "lint": "eslint ."
   },
   "dependencies": {

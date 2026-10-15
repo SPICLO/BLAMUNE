@@ -84,6 +84,8 @@ for f in ["server.js", "storage.js", "package.json", "package-lock.json",
           "Dockerfile", ".dockerignore", ".editorconfig", ".nvmrc",
           ".prettierrc.json", "eslint.config.mjs", "verifier_deploiement.py", "extraire_savoir.py", "fusionner_vocabulaire.py",
           ".github/workflows/ci.yml", "tests/unit.test.js", "tests/bot_service.test.py",
+          "tests/lib.test.js",
+          "lib/rate_limit.js", "lib/memoire.js", "lib/historique.js", "lib/resume.js",
           "build_bot.ps1", "build_bot.bat", "requirements.txt",
           "CLOUD.md", "Dockerfile.bot", "docker-compose.yml", "bot_service.py",
           "savoir_db.js", "migrer_savoir_sqlite.js", "replis.js", "replis.txt",
@@ -93,7 +95,7 @@ for f in ["server.js", "storage.js", "package.json", "package-lock.json",
     check(f"{f} present et suivi par git",
           os.path.exists(f) and f in suivis)
 
-for d in ["site", "admin"]:
+for d in ["site", "admin", "lib"]:
     check(f"dossier {d}/ suivi par git",
           any(x.startswith(d + "/") for x in suivis))
 
