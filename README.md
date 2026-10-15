@@ -43,6 +43,7 @@ PROJET/
 |- server.js          Serveur Express (routes, IA, comptes, admin)
 |- storage.js         Persistance cloud JSONBin
 |- bot.cpp / bot.exe  Bot local C++ (moteur de regles)
+|- bot_service.py     Service HTTP qui enveloppe bot.cpp (cloud)
 |- savoir.txt         Connaissances du bot (export lisible ; source : savoir.db)
 |- savoir_db.js       Source de verite SQLite des connaissances
 |- migrer_savoir_sqlite.js  Migration savoir.txt -> savoir.db
@@ -52,7 +53,7 @@ PROJET/
 |- vocabulaire.txt    Vocabulaire du composeur de phrases
 |- site/              Front PWA (index.html, app.js, style.css, sw.js, manifest.json)
 |- admin/             Panneau d'administration
-|- tests/             Tests (integration + unitaires)
+|- tests/             Tests (run.js + unit.test.js + bot_service.test.py)
 |- users/             Donnees par utilisateur (ignore par git)
 |- logs/ backups/     Journaux et sauvegardes (ignores par git)
 ```
@@ -108,6 +109,16 @@ g++ -std=c++14 bot.cpp -o bot.exe -lwininet
 
 Le projet utilise C++14 car la version MinGW de Dev-C++ ne supporte pas C++17.
 
+`bot.exe` est ignore par git : un clone frais ne contient donc pas le
+binaire. `ouvrir_bot.bat` le compile automatiquement au premier lancement
+(il appelle `build_bot.ps1` si `bot.exe` est absent) et s'arrete avec un
+message clair si la compilation echoue, au lieu de demarrer un serveur
+qui ne pourra pas repondre.
+
+`build_bot.ps1` renvoie un code de sortie non nul si la compilation echoue :
+un script qui "reussit" en ayant produit aucun binaire ferait echouer la
+detection plus tard, au pire moment.
+
 ## Configuration de l'IA
 
 Le bot fonctionne **sans cle**. Pour activer la conversation intelligente :
@@ -147,7 +158,9 @@ Voir `.env.example` (commentaires complets). Principales :
 Deux entrées existent :
 
 - **Version web IA externe / serveur Node** : `npm start` ; fonctionne sans clé en mode local limité, mais l'IA conversationnelle complète nécessite `API_KEY`.
-- **Version locale C++ sans clé** : `ouvrir_bot.bat` ou `.\serveur_bot.ps1` ; utilise `bot.exe` et `site/`.
+- **Version locale C++ sans clé** : `ouvrir_bot.bat` ou `.\serveur_bot.ps1` ;
+  utilise `bot.exe` et `site/`. Au premier lancement, `ouvrir_bot.bat`
+  compile `bot.exe` s'il est absent.
 
 - Site : `http://localhost:8080/`
 - Admin : `http://localhost:8080/admin`
@@ -157,9 +170,27 @@ Deux entrées existent :
 ## Tests
 
 ```powershell
-npm test          # tests d'integration (lance un vrai server.js + faux modele)
-npm run test:unit # tests unitaires (node:test)
+npm test                      # tests d'integration (lance un vrai server.js + faux modele)
+npm run test:unit             # tests unitaires (node:test)
+python tests\bot_service.test.py  # service HTTP du bot (poignee de main, /health, /respond)
 ```
+
+Le bot C++ est compile par la CI, pas par les tests ci-dessus. Le job
+`bot-cpp` verifie **les deux branches plateforme** de `bot.cpp` :
+
+| Branche | Commande | Ce qu'elle couvre |
+|---|---|---|
+| `_WIN32` | `x86_64-w64-mingw32-g++ -std=c++14 -fsyntax-only bot.cpp` | toute l'implementation reelle : WinINet, appel en ligne, `pousserSavoir` |
+| POSIX | `g++ -std=c++14 -fsyntax-only bot.cpp` | ce que compile `Dockerfile.bot` |
+
+La branche POSIX ne contient que des stubs (`pousserSavoir` et
+`appelerEnLigne` y sont vides) : verifier uniquement celle-ci laisserait
+passer la moitie du fichier.
+
+`tests/bot_service.test.py` reproduit le protocole d'invites de `bot.cpp`
+avec un faux processus, sans avoir besoin du binaire. Les tests qui
+utilisent `select()` ne tournent que sous POSIX (le service ne tourne que
+dans le conteneur Linux) ; les tests HTTP s'executent partout.
 
 Verification du dossier de deploiement :
 

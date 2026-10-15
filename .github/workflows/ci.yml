@@ -44,5 +44,38 @@ jobs:
       - name: Tests d'integration
         run: npm test
 
+      - name: Tests du service bot (Python)
+        run: python tests/bot_service.test.py
+
       - name: Verification du deploiement (Python)
         run: python verifier_deploiement.py
+
+  # ---------------------------------------------------------------------
+  # bot.cpp : ~10 000 lignes, jamais compilees par le job "test".
+  #
+  # Le fichier a deux branches plateforme. La branche #else (POSIX) n'est
+  # que des stubs : toute l'implementation reelle (WinINet, appel en ligne,
+  # pousserSavoir) vit dans #ifdef _WIN32. Compiler uniquement sur ubuntu
+  # verifierait ~9 800 lignes en ignorant les 226 qui font le bot
+  # fonctionner en local. On compile donc LES DEUX.
+  # ---------------------------------------------------------------------
+  bot-cpp:
+    name: Bot C++ (bot.cpp)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer le cross-compilateur Windows (mingw-w64)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-x86-64
+
+      # Meme toolchain que build_bot.ps1 (MinGW g++). -fsyntax-only ne lie
+      # pas, donc -lwininet n'est pas necessaire : les en-tetes wininet.h
+      # suffisent a valider les appels.
+      - name: Branche _WIN32 (locale, WinINet, appel en ligne)
+        run: x86_64-w64-mingw32-g++ -std=c++14 -fsyntax-only bot.cpp
+
+      # Branche POSIX : c'est celle que compile Dockerfile.bot.
+      - name: Branche POSIX (build Docker)
+        run: g++ -std=c++14 -fsyntax-only bot.cpp

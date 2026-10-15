@@ -28,4 +28,15 @@ $source = Join-Path $PSScriptRoot 'bot.cpp'
 $output = Join-Path $PSScriptRoot 'bot.exe'
 Write-Host "Compilation : $source -> $output"
 & $gcc -std=c++14 $source -o $output -lwininet
-Write-Host 'Compilation terminée : bot.exe'
+
+# Sans ces verifications, un echec de compilation laissait un script qui
+# "reussit" quand meme : l'appelant (ouvrir_bot.bat, CI) ne pouvait pas
+# savoir que bot.exe n'existait pas.
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "La compilation a echoue (code $LASTEXITCODE) : bot.exe n'a pas ete produit."
+}
+if (-not (Test-Path $output)) {
+    Write-Error "bot.exe est toujours absent apres compilation. Verifie que $gcc accepte -std=c++14 (et non c++17)."
+}
+
+Write-Host 'Compilation terminee : bot.exe'

@@ -83,7 +83,7 @@ for f in ["server.js", "storage.js", "package.json", "package-lock.json",
           "README.md", "LICENSE", "CHANGELOG.md", ".env.example",
           "Dockerfile", ".dockerignore", ".editorconfig", ".nvmrc",
           ".prettierrc.json", "eslint.config.mjs", "verifier_deploiement.py", "extraire_savoir.py", "fusionner_vocabulaire.py",
-          ".github/workflows/ci.yml", "tests/unit.test.js",
+          ".github/workflows/ci.yml", "tests/unit.test.js", "tests/bot_service.test.py",
           "build_bot.ps1", "build_bot.bat", "requirements.txt",
           "CLOUD.md", "Dockerfile.bot", "docker-compose.yml", "bot_service.py",
           "savoir_db.js", "migrer_savoir_sqlite.js", "replis.js", "replis.txt",
@@ -97,7 +97,27 @@ for d in ["site", "admin"]:
     check(f"dossier {d}/ suivi par git",
           any(x.startswith(d + "/") for x in suivis))
 
-section("4. Poids du depot")
+section("4. Coverage du bot C++ (regressions deja corrigees)")
+
+ci = open(".github/workflows/ci.yml", encoding="utf-8").read()
+bat = open("ouvrir_bot.bat", encoding="utf-8").read()
+
+# bot.cpp fait ~10 000 lignes et a deux branches plateforme. Sans ces
+# controles, on peut supprimer la compilation de la CI ou le build au
+# premier lancement : plus aucun test ne le rattraperait.
+check("la CI compile bot.cpp",
+      "bot.cpp" in ci,
+      "le job bot-cpp verifie les branches _WIN32 et POSIX")
+
+check("la CI verifie la branche _WIN32 (WinINet)",
+      "mingw" in ci.lower(),
+      "la branche #ifdef _WIN32 contient toute l'implementation reelle")
+
+check("ouvrir_bot.bat compile bot.exe si absent",
+      "build_bot.ps1" in bat,
+      "bot.exe est ignore par git : un clone frais n'en a pas")
+
+section("5. Poids du depot")
 
 total = 0
 for x in suivis:
