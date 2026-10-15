@@ -15,6 +15,7 @@ const storage = require('./storage');
 const { checkRateLimit, checkUserRateLimit, purger: purgerRateLimits } = require('./lib/rate_limit');
 const { creerHistorique } = require('./lib/historique');
 const { creerMemoire } = require('./lib/memoire');
+const { creerConfigIA } = require('./lib/config_ia');
 const { creerResume } = require('./lib/resume');
 
 const app = express();
@@ -84,110 +85,23 @@ app.use((req, res, next) => {
 });
 
 // ==================== CONFIG ====================
-let config = {
-  api_provider: 'gemini',
-  api_key: process.env.API_KEY || '',
-  api_model: 'gemini-3.5-flash',
-  // Base de l'API : on y ajoute '/models/<modele>:...' selon l'appel.
-  // Accepte aussi l'URL complete (ancien format) : voir baseGemini().
-  api_url: process.env.API_URL || 'https://generativelanguage.googleapis.com/v1beta',
-  // Reponses courtes (1 a 5 phrases nettoyees) : inutile de laisser
-  // le modele generer des milliers de tokens, ca rallonge la reponse.
-  api_max_tokens: 1024,
-  api_temperature: 0.7,
-  // Extraction des faits par le modele (tache de fond, apres la reponse) :
-  // comprend les formes que les regex ratent, au prix d'un appel modele en
-  // plus par message substantiel. METTRE false (ou MEMOIRE_EXTRACTION=0)
-  // pour revenir aux seules regex.
-  memoire_extraction: true,
-  // Recherche web (grounding Google Search) : activee uniquement quand le
-  // message parle d'actualite (heuristique dans mereiteRecherche), pour ne
-  // pas facturer une recherche a chaque phrase. RECHERCHE_WEB=0 pour couper.
-  recherche_web: process.env.RECHERCHE_WEB !== '0'
-};
-
-// gemini-2.5-flash n'existe plus pour les nouveaux comptes Google
-// ("no longer available to new users") : on le remplace par 3.8-flash.
-const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.7-flash'];
-
-// Fournisseurs "compatibles OpenAI" : ils exposent POST {base}/chat/completions
-// avec le meme format de messages que l'API OpenAI. Brancher Groq, OpenRouter,
-// Ollama, LM Studio, vLLM, Mistral, DeepSeek ou Eden AI ne demande alors aucun
-// code : il suffit de regler API_PROVIDER / API_URL / API_MODEL.
+// Fournisseur, liste de modeles et rotation : implementation dans
+// lib/config_ia.js.
 //
-// Eden AI (`edenai`) est une passerelle multi-fournisseurs : une seule cle
-// donne acces a 1 100+ modeles (OpenAI, Anthropic, Google, Meta...) via
-// https://api.edenai.run/v3. Attention : c'est un service PAYANT, la cle doit
-// etre accompagnee de credits sur le compte Eden.
-//
-// NVIDIA (`nvidia`, NIM) heberge des modeles open-source via
-// https://integrate.api.nvidia.com/v1 et offre des credits gratuits a
-// l'inscription sur build.nvidia.com. Les identifiants de modele sont de la
-// forme "nom_editeur/nom_modele" (ex. "meta/llama-3.1-8b-instruct").
-const PROVIDERS_OPENAI = ['openai', 'groq', 'openrouter', 'ollama', 'lmstudio',
-  'vllm', 'together', 'mistral', 'deepseek', 'perplexity', 'edenai', 'eden',
-  'nvidia', 'nim'];
-function providerOpenAI() {
-  return PROVIDERS_OPENAI.indexOf(String(config.api_provider || '').toLowerCase()) >= 0;
-}
-
-// Modeles de secours du mode compatible OpenAI (API_MODELS, separes par virgule).
-const OPENAI_FALLBACK_MODELS = String(process.env.API_MODELS || '')
-  .split(',').map(s => s.trim()).filter(Boolean);
-
-// Tous les modeles utilisables, du principal au fallback.
-// La liste de secours depend du fournisseur (Gemini vs compatible OpenAI).
-function modelesConnus() {
-  const secours = providerOpenAI() ? OPENAI_FALLBACK_MODELS : FALLBACK_MODELS;
-  return [config.api_model, ...secours.filter(m => m !== config.api_model)];
-}
-
-// Dernier modele qui a repondu. Le gaspillage avant : chaque requete
-// recommencait par le modele principal (mort ou en quota) et depensait
-// 2 appels inutiles avant de trouver celui qui repondait vraiment.
-let dernierModeleOk = '';
-function modeleActif() {
-  return (dernierModeleOk && modelesConnus().indexOf(dernierModeleOk) >= 0)
-    ? dernierModeleOk
-    : modelesConnus()[0];
-}
-function ordreModeles() {
-  const premier = modeleActif();
-  return [premier, ...modelesConnus().filter(m => m !== premier)];
-}
-function memoriserModeleOk(modele) {
-  if (!modele || modelesConnus().indexOf(modele) < 0) return;
-  if (dernierModeleOk === modele) return;
-  dernierModeleOk = modele;
-  // Survit a un redemarrage : stats.json est ecrit sur disque tout de suite.
-  stats.dernierModeleOk = modele;
-  stats.modeleOkDate = new Date().toISOString();
-  sauverStats();
-}
-
-// Env vars first
-if (process.env.API_KEY) config.api_key = process.env.API_KEY;
-if (process.env.API_PROVIDER) config.api_provider = process.env.API_PROVIDER;
-if (process.env.API_MODEL) config.api_model = process.env.API_MODEL;
-if (process.env.API_URL) config.api_url = process.env.API_URL;
-if (process.env.API_MAX_TOKENS) config.api_max_tokens = parseInt(process.env.API_MAX_TOKENS);
-if (process.env.API_TEMPERATURE) config.api_temperature = parseFloat(process.env.API_TEMPERATURE);
-if (process.env.MEMOIRE_EXTRACTION) config.memoire_extraction = process.env.MEMOIRE_EXTRACTION !== '0';
-
-// Fallback to config.json
-const configPath = path.join(RACINE, 'config.json');
-try {
-  if (fs.existsSync(configPath)) {
-    const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    if (cfg.api_provider && !process.env.API_PROVIDER) config.api_provider = cfg.api_provider;
-    if (cfg.api_key && !process.env.API_KEY) config.api_key = cfg.api_key;
-    if (cfg.api_model && !process.env.API_MODEL) config.api_model = cfg.api_model;
-    if (cfg.api_url && !process.env.API_URL) config.api_url = cfg.api_url;
-    if (cfg.api_max_tokens && !process.env.API_MAX_TOKENS) config.api_max_tokens = cfg.api_max_tokens;
-    if (cfg.api_temperature && !process.env.API_TEMPERATURE) config.api_temperature = cfg.api_temperature;
-    if (cfg.memoire_extraction !== undefined && !process.env.MEMOIRE_EXTRACTION) config.memoire_extraction = !!cfg.memoire_extraction;
-  }
-} catch (e) { loggerErreur('config', e.message); }
+// onModeleOk est un callback volontairement EVALU PLUS TARD : il touche
+// stats et sauverStats, definis plus bas. Injecter un callback plutot que
+// les objets evite d'avoir a deplacer tout le bloc STATE ici.
+const { config, providerOpenAI, modeleActif, ordreModeles,
+        memoriserModeleOk, restaureModeleOk, dernierModeleOkConnu } = creerConfigIA({
+  racine: RACINE,
+  onModeleOk: (modele) => {
+    // Survit a un redemarrage : stats.json est ecrit sur disque tout de suite.
+    stats.dernierModeleOk = modele;
+    stats.modeleOkDate = new Date().toISOString();
+    sauverStats();
+  },
+  loggerErreur,
+});
 
 // ==================== DATA ====================
 const COMPTES_PATH = path.join(RACINE, 'comptes.json');
@@ -239,9 +153,7 @@ function sauverStats() {
 
 chargerStats();
 // Apres un redemarrage on repart du modele qui repondait avant.
-if (stats.dernierModeleOk && modelesConnus().indexOf(stats.dernierModeleOk) >= 0) {
-  dernierModeleOk = stats.dernierModeleOk;
-}
+restaureModeleOk(stats.dernierModeleOk);
 
 // ==================== ALERTES ====================
 // Avant : quand tout casse, la seule trace est une ligne dans /admin/logs.
@@ -283,7 +195,7 @@ function etatModele() {
   return {
     principal: config.api_model,
     actif: modeleActif(),
-    reussi: dernierModeleOk,
+    reussi: dernierModeleOkConnu(),
     ordre: ordreModeles()
   };
 }
@@ -486,9 +398,7 @@ function appliquerSauvegarde(snap) {
   if (snap.stats && typeof snap.stats === 'object') {
     stats = Object.assign({}, stats, snap.stats);
     stats.demarrage = new Date().toISOString();
-    if (stats.dernierModeleOk && modelesConnus().indexOf(stats.dernierModeleOk) >= 0) {
-      dernierModeleOk = stats.dernierModeleOk;
-    }
+    restaureModeleOk(stats.dernierModeleOk);
   }
   if (storage.estConfigure()) storage.setComptes(comptes);
   return ecrits;
@@ -671,7 +581,7 @@ function autoApprentissage(uid, msg) {
   }
 
   // Anniversaire: "mon anniversaire c'est le 12 mai", "je suis ne le 3 mai 2005"
-  // (on compare sans accents : "fevrier" / "février" marchent)
+  // (on compare sans accents : "fevrier" / "fÃ©vrier" marchent)
   const clair = sansAccents(lower);
   const RECHERCHE_MOIS = 'janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre';
   m = clair.match(new RegExp('(?:mon anniversaire|mon jour de naissance)\\s*(?:c\'est|est|:)?\\s*(?:le\\s+)?(\\d{1,2})\\s+(?:de\\s+)?(' + RECHERCHE_MOIS + ')(?:\\s+(?:en\\s+)?(19\\d{2}|20\\d{2}))?'));
@@ -745,7 +655,7 @@ function autoApprentissage(uid, msg) {
     const humeur = m[2] || m[1];
     if (humeur && mem.humeur !== humeur) { mem.humeur = humeur; changed = true; }
   }
-  if (/(?:enleve|supprime|enlever|retire|enl[eè]ve)\s+(?:la\s+|l['\u2019\u0027]?\s*|les\s+)?humeur/i.test(lower)) { mem.humeur = ''; changed = true; }
+  if (/(?:enleve|supprime|enlever|retire|enl[eÃ¨]ve)\s+(?:la\s+|l['\u2019\u0027]?\s*|les\s+)?humeur/i.test(lower)) { mem.humeur = ''; changed = true; }
 
   // Souvenirs : moments marquants que BLAMUNE garde pour les conversations futures
   try {
@@ -1149,7 +1059,7 @@ function exporterSavoir() {
 // cours d'usage ne sont jamais supprimees.
 //
 // Pourquoi a chaque demarrage et seulement au premier : avec un import
-// unique (« si la base est vide »), une base deja creee conserve
+// unique (Â« si la base est vide Â»), une base deja creee conserve
 // indefiniment le contenu d'un savoir.txt ancien. C'est ce qui a garde en
 // production des entrees polluees retirees du depot.
 (function synchroniserSavoirAuDemarrage() {
@@ -1270,7 +1180,7 @@ async function reponseSecours(msg, e) {
 // Google ; sinon on laisse la cascade changer de modele (chaque modele a son
 // propre quota) plutot que de faire patienter l'utilisateur 45 secondes.
 // `avecOutils` : la recherche web n'est demandee QUE par les messages de
-// conversation (appelerGemini) — jamais par resume/extraction, pour ne pas
+// conversation (appelerGemini) â€” jamais par resume/extraction, pour ne pas
 // facturer une recherche web a chaque tache de fond.
 async function modeleClassique(modele, contents, budget, patient, avecOutils) {
   const sansReflexion = !reflexionRefusee;
@@ -1690,10 +1600,10 @@ function contexteHeureEGO() {
 function getPromptBLAMUNE(humeur) {
   const humeurMap = {
     'joyeux': 'Tu es en pleine forme, tu ris facilement, tu es ultra positif et enthousiaste. Tout t\'amuse.',
-    'calme': 'Tu es zen, posé, tu parles doucement. Tu es reflectif et paisible.',
+    'calme': 'Tu es zen, posÃ©, tu parles doucement. Tu es reflectif et paisible.',
     'fatigue': 'Tu es mou, tu t\'ennuies un peu, tu reponds mollement. "bof", "j\'ai la flemme".',
     'energique': 'Tu es en pleine puissance, tu parles vite, tu es motive. Tout est possible.',
-    'triste': 'Tu es un peu down, mélancolique. Tu parles moins, tu es plus sentimental.',
+    'triste': 'Tu es un peu down, mÃ©lancolique. Tu parles moins, tu es plus sentimental.',
     'blagueur': 'Tu es un farceur, tu fais des jeux de mots, des vannes, tu rigoles tout le temps.'
   };
   const humeurText = humeur && humeurMap[humeur] ? '\n\nTON ETAT INTERIEUR : ' + humeurMap[humeur] + ' C\'est ce que TU ressens en ce moment, vis-le a ta facon. L\'humeur de l\'utilisateur peut etre differente de la tienne.' : '';
@@ -1848,7 +1758,7 @@ function blocSysteme(o) {
   // ci-dessous lui dit d'en faire quelque chose au lieu de l'ignorer.
   if (o.image) t += "\n\nIMAGE RECUE : il vient de t'envoyer une photo avec ce message. Regarde-la et reagis naturellement (decris ce que tu vois si ca a du sens).";
 
-  // Anniversaire : connu, daté, on le prepare plutot que de le rater.
+  // Anniversaire : connu, datÃ©, on le prepare plutot que de le rater.
   if (memoire.anniversaire) {
     const j = joursAvantAnniversaire(memoire.anniversaire);
     if (j === 0) t += `\n\nANNIVERSAIRE : c'est AUJOURD'HUI (${memoire.anniversaire}) ! Souhaite-lui un joyeux anniversaire, c'est le moment.`;
@@ -2060,7 +1970,7 @@ function detecterSouvenirs(etat, lower) {
     if (!p.re.test(propre)) continue;
     const now = Date.now();
     const dernier = etat.souvenirs[etat.souvenirs.length - 1];
-    // Même souvenir déjà noté il y a moins de 3 h : on ne le rajoute pas.
+    // MÃªme souvenir dÃ©jÃ  notÃ© il y a moins de 3 h : on ne le rajoute pas.
     if (dernier && now - dernier.ts < 10800000 && dernier.texte === p.texte) continue;
     if (etat.souvenirs.some(s => s.texte === p.texte && now - s.ts < 86400000)) continue;
     etat.souvenirs.push({ ts: now, texte: p.texte });
@@ -2168,9 +2078,9 @@ function evenementProactif(uid) {
     return {
       cle: 'manque', type: 'manque',
       texte: variante([
-        "Tu m'as manqué. Ça fait " + jours + " jour" + (jours > 1 ? 's' : '') + " que t'as pas donné de nouvelles.",
+        "Tu m'as manquÃ©. Ã‡a fait " + jours + " jour" + (jours > 1 ? 's' : '') + " que t'as pas donnÃ© de nouvelles.",
         "Plus de nouvelles depuis " + jours + " jours" + surnom + "... tout va bien ?",
-        "Je comptais les jours. " + jours + " jours de silence, ça laisse des marques."
+        "Je comptais les jours. " + jours + " jours de silence, Ã§a laisse des marques."
       ], uid + 'manque' + jours)
     };
   }
@@ -2182,9 +2092,9 @@ function evenementProactif(uid) {
       return {
         cle: 'promesse', type: 'promesse',
         texte: variante([
-          "Petit rappel : tu m'avais demandé de ne pas oublier — « " + liste[0] + " ». J'y pense encore.",
-          "Au fait, concernant « " + liste[0] + " » : je n'ai pas oublié.",
-          "Je te dois un rappel : « " + liste[0] + " ». Ça avance ?"
+          "Petit rappel : tu m'avais demandÃ© de ne pas oublier â€” Â« " + liste[0] + " Â». J'y pense encore.",
+          "Au fait, concernant Â« " + liste[0] + " Â» : je n'ai pas oubliÃ©.",
+          "Je te dois un rappel : Â« " + liste[0] + " Â». Ã‡a avance ?"
         ], uid + 'promesse')
       };
     }
@@ -2231,7 +2141,7 @@ const { lireResume, supprimerResume, majResume } = creerResume({
 // Les regex attrapent les formes classiques ("je m'appelle Theo") et ratent
 // tout le reste : "c'est moi Maeva", une reponse "17 ans" a une question, ou
 // trois infos d'un coup. On demande alors au modele un objet JSON de mises a
-// jour — en tache de fond, apres la reponse, et SEULEMENT si les regex n'ont
+// jour â€” en tache de fond, apres la reponse, et SEULEMENT si les regex n'ont
 // rien trouve (sinon on paie un appel pour rien).
 const CHAMPS_EXTRACTION = ['nom', 'age', 'genre', 'ville', 'travail', 'plat', 'hobby',
   'sport', 'musique', 'serie', 'reve', 'aime', 'aimePas', 'motsFavoris', 'anniversaire'];
@@ -2670,7 +2580,7 @@ app.post('/invite/jeton', (req, res) => {
 // rejoint savoir.txt IMMERDIATEMENT (aucun commit ni deploy) et sert de
 // secours des le prochain message quand Gemini est en panne. Ecriture
 // protegee : authentification stricte (invite muni de son jeton ou compte
-// admin — pas d'invite legacy sans enregistrement) + debit limite.
+// admin â€” pas d'invite legacy sans enregistrement) + debit limite.
 app.post('/savoir', (req, res) => {
   const auth = extraireAuth(req);
   if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
@@ -2924,7 +2834,7 @@ app.post('/send', async (req, res) => {
       // Commentaire SSE ignore par le client : sert de diagnostic
       // (modele utilise + duree totale de la requete).
       try {
-        res.write(':diag modele=' + (dernierModeleOk || '?') +
+        res.write(':diag modele=' + (dernierModeleOkConnu() || '?') +
                   ' duree=' + duree + 'ms reflexion=' + (reflexionRefusee ? 'off-forcee' : 'off') + '\n\n');
         res.write('data: ' + JSON.stringify({ fin: true, etat, reponses, confiance: 'haute' }) + '\n\n');
       } catch (e) {}

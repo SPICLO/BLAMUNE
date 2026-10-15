@@ -14,6 +14,7 @@ const { checkRateLimit, checkUserRateLimit, purger } = require('../lib/rate_limi
 const { creerMemoire } = require('../lib/memoire');
 const { creerHistorique } = require('../lib/historique');
 const { creerResume } = require('../lib/resume');
+const { creerConfigIA } = require('../lib/config_ia');
 
 // Storage cloud desactive : ces tests ne doivent toucher aucun service.
 const storageFaux = { estConfigure: () => false, setMemoire() {}, setHistorique() {} };
@@ -157,6 +158,171 @@ test('historique : sans uid on renvoie un tableau vide', (t) => {
   assert.deepStrictEqual(chargerHistorique('', '2'), []);
 });
 
+// ========================= CONFIG FOURNISSEUR IA =========================
+
+// creerConfigIA lit process.env a chaque appel. Un seul mecanisme les
+// restaure : deux mecanismes imbriques se marchaient dessus, l'un
+// restaurant l'environnement pendant que l'autre le vidait.
+const ENV_IA = ['API_KEY', 'API_PROVIDER', 'API_MODEL', 'API_URL',
+  'API_MAX_TOKENS', 'API_TEMPERATURE', 'MEMOIRE_EXTRACTION', 'RECHERCHE_WEB'];
+
+function isoleEnvIA(t, env) {
+  const saved = {};
+  for (const k of ENV_IA) { saved[k] = process.env[k]; delete process.env[k]; }
+  Object.assign(process.env, env || {});
+  t.after(() => {
+    for (const k of ENV_IA) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  });
+}
+
+function configDeTest(t, { configJson = null, env = {} } = {}) {
+  const root = dossierTmp(t);
+  if (configJson) fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify(configJson), 'utf8');
+  isoleEnvIA(t, env);
+  return creerConfigIA({ racine: root, onModeleOk: () => {}, loggerErreur: () => {} });
+}
+
+test('config IA : valeurs par defaut sans env ni config.json', (t) => {
+  const { config } = configDeTest(t);
+  assert.strictEqual(config.api_provider, 'gemini');
+  assert.strictEqual(config.api_model, 'gemini-3.5-flash');
+  assert.strictEqual(config.api_key, '');
+  assert.strictEqual(config.recherche_web, true, 'la recherche web est activee par defaut');
+});
+
+test('config IA : l environnement prime sur config.json', (t) => {
+  const { config } = configDeTest(t, {
+    configJson: { api_model: 'depuis-fichier', api_provider: 'groq' },
+    env: { API_MODEL: 'depuis-env' },
+  });
+  assert.strictEqual(config.api_model, 'depuis-env', 'API_MODEL doit primer');
+  // Non surcharge par l'env : le fichier garde la main.
+  assert.strictEqual(config.api_provider, 'groq');
+});
+
+test('config IA : config.json est lu quand l env est muet', (t) => {
+  const { config } = configDeTest(t, { configJson: { api_model: 'depuis-fichier' } });
+  assert.strictEqual(config.api_model, 'depuis-fichier');
+});
+
+test('config IA : RECHERCHE_WEB=0 et MEMOIRE_EXTRACTION=0 coupent les options', (t) => {
+  const { config } = configDeTest(t, { env: { RECHERCHE_WEB: '0', MEMOIRE_EXTRACTION: '0' } });
+  assert.strictEqual(config.recherche_web, false);
+  assert.strictEqual(config.memoire_extraction, false);
+});
+
+test('config IA : un config.json corrompu ne fait pas tomber le serveur', (t) => {
+  const root = dossierTmp(t);
+  fs.writeFileSync(path.join(root, 'config.json'), '{pas du json', 'utf8');
+  isoleEnvIA(t);
+  const erreurs = [];
+  const { config } = creerConfigIA({
+    racine: root,
+    onModeleOk: () => {},
+    loggerErreur: (cat) => erreurs.push(cat),
+  });
+  assert.strictEqual(config.api_provider, 'gemini', 'les defauts doivent rester');
+  assert.ok(erreurs.includes('config'), 'le journal doit avoir etre prevenu');
+});
+
+test('config IA : la liste des fournisseurs OpenAI est reconnue', (t) => {
+  for (const p of ['groq', 'openrouter', 'ollama', 'nvidia', 'edenai', 'deepseek']) {
+    const { providerOpenAI } = configDeTest(t, { env: { API_PROVIDER: p } });
+    assert.strictEqual(providerOpenAI(), true, p + ' devrait etre compatible OpenAI');
+  }
+  const { providerOpenAI } = configDeTest(t, { env: { API_PROVIDER: 'gemini' } });
+  assert.strictEqual(providerOpenAI(), false, 'gemini n est pas compatible OpenAI');
+});
+
+test('config IA : le fournisseur est compare sans regarder la casse', (t) => {
+  const { providerOpenAI } = configDeTest(t, { env: { API_PROVIDER: 'OLLAMA' } });
+  assert.strictEqual(providerOpenAI(), true);
+});
+
+test('config IA : ordreModeles commence par le modele principal', (t) => {
+  const { ordreModeles, config } = configDeTest(t, { env: { API_MODEL: 'm-principal' } });
+  const ordre = ordreModeles();
+  assert.strictEqual(ordre[0], 'm-principal');
+  assert.ok(ordre.includes(config.api_model));
+  assert.strictEqual(new Set(ordre).size, ordre.length, 'pas de doublon dans la liste');
+});
+
+test('config IA : un modele de secours repondu devient le modele actif', (t) => {
+  const { ordreModeles, memoriserModeleOk } = configDeTest(t);
+  const secours = ordreModeles()[1];
+  memoriserModeleOk(secours);
+  assert.strictEqual(ordreModeles()[0], secours, 'le secours doit passer en tete');
+});
+
+test('config IA : memoriserModeleOk signale une seule fois', (t) => {
+  const root = dossierTmp(t);
+  isoleEnvIA(t);
+  const vus = [];
+  const { memoriserModeleOk, ordreModeles } = creerConfigIA({
+    racine: root, onModeleOk: (m) => vus.push(m), loggerErreur: () => {},
+  });
+  const secours = ordreModeles()[1];
+  memoriserModeleOk(secours);
+  memoriserModeleOk(secours);
+  memoriserModeleOk(secours);
+  assert.deepStrictEqual(vus, [secours], 'la persistance ne doit pas repeter');
+});
+
+test('config IA : un modele inconnu n est jamais memorise', (t) => {
+  const root = dossierTmp(t);
+  isoleEnvIA(t);
+  const vus = [];
+  const { memoriserModeleOk, dernierModeleOkConnu } = creerConfigIA({
+    racine: root, onModeleOk: (m) => vus.push(m), loggerErreur: () => {},
+  });
+  memoriserModeleOk('modele-qui-nexiste-pas');
+  assert.strictEqual(dernierModeleOkConnu(), '');
+  assert.deepStrictEqual(vus, []);
+});
+
+test('config IA : restaureModeleOk ne reecrit pas la persistance', (t) => {
+  const root = dossierTmp(t);
+  isoleEnvIA(t);
+  const vus = [];
+  const { restaureModeleOk, dernierModeleOkConnu, ordreModeles } = creerConfigIA({
+    racine: root, onModeleOk: (m) => vus.push(m), loggerErreur: () => {},
+  });
+  const secours = ordreModeles()[1];
+  restaureModeleOk(secours);
+  assert.strictEqual(dernierModeleOkConnu(), secours, 'le modele doit etre repris');
+  assert.deepStrictEqual(vus, [], 'restaurer ne doit pas reecrire stats.json');
+});
+
+test('config IA : restaureModeleOk ignore un modele hors liste', (t) => {
+  const { restaureModeleOk, dernierModeleOkConnu } = configDeTest(t);
+  restaureModeleOk('modele-obsolete');
+  assert.strictEqual(dernierModeleOkConnu(), '', 'un modele inconnu ne doit pas etre repris');
+});
+
+test('config IA : lit bien l env, et la restauration rend la main', (t) => {
+  // Ce test pilote lui-meme l'isolement : l'assertion sur la restauration
+  // doit avoir lieu AVANT que t.after ne s'execute, donc on ne passe pas
+  // par isoleEnvIA ici.
+  const avant = process.env.API_PROVIDER;
+  const saved = {};
+  for (const k of ENV_IA) { saved[k] = process.env[k]; delete process.env[k]; }
+  process.env.API_PROVIDER = 'ollama';
+  try {
+    const { providerOpenAI } = creerConfigIA({
+      racine: dossierTmp(t), onModeleOk: () => {}, loggerErreur: () => {},
+    });
+    assert.strictEqual(providerOpenAI(), true, 'la config doit avoir lu API_PROVIDER');
+  } finally {
+    for (const k of ENV_IA) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  }
+  assert.strictEqual(process.env.API_PROVIDER, avant, 'l env doit etre rendu intact');
+});
 // ============================== RESUME ==============================
 
 function resumeDeTest(t, questionModele) {

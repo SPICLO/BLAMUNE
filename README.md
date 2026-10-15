@@ -61,7 +61,7 @@ PROJET/
 
 ### Modules extraits de `server.js`
 
-`server.js` fait encore ~2 990 lignes (routes et couche IA). Les briques
+`server.js` fait encore ~2 906 lignes (routes et appels HTTP). Les briques
 sans etat partage ont ete sorties dans `lib/`, chacune **injectant ses
 dependances** (`dossierUser`, `storage`, `questionModele`...) plutot que de
 les importer. Consequence directe : elles sont testables sans demarrer le
@@ -69,14 +69,21 @@ serveur — voir `tests/lib.test.js`.
 
 | Module | Role | Dependances injectees |
 |---|---|---|
+| `lib/config_ia.js` | Fournisseur, modeles de secours, rotation et dernier modele repondu | `racine`, `onModeleOk` (callback tardif), `loggerErreur` |
 | `lib/rate_limit.js` | Fenetre glissante par IP et par utilisateur, purge periodique | aucune |
 | `lib/memoire.js` | `users/<uid>/`, `memoire.txt` (format plat partage avec le bot C++) | `usersDir`, `storage` |
 | `lib/historique.js` | `historique_mode<1\|2>.json`, push cloud | `dossierUser`, `storage` |
 | `lib/resume.js` | Repliage des anciens echanges en tache de fond | `dossierUser`, `cheminHistorique`, `questionModele`, `nettoyerReponse`, `loggerErreur` |
 
-Le reste (routes, couche IA multi-fournisseurs, quotas) est encore dans
-`server.js` : ces briques partagent un etat commun et doivent etre
+Le reste (routes, appels HTTP aux fournisseurs, quota temps reel) est encore
+dans `server.js` : ces briques partagent un etat commun et doivent etre
 extraites ensemble, pas une par une.
+
+`lib/config_ia.js` illustre pourquoi l'injection passe par un **callback**
+et non par les objets : `memoriserModeleOk` doit toucher `stats`, qui est
+defini plus bas dans `server.js`. Injecter la fonction `onModeleOk` evite
+d'avoir a deplacer tout le bloc STATE, tout en gardant une dependance
+explicite.
 ```
 
 ## Prerequis
