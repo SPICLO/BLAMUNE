@@ -76,12 +76,17 @@ class _Lecture(object):
                 # Le test a fini et a ferme le canal : on se comporte comme
                 # une fin de flux pour que le thread se termine proprement.
                 return b""
-        return self._f.read(n)
+        try:
+            return self._f.read(n)
+        except ValueError:
+            # Sous POSIX, fermer un tube pendant une lecture levoque un
+            # ValueError, pas une fin de flux. Meme traitement.
+            return b""
 
     def close(self):
         try:
             self._f.close()
-        except OSError:
+        except (OSError, ValueError):
             pass
 
 
@@ -104,7 +109,8 @@ class _Ecriture(object):
     def close(self):
         try:
             self._f.close()
-        except OSError:
+        except (OSError, ValueError):
+            # ValueError : deja ferme, sans importance.
             pass
 
 
@@ -114,12 +120,18 @@ def _canaux():
     Chaque tube relie le bot AU SERVICE dans un seul sens :
       - le bot ecrit l'invite, le service la lit  -> ce tube-la
       - le service ecrit la reponse, le bot la lit -> l'autre tube
+
+    Les quatre canaux passent TOUJOURS par les adaptateurs _Lecture /
+    _Ecriture, y compris sous POSIX : c'est ce qui garantit qu'un canal
+    ferme fait proprement end of stream au lieu de lever dans le thread.
     """
     if POSIX:
         sr, sw = os.pipe()   # bot -> service
         er, ew = os.pipe()   # service -> bot
-        return (os.fdopen(sr, "rb", buffering=0), os.fdopen(ew, "wb", buffering=0),
-                os.fdopen(er, "rb", buffering=0), os.fdopen(sw, "wb", buffering=0))
+        return (_Lecture(os.fdopen(sr, "rb", buffering=0), False),
+                _Ecriture(os.fdopen(ew, "wb", buffering=0), False),
+                _Lecture(os.fdopen(er, "rb", buffering=0), False),
+                _Ecriture(os.fdopen(sw, "wb", buffering=0), False))
     # socketpair : bidirectionnel, le service prend 'a', le bot 'b'.
     a, b = socket.socketpair()
     _SOCKETS[a.fileno()] = a
@@ -175,6 +187,7 @@ class FauxProcess(object):
         self.message_recu = None
         self.poll = lambda: None
         self._defiler = defiler
+        self._ferme = False
         self._thread = threading.Thread(
             target=self._boucle, args=(invites, reponse, lecture_bot),
             daemon=True,
@@ -184,21 +197,26 @@ class FauxProcess(object):
     # -- helpers --
     def _ecrire(self, texte):
         try:
-            if POSIX:
-                os.write(self._ecriture_bot.fileno(), texte.encode("utf-8"))
-            else:
-                self._ecriture_bot.write(texte.encode("utf-8"))
-        except OSError:
-            # Le test a fini (close() a ferme le tube) alors que ce thread
+            self._ecriture_bot.write(texte.encode("utf-8"))
+        except (OSError, ValueError):
+            # Le test a fini (close() a ferme le canal) alors que ce thread
             # daemon s'executait encore : rien a signaler.
+            # Sous POSIX, ecrire sur un tube ferme leve ValueError ; sous
+            # Windows, le socket leve OSError. Il faut couvrir les deux, sinon
+            # ce traceback ecrit sur stderr pendant l'arret de l'interpreteur
+            # provoque un abort aleatoire (exit 134).
             pass
 
     def _bloquer_si(self, condition):
         # On ne bloque qu'AVANT la reponse finale : bloquer pendant la
         # poignee de main ferait echouer demarrer() (delai 20 s) au lieu de
         # repondre() (delai 0,5 s dans les tests).
+        # L'attente est interruptible pour que close() puisse arreter le
+        # thread sans attendre la fin du delai.
         if self._defiler and condition:
-            time.sleep(8)
+            limite = time.time() + 8
+            while not self._ferme and time.time() < limite:
+                time.sleep(0.02)
 
     def _boucle(self, invites, reponse, f):
         try:
@@ -209,8 +227,12 @@ class FauxProcess(object):
             self.message_recu = self._lire_ligne(f)
             self._bloquer_si(True)
             self._ecrire(reponse + ATTENTE)
-            while True:  # garde le canal ouvert, comme un vrai bot
-                time.sleep(0.05)
+            # Reste ouvert tant que le test vit, comme un vrai bot en attente
+            # de la saisie suivante. La boucle s'arrete sur _ferme : un thread
+            # daemon qui tourne encore a la fermeture de l'interpreteur entre
+            # en course avec l'arret du processus (abort aleatoire, exit 134).
+            while not self._ferme:
+                time.sleep(0.02)
         finally:
             f.close()
 
@@ -227,6 +249,19 @@ class FauxProcess(object):
             morceaux += c
 
     def close(self):
+        # Arreter proprement le thread : un daemon encore vivant pendant
+        # l'arret de l'interpreteur provoque un abort aleatoire (exit 134).
+        #
+        # L'ordre compte. On ferme D'ABORD la lecture du bot : il est
+        # bloque dedans en permanence, et la fermeture le rend la main
+        # immediatement. Joindre avant de fermer le laisserait attendre le
+        # timeout a chaque test (suite multipliee par 6).
+        self._ferme = True
+        try:
+            self._lecture_bot.close()
+        except OSError:
+            pass
+        self._thread.join(timeout=2)
         for f in (self.stdout, self.stdin, self._lecture, self._ecriture,
                   self._lecture_bot, self._ecriture_bot):
             try:
@@ -261,6 +296,7 @@ class TestLectureNonBloquante(_SelectCompatible):
 
     def test_timeout_leve_timeouterror(self):
         proc = FauxProcess([PROMPT_CHOIX], defiler=True)
+        self.addCleanup(proc.close)   # sinon son thread survit au test
         bot = bot_service.BotLocal.__new__(bot_service.BotLocal)
         bot.proc = proc
         bot.buffer = ""
@@ -393,8 +429,16 @@ class TestHttp(unittest.TestCase):
         return "http://127.0.0.1:%d%s" % (self.port, chemin)
 
     def _get(self, chemin):
-        with urllib.request.urlopen(self._url(chemin), timeout=5) as r:
-            return r.status, json.loads(r.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(self._url(chemin), timeout=5) as r:
+                return r.status, json.loads(r.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            # HTTPError retient le flux de la reponse : sans close() explicite
+            # Python signale un ResourceWarning a la destruction.
+            try:
+                return e.code, json.loads(e.read().decode("utf-8"))
+            finally:
+                e.close()
 
     def _post(self, chemin, corps, brut=False):
         data = corps if brut else json.dumps(corps).encode("utf-8")
@@ -403,7 +447,10 @@ class TestHttp(unittest.TestCase):
             with urllib.request.urlopen(req, timeout=5) as r:
                 return r.status, json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
-            return e.code, json.loads(e.read().decode("utf-8"))
+            try:
+                return e.code, json.loads(e.read().decode("utf-8"))
+            finally:
+                e.close()
 
     # -- tests --
     def test_health_pret(self):
@@ -426,13 +473,9 @@ class TestHttp(unittest.TestCase):
         self.assertFalse(obj["pret"])
 
     def test_route_inconnue_404(self):
-        for chemin in ("/inconnu", "/respond/x"):
-            bot_service.BOT = _BotFaux()
-            try:
-                code, _ = self._get(chemin)
-            except urllib.error.HTTPError as e:
-                code = e.code
-            self.assertEqual(code, 404)
+        bot_service.BOT = _BotFaux()
+        for chemin in ("/inconnu", "/reponse/x"):
+            self.assertEqual(self._get(chemin)[0], 404, chemin)
 
     def test_post_inconnu_404(self):
         bot_service.BOT = _BotFaux()
