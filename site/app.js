@@ -98,8 +98,11 @@ function clearAuth() {
   localStorage.removeItem(AUTH_CLES.jeton);
 }
 function estAuth() { return !!getAuthEgo(); }
-function estInvite() { return !estAuth(); }
 
+// L'identite voyage dans les entetes (X-EGO / X-UID / X-Jeton). Le serveur
+// les lit avant le corps et le query string : un "authBody" qui recopierait
+// les memes valeurs dans le corps n aurait donc jamais ete utilise. Il a ete
+// supprime avec estInvite(), qui n etait appele nulle part non plus.
 function authHeaders() {
   var h = {};
   var e = getAuthEgo();
@@ -108,16 +111,6 @@ function authHeaders() {
   var j = getAuthJeton();
   if (j) h['X-Jeton'] = j;
   return h;
-}
-
-function authBody() {
-  var p = {};
-  var e = getAuthEgo();
-  if (e) p.ego = e;
-  p.uid = getAuthUserId();
-  var j = getAuthJeton();
-  if (j) p.jeton = j;
-  return p;
 }
 
 // Migration des invites creees avant les jetons : elles n'ont que leur uid.

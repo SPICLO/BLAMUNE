@@ -35,7 +35,6 @@ let modeleReponse = null; // modele qui a fini par repondre
 // Trois types de requetes distinctes, on garde la derniere de chaque.
 let dernierChat = null;       // message de conversation (prompt BLAMUNE)
 let dernierEgo = null;        // prompt du mode EGO (conversation intelligente)
-let derniereExtraction = null; // tache d'extraction de faits
 let dernierResume = null;      // pliage du resume de conversation
 let dernierOutillage = null;   // tools envoyes par le serveur (recherche web)
 let failOutils = false;        // 400 "outil non supporte" sur le prochain chat
@@ -146,8 +145,9 @@ const mock = http.createServer((req, res) => {
     // Le modele "invente" un fait uniquement si le message en contient un
     // (sinon il repond {} comme le demandait la consigne).
     if (demande.indexOf('EXTRACTION-FACTS') >= 0) {
-      derniereExtraction = corps;
       nbExtractions++;
+      // journalExtractions suffit : il conserve la fin de chaque consigne et
+      // est vide en fin de suite quand tout va bien.
       journalExtractions.push(Date.now() + ' ...' + demande.substring(demande.length - 260));
       return repondre(res, demande.indexOf('Maeva') >= 0
         ? '{"nom":"Maeva","ville":"Bordeaux"}' : '{}');
