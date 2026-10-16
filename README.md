@@ -148,6 +148,7 @@ raison pour laquelle `getComptes()` / `getStats()` existent.
 | `lib/memoire.js` | `users/<uid>/`, `memoire.txt` (format plat partagé avec le bot C++) | 80 |
 | `lib/historique.js` | `historique_mode<1\|2>.json`, push cloud | 34 |
 | `lib/resume.js` | Repliage des anciens échanges en tâche de fond | 90 |
+| `lib/ia/gemini.js` | Transport Gemini, historique envoyé au modèle, reprise sur 429, état de quota | 269 |
 
 | Module de routes | Couvre | Lignes |
 |---|---|---|
@@ -157,9 +158,13 @@ raison pour laquelle `getComptes()` / `getStats()` existent.
 | `lib/routes/consultation.js` | `/historique`, `/proactif`, `/stats-perso`, `/mode`, `/profil` | 121 |
 | `lib/routes/statique.js` | Site PWA et panneau admin, avec garde-fous de traversée de chemin | 76 |
 
-La couche HTTP aux fournisseurs (Gemini, compatible OpenAI) reste dans
-`server.js` : elle partage quota, rotation de modèle et alertes, et sort
-maintenant que les routes ne sont plus le point d'accroche.
+La couche HTTP reste partiellement dans `server.js` : le fournisseur
+compatible OpenAI, le service du bot C++ et le secours « savoir ».
+`lib/ia/gemini.js` est déjà sorti, parce qu'il possède un état transversal
+(rotation des clés, drapeaux de retraitement, instant du dernier 429) que le
+reste de la couche doit lire et écrire. Les trois blocs restants sont plus
+facilement extractibles dans cet ordre : le fournisseur OpenAI d'abord, puis
+le service du bot, puis le secours savoir.
 ```
 
 ## Prerequis

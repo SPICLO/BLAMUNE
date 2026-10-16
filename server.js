@@ -21,6 +21,7 @@ const { creerRoutesAdmin } = require('./lib/routes/admin');
 const { creerRoutesConsultation } = require('./lib/routes/consultation');
 const { creerRoutesStatique } = require('./lib/routes/statique');
 const { creerRouteSend } = require('./lib/routes/send');
+const { creerGemini } = require('./lib/ia/gemini');
 const { creerResume } = require('./lib/resume');
 
 const app = express();
@@ -586,7 +587,7 @@ function autoApprentissage(uid, msg) {
   }
 
   // Anniversaire: "mon anniversaire c'est le 12 mai", "je suis ne le 3 mai 2005"
-  // (on compare sans accents : "fevrier" / "fÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©vrier" marchent)
+  // (on compare sans accents : "fevrier" / "fÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©vrier" marchent)
   const clair = sansAccents(lower);
   const RECHERCHE_MOIS = 'janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre';
   m = clair.match(new RegExp('(?:mon anniversaire|mon jour de naissance)\\s*(?:c\'est|est|:)?\\s*(?:le\\s+)?(\\d{1,2})\\s+(?:de\\s+)?(' + RECHERCHE_MOIS + ')(?:\\s+(?:en\\s+)?(19\\d{2}|20\\d{2}))?'));
@@ -660,7 +661,7 @@ function autoApprentissage(uid, msg) {
     const humeur = m[2] || m[1];
     if (humeur && mem.humeur !== humeur) { mem.humeur = humeur; changed = true; }
   }
-  if (/(?:enleve|supprime|enlever|retire|enl[eÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨]ve)\s+(?:la\s+|l['\u2019\u0027]?\s*|les\s+)?humeur/i.test(lower)) { mem.humeur = ''; changed = true; }
+  if (/(?:enleve|supprime|enlever|retire|enl[eÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨]ve)\s+(?:la\s+|l['\u2019\u0027]?\s*|les\s+)?humeur/i.test(lower)) { mem.humeur = ''; changed = true; }
 
   // Souvenirs : moments marquants que BLAMUNE garde pour les conversations futures
   try {
@@ -680,235 +681,27 @@ function autoApprentissage(uid, msg) {
 const { cheminHistorique, chargerHistorique, sauvegarderHistorique } =
   creerHistorique({ dossierUser, storage });
 
-// ==================== APPEL GEMINI ====================
-// Deux points qui font gagner du temps :
-//  1) on n'envoie que les N derniers messages (moins d'entree = premiere
-//     lettre affichee bien plus tot),
-//  2) on demande une reponse EN FLUX (SSE) : le client voit le texte
-//     s'ecrire au lieu d'attendre la fin de la generation.
-
-const HISTO_API_MAX = 16; // derniers echanges envoyes a l'API
-const HISTO_AFFICHAGE_MAX = 100; // dernieres bulles rendues par /historique
-
-function limiterHisto(histo, nb) {
-  if (!Array.isArray(histo) || histo.length <= nb + 1) return histo;
-  const systeme = histo.filter(h => h.role === 'system');
-  let convo = histo.filter(h => h.role !== 'system').slice(-nb);
-  while (convo.length && convo[0].role !== 'user') convo.shift();
-  return systeme.concat(convo);
-}
-
-function construireContenus(histo, imageParts) {
-  const contents = [];
-  let systemText = '';
-  for (const h of histo) {
-    if (h.role === 'system') {
-      systemText += h.content + '\n\n';
-    } else {
-      const role = h.role === 'assistant' ? 'model' : 'user';
-      const text = (h.role === 'user' && systemText) ? systemText + h.content : h.content;
-      contents.push({ role, parts: [{ text }] });
-      if (h.role === 'user') systemText = '';
-    }
-  }
-  if (systemText && contents.length === 0) {
-    contents.push({ role: 'user', parts: [{ text: systemText }] });
-  }
-  // La photo jointe : attachee au DERNIER message utilisateur (= celui qui
-  // vient d'etre pousse dans l'historique), jamais aux anciens.
-  if (imageParts) {
-    for (let i = contents.length - 1; i >= 0; i--) {
-      if (contents[i].role === 'user') {
-        contents[i].parts.push({ inline_data: imageParts });
-        break;
-      }
-    }
-  }
-  return contents;
-}
-
-// Support plusieurs cles Gemini : API_KEYS=cle1,cle2,...
-// On bascule automatiquement sur la suivante quand une cle est en quota.
-let cleGeminiIndex = 0;
-// Rotation reservee au fournisseur Gemini. Si le fournisseur actif est
-// compatible OpenAI (Eden AI, Groq, Ollama...), on ne retourne RIEN : la
-// cle principale appartient a un autre service et ne doit jamais etre
-// envoyee en x-goog-api-key a l'API Google.
-function clesGemini() {
-  if (providerOpenAI()) return [];
-  const raw = process.env.API_KEYS || process.env.API_KEY || '';
-  const splittes = String(raw).split(',').map(s => s.trim()).filter(Boolean);
-  if (splittes.length) return splittes;
-  if (config.api_key) return [config.api_key];
-  return [];
-}
-function cleGeminiActive() {
-  const cles = clesGemini();
-  if (!cles.length) return '';
-  return cles[cleGeminiIndex % cles.length];
-}
-function noterErreurGemini(e) {
-  if ((e && e.statusCode === 429) || (e && /quota|429|rate limit/i.test(e.message || ''))) {
-    const cles = clesGemini();
-    if (cles.length > 1) cleGeminiIndex++;
-  }
-}
-
-function optionsGemini() {
-  return {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cleGeminiActive() },
-    timeout: 30000
-  };
-}
-
-// La "reflexion" du modele (thinking) ajoute plusieurs secondes avant la
-// premiere lettre : on la desactive pour repondre vite. Si le modele refuse
-// ce champ (HTTP 400), on retente une seule fois sans, puis on n'insiste plus.
-let reflexionRefusee = false;
-// Idem pour l'outil de recherche web : si le modele refuse `tools`, on coupe
-// definitivement la recherche plutot que de casser la conversation.
-let rechercheRefusee = false;
-
-// Recherche web utile UNIQUEMENT pour les questions d'actualite : laisser
-// google_search sur chaque phrase facturerait une recherche a chaque appel.
-function mereiteRecherche(texte) {
-  const t = sansAccents(String(texte || '').toLowerCase());
-  // Volontairement strict : chaque declenchement facture une recherche
-  // Google et retarde le premier caractere affiche. On garde les demandes
-  // explicites d'infos en direct (actu, meteo, resultats sportifs ou
-  // electoraux, sorties culturelles, cours) et on laisse tomber les pieges
-  // du quotidien : "hier", "aujourd'hui", "match", "resultats" (scolaires
-  // !), une date d'anniversaire, une annee... qui ne demandent pas le web.
-  return /\b(actualite|dernieres? infos?|en ce moment|breaking|meteo|elections?|resultats? des elections|qui a gagne|gagn(e|er) (le |la |l')?(match|election|coupe)|nouveau (film|album|episode)|bande[- ]annonce|cours (du|de|des) (bourse|bitcoin|crypto|action)|ligue des champions|coupe du monde)\b/.test(t);
-}
-
-// Dernier texte vu dans les contenus (= le message qui arrive).
-function dernierTexteContenus(contents) {
-  for (let i = contents.length - 1; i >= 0; i--) {
-    const parts = (contents[i] && contents[i].parts) || [];
-    for (const p of parts) if (p && p.text) return p.text;
-  }
-  return '';
-}
-
-// Vrai si la recherche web merite d'etre demandee pour CE contenu.
-function outillageUtile(contents) {
-  return config.recherche_web !== false && !rechercheRefusee &&
-    mereiteRecherche(dernierTexteContenus(contents));
-}
-
-function corpsGemini(contents, sansReflexion, avecOutils) {
-  const generationConfig = {
-    maxOutputTokens: config.api_max_tokens,
-    temperature: config.api_temperature
-  };
-  if (sansReflexion) generationConfig.thinkingConfig = { thinkingBudget: 0 };
-  const corps = { contents, generationConfig };
-  if (avecOutils) corps.tools = [{ google_search: {} }];
-  return JSON.stringify(corps);
-}
-
-// 400 recu alors qu'on venait d'envoyer un champ que le modele refuse :
-// l'outil de recherche d'abord (si on l'a vraiment envoye), puis
-// thinkingConfig. On marque l'echec et on signale le retraitement.
-function refusChamp(statusCode, sansReflexion, avecOutils) {
-  if (statusCode !== 400) return null;
-  if (avecOutils && !rechercheRefusee) {
-    rechercheRefusee = true;
-    const e = new Error('outil de recherche refuse par le modele');
-    e.recherche = true;
-    return e;
-  }
-  if (sansReflexion && !reflexionRefusee) {
-    reflexionRefusee = true;
-    const e = new Error('thinkingConfig refuse par le modele');
-    e.reflexion = true;
-    return e;
-  }
-  return null;
-}
-
-function texteDepuisReponse(data) {
-  const json = JSON.parse(data);
-  if (json.error) throw new Error(json.error.message);
-  return ((json.candidates && json.candidates[0] &&
-           json.candidates[0].content && json.candidates[0].content.parts) || [])
-    .filter(p => p && p.text && !p.thought)
-    .map(p => p.text).join('');
-}
-
-// --- Construction des URL -------------------------------------------------
-// config.api_url accepte deux formats :
-//   - la base : https://host/v1beta                              (recommande)
-//   - l'URL complete : https://host/v1beta/models/modele:generateContent
-//     (ancien format, cf. config.json.example)
-// Dans les deux cas on en deduit la base, puis on construit l'URL exacte du
-// modele demande. Ca permet de pointer API_URL vers un proxy (http://...).
-const URL_GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-
-function baseGemini() {
-  let u = String(config.api_url || '').trim().replace(/\/+$/, '');
-  if (!u) return URL_GEMINI_BASE;
-  u = u.replace(/\/models\/[^/:?]+:(?:generateContent|streamGenerateContent)(?:\?.*)?$/i, '');
-  u = u.replace(/\/models\/[^/:?]+$/i, '');
-  return u || URL_GEMINI_BASE;
-}
-
-function urlGemini(modele, enFlux) {
-  return baseGemini() + '/models/' + modele +
-    (enFlux ? ':streamGenerateContent?alt=sse' : ':generateContent');
-}
-
-// http ou https selon la base (un proxy local est en http).
-function requeter(url, options, onReponse) {
-  return (url.indexOf('http:') === 0 ? http : https).request(url, options, onReponse);
-}
-
-// --- Reprise sur erreur transitoire ---------------------------------------
-// 429 (quota), 5xx et erreurs reseau sont retentables UNE fois, avec un
-// delai court. Le budget est donne par l'appelant (`{ n: 1 }`) et reste local
-// a sa requete : une tache de fond (resume, extraction) n'empiete jamais sur
-// les tentatives de la reponse en cours d'ecriture.
-function erreurRetentable(e) {
-  if (!e) return false;
-  const c = e.statusCode;
-  if (c === 429 || c === 500 || c === 502 || c === 503 || c === 504) return true;
-  const code = e.code || '';
-  if (['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN', 'EPIPE', 'ENOTFOUND'].indexOf(code) >= 0) return true;
-  return e.message === 'Timeout';
-}
-
-function tentable(budget) {
-  if (!budget || budget.n <= 0) return false;
-  budget.n--;
-  return true;
-}
-
-// Google precise la vraie duree d'attente dans le 429 :
-// "Please retry in 45.411629042s". 0 si le message ne le dit pas.
-function delaiIndique(e) {
-  const m = e && e.message && e.message.match(/retry in\s+(\d+(?:\.\d+)?)\s*s/i);
-  return m ? Math.round(parseFloat(m[1]) * 1000) : 0;
-}
-
-// Dernier quota reel vu (pour garder les taches de fond hors du chemin).
-// Le quota gratuit se recharge en 1 minute.
-let dernierQuota = 0;
-const QUOTA_FENETRE = 60000;
-
-// Les taches de fond (resume, extraction) ajoutent des appels par message :
-// juste apres un 429, on attend la recharger de la fenetre plutot que de
-// crever a nouveau le quota et de voler les requetes de la reponse.
-function reporterTache(lancer) {
-  const ecart = Date.now() - dernierQuota;
-  const delai = ecart >= QUOTA_FENETRE ? 0 : QUOTA_FENETRE - ecart;
-  if (delai <= 0) { lancer(); return; }
-  setTimeout(lancer, delai);
-}
-
-function attendre(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-
+// Transport Gemini, historique envoye au modele, reprise sur erreur et quota :
+// implementation dans lib/ia/gemini.js.
+//
+// Ce module detient des etats que le reste de la couche IA doit lire et
+// ecrire : l'instant du dernier 429 et le drapeau "thinkingConfig refuse".
+// C'est pourquoi il expose marquerQuota / instantDernierQuota /
+// resteFenetreQuota / reflexionRefusee plutot que des variables.
+const {
+  HISTO_API_MAX, HISTO_AFFICHAGE_MAX,
+  limiterHisto, construireContenus,
+  noterErreurGemini, optionsGemini,
+  outillageUtile, corpsGemini, refusChamp, texteDepuisReponse,
+  urlGemini, requeter,
+  erreurRetentable, tentable, delaiIndique,
+  marquerQuota, instantDernierQuota, resteFenetreQuota,
+  reflexionDejaRefusee,
+  reporterTache, attendre,
+} = creerGemini({
+  getConfig: () => config,
+  providerOpenAI,
+});
 // ============ SERVICE BOT C++ (LOCAL / CLOUD) ============
 // Sur le serveur cloud, le bot C++ tourne dans un conteneur voisin expose
 // sur BOT_SERVICE_URL. Il repond avec son moteur de regles local quand
@@ -1017,7 +810,7 @@ function estQuota(e) {
 // restant de la fenetre d'une minute, on prend le plus long des deux (borne).
 function delaiAvantNouvellePasse(erreur) {
   const indique = delaiIndique(erreur) || 0;
-  const resteFenetre = Math.max(0, QUOTA_FENETRE - (Date.now() - dernierQuota));
+  const resteFenetre = resteFenetreQuota();
   const d = Math.max(indique, resteFenetre);
   return Math.min(Math.max(d, 500), QUOTA_ATTENTE_MAX);
 }
@@ -1064,7 +857,7 @@ function exporterSavoir() {
 // cours d'usage ne sont jamais supprimees.
 //
 // Pourquoi a chaque demarrage et seulement au premier : avec un import
-// unique (ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« si la base est vide ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â»), une base deja creee conserve
+// unique (ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« si la base est vide ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â»), une base deja creee conserve
 // indefiniment le contenu d'un savoir.txt ancien. C'est ce qui a garde en
 // production des entrees polluees retirees du depot.
 (function synchroniserSavoirAuDemarrage() {
@@ -1185,10 +978,10 @@ async function reponseSecours(msg, e) {
 // Google ; sinon on laisse la cascade changer de modele (chaque modele a son
 // propre quota) plutot que de faire patienter l'utilisateur 45 secondes.
 // `avecOutils` : la recherche web n'est demandee QUE par les messages de
-// conversation (appelerGemini) ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â jamais par resume/extraction, pour ne pas
+// conversation (appelerGemini) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â jamais par resume/extraction, pour ne pas
 // facturer une recherche web a chaque tache de fond.
 async function modeleClassique(modele, contents, budget, patient, avecOutils) {
-  const sansReflexion = !reflexionRefusee;
+  const sansReflexion = !reflexionDejaRefusee();
   const b = budget || { n: 1 };
   try {
     return await modeleClassiqueBrut(modele, contents, sansReflexion, avecOutils);
@@ -1199,7 +992,7 @@ async function modeleClassique(modele, contents, budget, patient, avecOutils) {
     const delai = delaiIndique(e);
     // Tout 429 remet les taches de fond en veille, meme sans "retry in"
     // ("Resource has been exhausted" n'en indique pas).
-    if (delai || (e && e.statusCode === 429)) { dernierQuota = Date.now(); noterErreurGemini(e); }
+    if (delai || (e && e.statusCode === 429)) { marquerQuota(); noterErreurGemini(e); }
     if (erreurRetentable(e)) {
       if (!patient && delai > 3000) throw e; // quota long : autre modele
       if (tentable(b)) {
@@ -1239,7 +1032,7 @@ function modeleClassiqueBrut(modele, contents, sansReflexion, avecOutilsDemandes
 
 // --- Reponse en flux (SSE) : on appelle onDelta(texteEntiere) au fil de l'eau ---
 async function modeleEnFlux(modele, contents, onDelta, budget, avecOutils) {
-  const sansReflexion = !reflexionRefusee;
+  const sansReflexion = !reflexionDejaRefusee();
   const b = budget || { n: 1 };
   // On ne retente le flux que si RIEN n'a encore ete affiche au client :
   // relancer apres des deltas donnerait un texte bache.
@@ -1253,7 +1046,7 @@ async function modeleEnFlux(modele, contents, onDelta, budget, avecOutils) {
     const delai = delaiIndique(e);
     // Tout 429 remet les taches de fond en veille, meme sans "retry in"
     // ("Resource has been exhausted" n'en indique pas).
-    if (delai || (e && e.statusCode === 429)) { dernierQuota = Date.now(); noterErreurGemini(e); }
+    if (delai || (e && e.statusCode === 429)) { marquerQuota(); noterErreurGemini(e); }
     if (!envoyaDuTexte && erreurRetentable(e)) {
       if (delai > 3000) throw e; // quota long : la cascade change de modele
       if (tentable(b)) {
@@ -1337,9 +1130,10 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
   // chaque tentative va 429, inutile de gaspiller ~8 requetes par message. On
   // repond tout de suite "quota sature" ; au bout d'une minute dernierQuota
   // devient ancien, la porte se rouvre et la cascade retente toute seule.
-  if (alertes.quota && dernierQuota && Date.now() - dernierQuota < QUOTA_FENETRE) {
+  const dernier429 = instantDernierQuota();
+  if (alertes.quota && dernier429 && resteFenetreQuota() > 0) {
     loggerErreur('gemini', 'quota actif depuis ' +
-      Math.round((Date.now() - dernierQuota) / 1000) + ' s -> reponse immediate sans cascade');
+      Math.round((Date.now() - dernier429) / 1000) + ' s -> reponse immediate sans cascade');
     alerter('quota', 'reponse immediate sans cascade (fenetre en cours)');
     throw new Error('quota satur\u00e9 : fenetre de quota en cours');
   }
@@ -1523,7 +1317,7 @@ async function appelerOpenAI(message, histo, onDelta, imageParts) {
     } catch (e) {
       derniereErreur = e;
       const delai = delaiIndique(e);
-      if (delai || (e && e.statusCode === 429)) dernierQuota = Date.now();
+      if (delai || (e && e.statusCode === 429)) marquerQuota();
       loggerErreur('ia', modele + ' KO: ' + e.message);
     }
   }
@@ -1605,10 +1399,10 @@ function contexteHeureEGO() {
 function getPromptBLAMUNE(humeur) {
   const humeurMap = {
     'joyeux': 'Tu es en pleine forme, tu ris facilement, tu es ultra positif et enthousiaste. Tout t\'amuse.',
-    'calme': 'Tu es zen, posÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©, tu parles doucement. Tu es reflectif et paisible.',
+    'calme': 'Tu es zen, posÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©, tu parles doucement. Tu es reflectif et paisible.',
     'fatigue': 'Tu es mou, tu t\'ennuies un peu, tu reponds mollement. "bof", "j\'ai la flemme".',
     'energique': 'Tu es en pleine puissance, tu parles vite, tu es motive. Tout est possible.',
-    'triste': 'Tu es un peu down, mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©lancolique. Tu parles moins, tu es plus sentimental.',
+    'triste': 'Tu es un peu down, mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©lancolique. Tu parles moins, tu es plus sentimental.',
     'blagueur': 'Tu es un farceur, tu fais des jeux de mots, des vannes, tu rigoles tout le temps.'
   };
   const humeurText = humeur && humeurMap[humeur] ? '\n\nTON ETAT INTERIEUR : ' + humeurMap[humeur] + ' C\'est ce que TU ressens en ce moment, vis-le a ta facon. L\'humeur de l\'utilisateur peut etre differente de la tienne.' : '';
@@ -1763,7 +1557,7 @@ function blocSysteme(o) {
   // ci-dessous lui dit d'en faire quelque chose au lieu de l'ignorer.
   if (o.image) t += "\n\nIMAGE RECUE : il vient de t'envoyer une photo avec ce message. Regarde-la et reagis naturellement (decris ce que tu vois si ca a du sens).";
 
-  // Anniversaire : connu, datÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©, on le prepare plutot que de le rater.
+  // Anniversaire : connu, datÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©, on le prepare plutot que de le rater.
   if (memoire.anniversaire) {
     const j = joursAvantAnniversaire(memoire.anniversaire);
     if (j === 0) t += `\n\nANNIVERSAIRE : c'est AUJOURD'HUI (${memoire.anniversaire}) ! Souhaite-lui un joyeux anniversaire, c'est le moment.`;
@@ -1975,7 +1769,7 @@ function detecterSouvenirs(etat, lower) {
     if (!p.re.test(propre)) continue;
     const now = Date.now();
     const dernier = etat.souvenirs[etat.souvenirs.length - 1];
-    // MÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âªme souvenir dÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©jÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  notÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© il y a moins de 3 h : on ne le rajoute pas.
+    // MÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âªme souvenir dÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©jÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  notÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© il y a moins de 3 h : on ne le rajoute pas.
     if (dernier && now - dernier.ts < 10800000 && dernier.texte === p.texte) continue;
     if (etat.souvenirs.some(s => s.texte === p.texte && now - s.ts < 86400000)) continue;
     etat.souvenirs.push({ ts: now, texte: p.texte });
@@ -2083,9 +1877,9 @@ function evenementProactif(uid) {
     return {
       cle: 'manque', type: 'manque',
       texte: variante([
-        "Tu m'as manquÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©. ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¡a fait " + jours + " jour" + (jours > 1 ? 's' : '') + " que t'as pas donnÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© de nouvelles.",
+        "Tu m'as manquÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©. ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡a fait " + jours + " jour" + (jours > 1 ? 's' : '') + " que t'as pas donnÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© de nouvelles.",
         "Plus de nouvelles depuis " + jours + " jours" + surnom + "... tout va bien ?",
-        "Je comptais les jours. " + jours + " jours de silence, ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§a laisse des marques."
+        "Je comptais les jours. " + jours + " jours de silence, ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§a laisse des marques."
       ], uid + 'manque' + jours)
     };
   }
@@ -2097,9 +1891,9 @@ function evenementProactif(uid) {
       return {
         cle: 'promesse', type: 'promesse',
         texte: variante([
-          "Petit rappel : tu m'avais demandÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© de ne pas oublier ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« " + liste[0] + " ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â». J'y pense encore.",
-          "Au fait, concernant ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« " + liste[0] + " ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â» : je n'ai pas oubliÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©.",
-          "Je te dois un rappel : ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« " + liste[0] + " ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â». ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¡a avance ?"
+          "Petit rappel : tu m'avais demandÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© de ne pas oublier ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« " + liste[0] + " ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â». J'y pense encore.",
+          "Au fait, concernant ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« " + liste[0] + " ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â» : je n'ai pas oubliÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©.",
+          "Je te dois un rappel : ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« " + liste[0] + " ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â». ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡a avance ?"
         ], uid + 'promesse')
       };
     }
@@ -2146,7 +1940,7 @@ const { lireResume, supprimerResume, majResume } = creerResume({
 // Les regex attrapent les formes classiques ("je m'appelle Theo") et ratent
 // tout le reste : "c'est moi Maeva", une reponse "17 ans" a une question, ou
 // trois infos d'un coup. On demande alors au modele un objet JSON de mises a
-// jour ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â en tache de fond, apres la reponse, et SEULEMENT si les regex n'ont
+// jour ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â en tache de fond, apres la reponse, et SEULEMENT si les regex n'ont
 // rien trouve (sinon on paie un appel pour rien).
 const CHAMPS_EXTRACTION = ['nom', 'age', 'genre', 'ville', 'travail', 'plat', 'hobby',
   'sport', 'musique', 'serie', 'reve', 'aime', 'aimePas', 'motsFavoris', 'anniversaire'];
@@ -2292,7 +2086,7 @@ creerRouteSend(app, {
   getStats: () => stats,
   getConfig: () => config,
   getEtat: () => etat,
-  getReflexionRefusee: () => reflexionRefusee,
+  getReflexionRefusee: reflexionDejaRefusee,
   extraireAuth, extraireChamp, getIp, checkRateLimit, checkUserRateLimit,
   modeParUser, connexionsActives, apiHistoriqueParUser,
   egoSystemPrompt: EGO_SYSTEM_PROMPT, contexteHeureEGO,
