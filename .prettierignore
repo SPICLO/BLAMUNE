@@ -1,0 +1,40 @@
+# Fichiers que prettier ne doit pas toucher.
+#
+# Tout ce qui est genere, importe ou binaire. Reformater une base de
+# connaissances ou un export du bot produirait un diff enorme sans
+# aucun sens : seul le code est de la forme du code.
+node_modules/
+package-lock.json
+
+# Base et exports : une ligne par fait, le format EST le fichier.
+savoir.txt
+savoir_nouvelles.txt
+vocabulaire.txt
+vocabulaire_ajouts.txt
+vocabulaire_partage.txt
+themes.txt
+themes_manquants.txt
+replis.txt
+personnalite.txt
+enrichir_lot*.txt
+mots.txt
+memoire.txt
+profil.txt
+
+# Python : PEP 8 avec 4 espaces, gere par .editorconfig et autopep8/black.
+# Prettier ne sait pas formater du Python et laisserait le fichier intact
+# en signalant une erreur, ce qui est pire que de ne rien faire.
+*.py
+
+# Scripts Windows : CRLF impose par .editorconfig, prettier forcerait LF.
+*.ps1
+*.bat
+*.cmd
+
+# Contenus utilisateur et sauvegardes.
+users/
+backups/
+logs/
+site/*.png
+site/*.ico
+site/logo.png

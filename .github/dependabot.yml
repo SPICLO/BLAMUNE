@@ -1,0 +1,70 @@
+# Surveillance des dependances.
+#
+# Sans cela, node_modules et l'image Docker vieillissent en silence : le
+# projet peut rester meses sur une faille connue sans qu'aucun signal
+# n'apparaisse. Dependabot ouvre une Pull Request, il ne casse rien tout
+# seul : la CI decide si la mise a jour passe.
+version: 2
+
+updates:
+  # --- JavaScript : dependances et outils de developpement ---
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    open-pull-requests-limit: 5
+    labels:
+      - dependabot
+    groups:
+      # Regrouper les patches : une PR par dependance pour un correctif de
+      # securite, c'est du bruit qui retarde le vrai merge.
+      patches:
+        applies-to: version-updates
+        update-types:
+          - patch
+
+  # --- Python : outils locaux (pyarrow pour les personas parquet) ---
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:30"
+    open-pull-requests-limit: 3
+    labels:
+      - dependabot
+
+  # --- Images Docker ---
+  # Le projet epingle ses images par digest (voir Dockerfile, Dockerfile.bot
+  # et docker-compose.yml). Dependabot sait mettre a jour un epinglage
+  # digest, mais il faut lui dire ou le digest est ecrit.
+  - package-ecosystem: docker
+    directory: "/Dockerfile"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+    open-pull-requests-limit: 3
+    labels:
+      - dependabot
+  - package-ecosystem: docker
+    directory: "/Dockerfile.bot"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+    open-pull-requests-limit: 3
+    labels:
+      - dependabot
+
+  # --- La CI elle-meme ---
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:30"
+    labels:
+      - dependabot

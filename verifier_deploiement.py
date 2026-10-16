@@ -109,6 +109,8 @@ for f in ["server.js", "storage.js", "package.json", "package-lock.json",
           "lib/routes/compte.js", "lib/routes/admin.js",
           "lib/routes/consultation.js", "lib/routes/statique.js",
           "lib/routes/send.js",
+          ".github/dependabot.yml", "SECURITY.md", "CONTRIBUTING.md",
+          ".prettierignore",
           "build_bot.ps1", "build_bot.bat", "requirements.txt",
           "CLOUD.md", "Dockerfile.bot", "docker-compose.yml", "bot_service.py",
           "savoir_db.js", "migrer_savoir_sqlite.js", "replis.js", "replis.txt",
@@ -141,6 +143,24 @@ check("la CI verifie la branche _WIN32 (WinINet)",
 check("ouvrir_bot.bat compile bot.exe si absent",
       "build_bot.ps1" in bat,
       "bot.exe est ignore par git : un clone frais n'en a pas")
+
+# Le README doit decrire ce qui existe, sinon un tiers ne sait pas quoi
+# lancer. On verifie la presence de quelques entrees representatives.
+readme = open("README.md", encoding="utf-8").read()
+for jeton, quoi in [
+    ("ouvrir_bot.bat", "lancement du bot local"),
+    ("ouvrir_admin.bat", "lancement du panneau admin"),
+    ("serveur_bot.ps1", "serveur de la version locale"),
+    ("serveur_admin.ps1", "serveur du panneau admin"),
+    ("protection.ps1", "integrite et surveillance des fichiers"),
+    ("sauvegarde.ps1", "sauvegarde locale"),
+    ("bot_service.py", "service HTTP du bot"),
+    ("docker-compose.yml", "stack cloud"),
+    ("render.yaml", "deploiement Render"),
+    ("SECURITY.md", "signalement de vulnerabilite"),
+    ("CONTRIBUTING.md", "guide de contribution"),
+]:
+    check(f"README documente {quoi}", jeton in readme)
 
 section("5. Reproductibilite du build")
 

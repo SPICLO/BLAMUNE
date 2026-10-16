@@ -12,12 +12,14 @@ fournisseur compatible OpenAI) pour la conversation intelligente.
 
 - [Fonctionnalites](#fonctionnalites)
 - [Architecture](#architecture)
+- [Scripts Windows](#scripts-windows)
 - [Prerequis](#prerequis)
 - [Installation](#installation)
 - [Configuration de l'IA](#configuration-de-lia)
 - [Variables d'environnement](#variables-denvironnement)
 - [Utilisation](#utilisation)
 - [Tests](#tests)
+- [Outillage](#outillage)
 - [Deploiement](#deploiement)
 - [Persistance](#persistance)
 - [Securite](#securite)
@@ -40,24 +42,91 @@ fournisseur compatible OpenAI) pour la conversation intelligente.
 
 ```
 PROJET/
-|- server.js          Serveur Express (routes, IA, comptes, admin)
+|
+|- --- Serveur ---
+|- server.js          Express : assemble les modules, ne definit plus de route
 |- storage.js         Persistance cloud JSONBin
 |- savoir_db.js       Source de verite SQLite des connaissances
-|- lib/               Modules extraits de server.js (voir plus bas)
-|- bot.cpp / bot.exe  Bot local C++ (moteur de regles)
-|- bot_service.py     Service HTTP qui enveloppe bot.cpp (cloud)
+|- migrer_savoir_sqlite.js  Migration savoir.txt -> savoir.db (au 1er demarrage)
+|- lib/               Modules metier (voir "Modules extraits" plus bas)
+|- lib/routes/        Un module de routes par domaine
+|
+|- --- Bot local ---
+|- bot.cpp / bot.exe  Moteur de regles C++ (compile par build_bot.ps1)
+|- bot_service.py     Service HTTP qui enveloppe bot.cpp (cloud, Linux)
 |- savoir.txt         Connaissances du bot (export lisible ; source : savoir.db)
-|- migrer_savoir_sqlite.js  Migration savoir.txt -> savoir.db
+|- vocabulaire.txt    Vocabulaire du composeur de phrases
+|- vocabulaire_partage.txt  Mots appris en mode 1, partages avec le mode 2
+|- personnalite.txt   Personnalite du bot
 |- replis.txt         Banque de repli francaise quand l'IA est injoignable
 |- replis.js          Detection de situation + tirage anti-repetition
-|- personnalite.txt   Personnalite du bot
-|- vocabulaire.txt    Vocabulaire du composeur de phrases
-|- site/              Front PWA (index.html, app.js, style.css, sw.js, manifest.json)
-|- admin/             Panneau d'administration
-|- tests/             Tests (run.js + unit.test.js + lib.test.js + bot_service.test.py)
+|
+|- --- Scripts Windows (usage local) ---
+|- build_bot.ps1 / .bat     Compile bot.cpp ; sort en erreur si ca echoue
+|- ouvrir_bot.bat           Lance la version locale C++ (compile si besoin)
+|- ouvrir_admin.bat         Lance le panneau d administration
+|- serveur_bot.ps1          Serveur du bot local (le vrai, 1 962 lignes)
+|- serveur_admin.ps1        Serveur du panneau d administration
+|- protection.ps1           Integrite SHA256 + surveillance (voir plus bas)
+|- sauvegarde.ps1           Sauvegarde complete locale, hors cloud
+|- ouvrir_parefeu.bat/.ps1 Regles pare-feu locales
+|
+|- --- Outils Python (optionnels) ---
+|- extraire_savoir.py       Extrait des personas parquet (pyarrow)
+|- fusionner_vocabulaire.py Fusionne les ajouts dans le vocabulaire
+|- verifier_deploiement.py  Garde-fous de depot et de deploiement
+|
+|- --- Front et donnees ---
+|- site/              PWA (index.html, app.js, style.css, sw.js, manifest.json)
+|- admin/             Panneau d administration (HTML / JS / CSS)
+|- tests/             run.js, unit.test.js, lib.test.js, routes_smoke.test.js,
+|                     bot_service.test.py
 |- users/             Donnees par utilisateur (ignore par git)
 |- logs/ backups/     Journaux et sauvegardes (ignores par git)
+|
+|- --- Deploiement ---
+|- Dockerfile / Dockerfile.bot   Images, epinglees par digest
+|- docker-compose.yml           Stack cloud (serveur + Ollama + bot)
+|- render.yaml                  Service Render (plan gratuit)
+|- PUBLICATION.md / CLOUD.md    Guide de publication et choix de serveur
+|- KEEPALIVE.md                 Eviter la mise en veille de l instance
+|- SECURITY.md / CONTRIBUTING.md
 ```
+
+### Scripts Windows
+
+`ouvrir_bot.bat` et `ouvrir_admin.bat` sont les deux portes d'entrée : elles
+lancent le bon serveur et, pour le bot, compilent `bot.exe` s'il est absent.
+
+`serveur_bot.ps1` et `serveur_admin.ps1` sont les serveurs réels de la
+version locale, distincts de `server.js`. Ils tournent en parallèle de la
+version web, pas à sa place.
+
+### protection.ps1
+
+Sert à vérifier qu'aucun fichier critique n'a été modifié, et à surveiller
+les fichiers en temps réel.
+
+```powershell
+.\protection.ps1 -Verifier    # compare les hachages, sort si l'un differe
+.\protection.ps1 -Reparer     # retire le lecture seule pour permettre une edition
+.\protection.ps1 -Surveiller  # FileSystemWatcher, alerte a chaque ecriture
+```
+
+Trois limites, à connaître :
+
+1. **17 fichiers seulement** (`bot.cpp`, `site/app.js`, `admin/*`, les
+   scripts de lancement, `vocabulaire.txt`...). Un `npm install` n'y touche
+   rien, et n'est jamais surveillé.
+2. **Faux positifs possibles sur les fins de ligne.** Les hachages sont
+   calculés sur les octets. `.gitattributes` impose LF sauf pour `.ps1` et
+   `.bat`, qui doivent rester en CRLF : un `core.autocrlf` mal réglé, ou un
+   éditeur qui réécrit ces fichiers, fera signaler une modification qui est
+   en fait un simple changement d'encodage. Le fichier de référence
+   `.protection_hash.json` est ignoré par git, donc chaque machine
+   enregistre sa propre base.
+3. **Windows uniquement**, et **non couvert par la CI** : la CI tourne sous
+   Linux. Son comportement est vérifié à la main, pas automatiquement.
 
 ### Modules extraits de `server.js`
 
@@ -234,6 +303,46 @@ Verification du dossier de deploiement :
 python verifier_deploiement.py
 ```
 
+## Outillage
+
+| Outil | Role | Etat |
+|---|---|---|
+| `npm run lint` | ESLint, 9 fichiers | **0 erreur, 0 warning** |
+| `.github/dependabot.yml` | npm, pip, images Docker, actions GitHub | hebdomadaire |
+| `prettier` | `.prettierrc.json` + `.prettierignore` | **installe, mais le code n'est pas encore formate** |
+| `verifier_deploiement.py` | garde-fous de depot | tourne dans la CI |
+
+### Le cas prettier, en clair
+
+La configuration existe depuis le début, mais `prettier` n'était pas dans
+les dépendances : le fichier était décoratif. Il l'est désormais :
+
+```bash
+npm run format        # applique la configuration
+npm run format:check  # signale les écarts sans les corriger
+```
+
+**Le code n'a pas encore été reformaté**, et la CI ne bloque donc pas sur ce
+point. C'est délibéré : passer `prettier --write .` touche environ 2 000
+lignes sur 17 fichiers, y compris 1 044 lignes du seul `tests/run.js`. Cela
+masquerait les refactorings dans `git log -p` pour un gain purement
+cosmétique. À faire dans un commit dédié, si vous le voulez.
+
+`.prettierignore` écarte les fichiers dont le format **est** la donnée
+(`savoir.txt`, vocabulaires…), le Python, et les scripts Windows dont le
+CRLF est imposé par `.editorconfig`.
+
+### Dependabot
+
+Ouvert chaque lundi sur cinq ecosystèmes : `npm`, `pip`, `Dockerfile`,
+`Dockerfile.bot`, et les actions GitHub. Les patchs npm sont regroupés en un
+seul lot — une PR par dépendance de sécurité, c'est du bruit qui retarde le
+vrai merge.
+
+Dependabot sait mettre à jour un épinglage par digest, ce qui compte ici :
+les images Docker sont volontairement figées sur un digest (voir
+[Deploiement](#deploiement)).
+
 ## Deploiement
 
 ### Stack cloud unifiee (latence minimale)
@@ -282,6 +391,13 @@ Deux couches indépendantes :
 - Fichiers sensibles (`comptes.json`, `config.json`...) servis en 404.
 - Limitation de debit par IP et par utilisateur.
 - Role admin configure via `ADMIN_PSEUDO` / `ADMIN_UID`.
+
+**A lire avant une exposition publique : [SECURITY.md](./SECURITY.md).** Il
+documente ce qui protege l'application, et trois points connus qui meritent
+d'etre tranches — dont un mot de passe admin par defaut ecrit en clair dans
+`server.js`, donc lisible par quiconque consulte ce depot.
+
+Pour contribuer : [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Licence
 
