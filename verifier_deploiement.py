@@ -169,6 +169,27 @@ check("ollama et ollama-init sur le meme digest",
       "ils partagent le volume ollama_data : des versions differentes "
       "casseraient le modele")
 
+# Le tag de base est volontairement flottant (22-slim) : il faut donc
+# garantir qu'il reste dans la plage annoncee par package.json, sinon
+# engines mentirait sur ce qui est reellement execute.
+pkg = json.load(open("package.json", encoding="utf-8"))
+engines = str(pkg.get("engines", {}).get("node", ""))
+m_base = re.search(r"^FROM node:(\d+)", dockerfile, re.M)
+m_haut = re.search(r"<\s*(\d+)\.", engines)
+if m_base and m_haut:
+    base = int(m_base.group(1))
+    plafond = int(m_haut.group(1))
+    check("image de base dans la plage engines.node",
+          base < plafond,
+          f"base node:{base} alors que engines.node interdit >= {plafond} ; "
+          "node:sqlite ou les tests peuvent ne pas s'y attendre")
+    m_bas = re.search(r">=\s*(\d+)", engines)
+    if m_bas:
+        plancher = int(m_bas.group(1))
+        check("image de base au-dessus du plancher engines.node",
+              base >= plancher,
+              f"base node:{base} mais engines.node exige >= {plancher}")
+
 section("6. Poids du depot")
 
 total = 0

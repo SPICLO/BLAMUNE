@@ -14,7 +14,16 @@
 # l'INDEX multi-plateforme (linux/amd64 et linux/arm64), donc portable : le
 # build choisit le bon enfant selon la machine.
 #
-# Pour lever l'epingle (patches de securite, nouvelle version de Node) :
+# Pourquoi "22-slim" et non "22.23-slim", alors que les deux designent
+# aujourd'hui le meme digest ? Parce que le role du tag est de documenter
+# l INTENTION ("Node 22, derniers correctifs"), et celui du digest est
+# d'imposer l'EXACTITUDE. Au prochain rafraîchissement, remplacer le digest
+# de "22-slim" redonne la toute derniere version 22.x, correctifs de
+# securite compris. Avec "22.23-slim", il faudrait penser a changer le tag en
+# meme temps ; si on l oublie, on reste epingle sur une base perimee sans
+# aucun avertissement. Le tag flottant epingle est donc le bon couple.
+#
+# Pour lever l'epingle :
 #   docker buildx imagetools inspect node:22-slim
 # puis remplacer le digest ci-dessous, en gardant le commentaire a jour.
 FROM node:22-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
