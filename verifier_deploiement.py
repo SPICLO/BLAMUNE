@@ -5,7 +5,7 @@ Controle ce qui peut casser un deploiement gratuit :
   1. render.yaml declare-t-il les variables d'environnement necessaires ?
   2. Aucun disque persistant (reserve aux plans payants) ;
   3. Aucun secret committe dans le depot ;
-  4. Les fichiers de donnee lus par le serveur sont-ils presents et suivis ?
+  4. Les fichiers necessaires au serveur sont-ils presents et suivis ?
   5. Poids total du depot (Render a une limite de taille) ;
   6. Le serveur demarre-t-il et repond-il ?
 """
@@ -29,6 +29,11 @@ def check(label, condition, detail=""):
 
 section("1. render.yaml")
 
+# Liste des fichiers SUIVIS par git, calculee une seule fois et reutilisee
+# par les sections suivantes (les secrets, les fichiers attendus, le poids).
+SUIVIS = set(subprocess.run(["git", "ls-files"],
+                           capture_output=True, text=True).stdout.split())
+
 ry = open("render.yaml", encoding="utf-8").read()
 
 check("pas de disque persistant (reserve aux plans payants)",
@@ -49,6 +54,39 @@ check("API_KEY en sync: false (jamais dans le depot)",
       re.search(r'key:\s*API_KEY\s*\n\s*sync:\s*false', ry) is not None)
 
 section("2. Secrets dans le depot")
+
+# Mots de passe administrateur qui auraient pu etre laisses en clair.
+# Historique : ADMIN_MDP n'existait pas et le compte admin etait cree avec
+# un mot de passe ecrit en dur dans server.js. Le depot etant public, ce
+# mot de passe donnait l'administration de toute instance deployee depuis
+# ce depot. Le serveur genere maintenant un mot de passe aleatoire quand
+# ADMIN_MDP est absente.
+ANCIENS_MDP_ADMIN = ["@" + "clotaire" + "#2012", "clo" + "taire"]
+# Ce fichier se declare lui-meme exclu : il doit pouvoir nommer le secret
+# qu il interdit, sinon le controle se detecterait lui-meme.
+FICHiers_A_EXCLURE = {"verifier_deploiement.py"}
+for secret in ANCIENS_MDP_ADMIN:
+    trouves = []
+    for x in SUIVIS:
+        if os.path.basename(x) in FICHiers_A_EXCLURE:
+            continue
+        try:
+            txt = open(x, encoding="utf-8", errors="ignore").read()
+        except Exception:
+            continue
+        if secret in txt:
+            trouves.append(x)
+    check(f"aucun mot de passe admin en clair ({secret[:9]}...)",
+          not trouves,
+          "present dans " + ", ".join(trouves) if trouves else
+          "le serveur genere un mot de passe si ADMIN_MDP est absente")
+
+# ADMIN_MDP doit etre declaree et jamais synchronisee depuis le depot.
+check("render.yaml declare ADMIN_MDP en sync: false",
+      re.search(r'key:\s*ADMIN_MDP\s*\n\s*sync:\s*false', ry) is not None,
+      "la valeur doit venir du dashboard Render, jamais du depot")
+check(".env.example documente ADMIN_MDP",
+      "ADMIN_MDP" in open(".env.example", encoding="utf-8").read())
 
 # cherche une vraie cle API commitee
 pattes = [r'sk-[A-Za-z0-9]{20,}', r'AIza[0-9A-Za-z_\-]{25,}', r'master\.jsonbin\.io']
@@ -77,9 +115,8 @@ for f in ["config.json", "comptes.json", "users/", ".blamune_session", "bot.exe"
 # Donnees d'un poste de travail : memoire.txt/profil.txt racine ne servent
 # qu'au repli hors ligne (le bot les recree), et les brouillons enrichir_lot*
 # ne sont lus par aucun code. Les versionner publiait des donnees de test.
-suivis = set(subprocess.run(["git", "ls-files"], capture_output=True, text=True).stdout.split())
 for f in ["memoire.txt", "profil.txt", "enrichir_lot1.txt", "enrichir_lot2.txt"]:
-    check(f"{f} non suivi par git", f not in suivis,
+    check(f"{f} non suivi par git", f not in SUIVIS,
           "contient des donnees locales, pas de code")
     # enrichir_lot1.txt et enrichir_lot2.txt sont couverts par un seul motif.
     motif = re.sub(r"enrichir_lot\d", "enrichir_lot*", f)
@@ -88,15 +125,13 @@ for f in ["memoire.txt", "profil.txt", "enrichir_lot1.txt", "enrichir_lot2.txt"]
 # Contraire : vocabulaire_partage.txt DOIT rester versionne, Dockerfile.bot
 # le copie dans l'image. Le retirer ferait echouer docker compose build.
 check("vocabulaire_partage.txt reste suivi par git",
-      "vocabulaire_partage.txt" in suivis,
+      "vocabulaire_partage.txt" in SUIVIS,
       "Dockerfile.bot fait COPY de ce fichier : absent, le build echoue")
 check("Dockerfile.bot copie vocabulaire_partage.txt",
       "COPY vocabulaire_partage.txt" in open("Dockerfile.bot", encoding="utf-8").read())
 
 section("3. Fichiers necessaires au serveur")
 
-lignes = subprocess.run(["git", "ls-files"], capture_output=True, text=True).stdout.split()
-suivis = set(lignes)
 for f in ["server.js", "storage.js", "package.json", "package-lock.json",
           "savoir.txt", "personnalite.txt", "vocabulaire.txt",
           "README.md", "LICENSE", "CHANGELOG.md", ".env.example",
@@ -118,11 +153,11 @@ for f in ["server.js", "storage.js", "package.json", "package-lock.json",
           "site/apple-touch-icon.png", "site/favicon.ico",
           "site/icon-192.png", "site/icon-512.png"]:
     check(f"{f} present et suivi par git",
-          os.path.exists(f) and f in suivis)
+          os.path.exists(f) and f in SUIVIS)
 
 for d in ["site", "admin", "lib"]:
     check(f"dossier {d}/ suivi par git",
-          any(x.startswith(d + "/") for x in suivis))
+          any(x.startswith(d + "/") for x in SUIVIS))
 
 section("4. Coverage du bot C++ (regressions deja corrigees)")
 
@@ -232,21 +267,21 @@ if m_base and m_haut:
 section("6. Poids du depot")
 
 total = 0
-for x in suivis:
+for x in SUIVIS:
     try:
         total += os.path.getsize(x)
     except OSError:
         pass
-print(f"  Fichiers suivis : {len(suivis)}")
+print(f"  Fichiers SUIVIS : {len(SUIVIS)}")
 print(f"  Poids total    : {total/1024/1024:.2f} Mo")
 check("sous 100 Mo (limite Render)", total < 100 * 1024 * 1024,
       f"{total/1024/1024:.2f} Mo")
 
-# les gros non-suivis qui gonflent le disque local
+# les gros non-SUIVIS qui gonflent le disque local
 gros = []
 for f in os.listdir(P):
     p = os.path.join(P, f)
-    if os.path.isfile(p) and f not in suivis and os.path.getsize(p) > 5 * 1024 * 1024:
+    if os.path.isfile(p) and f not in SUIVIS and os.path.getsize(p) > 5 * 1024 * 1024:
         gros.append((f, os.path.getsize(p) / 1024 / 1024))
 if gros:
     print("\n  Fichiers non publies mais volumineux (sans impact sur le depot) :")

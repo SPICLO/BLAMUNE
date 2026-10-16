@@ -202,8 +202,15 @@ async function main() {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'blamune-test-'));
   await new Promise(r => mock.listen(PORT_MOCK, '127.0.0.1', r));
 
+  // Mot de passe du compte admin de ces tests. Il passe par ADMIN_MDP comme en
+// production : aucun mot de passe n'est ecrit en dur dans le depot, et cet
+// envoi prouve au passage que la variable est bien prise en compte.
+const ADMIN_MDP_TEST = 'mot-de-passe-admin-de-test';
+const MDP_ENCODED = encodeURIComponent(ADMIN_MDP_TEST);
+
   const env = Object.assign({}, process.env, {
     PORT: String(PORT_APP),
+    ADMIN_MDP: ADMIN_MDP_TEST,
     API_KEY: 'cle-de-test',
     API_PROVIDER: 'gemini',
     API_MODEL: 'modele-test',
@@ -466,7 +473,7 @@ async function main() {
     //        Pendant la panne, l'alerte doit etre visible dans /stats et
     //        dans /admin/data (banniere du dashboard), pas seulement dans
     //        /admin/logs ; puis elle se resout d'elle-meme.
-    const lgQuota = await requete(PORT_APP, '/login', 'POST', 'pseudo=admin&mdp=%40clotaire%232012');
+    const lgQuota = await requete(PORT_APP, '/login', 'POST', 'pseudo=admin&mdp=' + MDP_ENCODED);
     assert(lgQuota.json && lgQuota.json.ok, 'login admin (alertes): ' + lgQuota.texte.substring(0, 120));
     const hQuota = { 'X-UID': lgQuota.json.uid, 'X-EGO': lgQuota.json.ego };
 
@@ -525,7 +532,7 @@ async function main() {
     ok.push('modele principal = dernier modele reussi (' + reussi + ')');
 
     // 13. Journal des erreurs : visible par l'admin
-    const login = await requete(PORT_APP, '/login', 'POST', 'pseudo=admin&mdp=%40clotaire%232012');
+    const login = await requete(PORT_APP, '/login', 'POST', 'pseudo=admin&mdp=' + MDP_ENCODED);
     assert(login.json && login.json.ok, 'login admin: ' + login.texte.substring(0, 120));
     const logs = await requete(PORT_APP, '/admin/logs', 'GET', null,
       { 'X-UID': login.json.uid, 'X-EGO': login.json.ego });
@@ -685,7 +692,7 @@ async function main() {
         'sauvegarde complete poussee dans le cloud');
       assert(binFaux.record.comptes && Object.keys(binFaux.record.comptes).length > 0,
         'comptes presents dans le cloud');
-      const etatLogin = await requete(portA, '/login', 'POST', 'pseudo=admin&mdp=%40clotaire%232012');
+      const etatLogin = await requete(portA, '/login', 'POST', 'pseudo=admin&mdp=' + MDP_ENCODED);
       const etatCloud = await requete(portA, '/stats', 'GET', null,
         { 'X-UID': etatLogin.json.uid, 'X-EGO': etatLogin.json.ego });
       assert(etatCloud.json && etatCloud.json.sauvegarde && etatCloud.json.sauvegarde.configure === true,
@@ -705,7 +712,7 @@ async function main() {
         await attendreServeur(portB);
         assert(fs.existsSync(path.join(dataB, 'users', invCloud.json.uid, 'historique_mode2.json')),
           'historique reconstitue sur le disque vierge');
-        const loginB = await requete(portB, '/login', 'POST', 'pseudo=admin&mdp=%40clotaire%232012');
+        const loginB = await requete(portB, '/login', 'POST', 'pseudo=admin&mdp=' + MDP_ENCODED);
         assert(loginB.json && loginB.json.ok,
           'compte admin reconstitue: ' + loginB.texte.substring(0, 120));
         const statsB = await requete(portB, '/stats', 'GET', null,

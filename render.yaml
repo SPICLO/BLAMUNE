@@ -56,4 +56,12 @@ services:
       # Pseudo du compte admin (defaut : admin).
       - key: ADMIN_PSEUDO
         value: admin
+      # Mot de passe du compte admin cree au premier demarrage.
+      #
+      # A DEFINIR dans le dashboard (jamais dans le depot). Laissée vide,
+      # le serveur genere un mot de passe aleatoire et l'affiche UNE FOIS
+      # dans les journaux : c'est correct mais oblige a aller le chercher.
+      # Un mot de passe ecrit ici serait public, comme tout le depot.
+      - key: ADMIN_MDP
+        sync: false
     healthCheckPath: /ping

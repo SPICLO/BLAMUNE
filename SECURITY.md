@@ -26,6 +26,7 @@ utilisateurs, déni de service par requête.
 | Mesure | Où |
 |---|---|
 | Mots de passe en scrypt + sel aléatoire | `hashMdpScrypt`, migration automatique des anciens hachages sha256 |
+| **Aucun mot de passe dans le dépôt** | `ADMIN_MDP`, sinon génération aléatoire |
 | Verrouillage après 5 échecs de connexion (15 min) | route `/login` |
 | Jeton secret par invite (256 bits, stocké **haché**) | `lib/routes/compte.js` |
 | Un uid d'invite seul ne suffit plus : le jeton est exigé | `extraireAuth` |
@@ -40,22 +41,36 @@ utilisateurs, déni de service par requête.
 Ce ne sont pas des failles exploitées, ce sont des décisions de conception
 qui méritent d'être tranchées.
 
-### 1. Mot de passe admin par défaut dans le dépôt
+### 1. ~~Mot de passe admin par défaut~~ — corrigé
 
-`server.js`, dans `serverListen()`, crée un compte `admin` si aucun n'existe,
-avec un mot de passe **écrit en clair dans le code source**.
+Le compte `admin` était créé au premier démarrage avec un mot de passe
+écrit en clair dans `server.js`. Le dépôt étant public, ce mot de passe
+donnait l'administration de toute instance fraîche.
 
-Conséquence : le dépôt étant public, toute personne connaissant ce mot de
-passe obtient l'administration sur une instance fraîche. Le mot de passe ne
-peut pas être changé par variable d'environnement : `.env.example` et
-`render.yaml` n'exposent que `ADMIN_PSEUDO` et `ADMIN_UID`.
+Désormais, `motDePasseAdminInitial()` :
 
-Ce que le serveur fait bien : ne pas recréer le compte s'il existe déjà, et
-ne pas écraser un mot de passe changé via `/admin/change-mdp`.
+1. utilise `ADMIN_MDP` si elle est définie (8 caractères minimum) ;
+2. sinon **génère un mot de passe aléatoire**, affiché une seule fois dans
+   les journaux au premier démarrage.
 
-Remédiation envisagée : lire le mot de passe depuis l'environnement, et
-refuser de démarrer en production si la variable est absente, pour qu'on ne
-puisse pas oublier.
+Aucun secret n'est plus publié dans le dépôt. Le mot de passe existant
+n'est **jamais** écrasé : un changement passe par `/admin/change-mdp`, ou
+par la suppression de `comptes.json` pour repartir d'un compte neuf.
+
+**À faire sur une instance déjà déployée** : le correctif ne change pas le
+mot de passe existant. Connectez-vous et passez par `/admin/change-mdp`, ou
+supprimez `comptes.json` puis redémarrez pour que le nouveau mécanisme
+s'applique.
+
+Le test d'intégration utilise lui aussi `ADMIN_MDP` : plus aucun mot de
+passe n'est écrit en dur, ni dans le serveur ni dans la suite de tests.
+`verifier_deploiement.py` échoue si l'ancien mot de passe réapparaît dans
+un fichier suivi.
+
+Le choix de ne pas **refuser de démarrer** sans `ADMIN_MDP` est
+délibéré : cela casserait le déploiement d'un opérateur qui aurait oublié
+la variable. Le mot de passe généré couvre déjà le risque ; `ADMIN_MDP`
+épargne seulement d'aller le chercher dans les journaux.
 
 ### 2. Endpoint d'administration lié à l'instance de production
 

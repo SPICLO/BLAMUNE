@@ -398,9 +398,13 @@ Deux couches indépendantes :
 - Role admin configure via `ADMIN_PSEUDO` / `ADMIN_UID`.
 
 **A lire avant une exposition publique : [SECURITY.md](./SECURITY.md).** Il
-documente ce qui protege l'application, et trois points connus qui meritent
-d'etre tranches — dont un mot de passe admin par defaut ecrit en clair dans
-`server.js`, donc lisible par quiconque consulte ce depot.
+documente ce qui protege l'application et les points connus qui meritent
+d'etre tranches.
+
+Le compte `admin` est cree au premier demarrage. Son mot de passe vient de
+`ADMIN_MDP`, ou est **genere aleatoirement et affiche une seule fois** dans
+les journaux : il n'existe nulle part dans le depot. Voir `.env.example`
+pour la mise en place sur Render.
 
 Pour contribuer : [CONTRIBUTING.md](./CONTRIBUTING.md).
 

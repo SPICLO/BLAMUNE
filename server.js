@@ -2166,20 +2166,58 @@ storage.initialiser().then(ok => {
 }).catch(e => console.log('[BLAMUNE] Erreur storage:', e.message))
   .then(() => serverListen());
 
+/**
+ * Mot de passe du compte "admin" cree automatiquement au premier demarrage.
+ *
+ * Il ne doit JAMAIS etre ecrit dans le depot : le depot est public, donc un
+ * mot de passe en dur donne l'administration a quiconque sait lire le code.
+ * Deux sources, dans l ordre :
+ *
+ *   1. ADMIN_MDP, si elle est definie (Render : dashboard > Environment).
+ *   2. sinon un mot de passe aleatoire, affiche UNE seule fois dans les
+ *      journaux. Aucun secret n est alors publie, et le deploiement demarre
+ *      quand meme.
+ *
+ * Refuser de demarrer sans ADMIN_MDP serait plus strict, mais ferait
+ * echouer le deploiement d un operateur qui a oublie la variable. Le mot de
+ * passe genere couvre deja le risque ; ADMIN_MDP evite seulement d avoir a
+ * le copier depuis les journaux.
+ */
+function motDePasseAdminInitial() {
+  const depuisEnv = String(process.env.ADMIN_MDP || '').trim();
+  if (depuisEnv.length >= 8) return depuisEnv;
+  if (depuisEnv) {
+    console.warn('[BLAMUNE] ADMIN_MDP fait moins de 8 caracteres : mot de passe genere.');
+  } else {
+    console.warn('[BLAMUNE] ADMIN_MDP absente : mot de passe genere au premier demarrage.');
+    console.warn('[BLAMUNE] Definissez ADMIN_MDP (dashboard Render > Environment) pour le fixer vous-meme.');
+  }
+  return crypto.randomBytes(18).toString('base64url');
+}
+
 function serverListen() {
 server.listen(PORT, () => {
   etat = 'pret';
   stats.demarrages++;
+  // Un compte deja present n est JAMAIS ecrase : c'est ce qui permet de
+  // changer le mot de passe sans redemarrer.
   if (!comptes['admin']) {
+    const mdpAdmin = motDePasseAdminInitial();
     const sel = crypto.randomBytes(16).toString('hex');
-    const hash = hashMdpScrypt('@clotaire#2012', sel);
+    const hash = hashMdpScrypt(mdpAdmin, sel);
     const uid = 'u' + crypto.randomBytes(6).toString('hex');
     const ego = genererEgo();
     comptes['admin'] = { pseudo: 'admin', email: 'admin@blamune.com', hash, sel, uid, ego, tokenCree: new Date().toISOString(), cree: new Date().toISOString().split('T')[0] };
     sauvegarderComptes();
     dossierUser(uid);
     ecrireMemoire(uid, 'nom', 'admin');
-    console.log('[BLAMUNE] Compte admin cree automatiquement');
+    console.log('[BLAMUNE] ========================================================');
+    console.log('[BLAMUNE]  Compte admin cree.');
+    console.log('[BLAMUNE]  Pseudo        : admin');
+    console.log('[BLAMUNE]  Mot de passe  : ' + mdpAdmin);
+    console.log('[BLAMUNE]  Il ne sera plus jamais affiche. Changez-le sur');
+    console.log('[BLAMUNE]  /admin/change-mdp des que vous vous etes connecte.');
+    console.log('[BLAMUNE] ========================================================');
   }
   console.log(`[BLAMUNE] Serveur pret sur le port ${PORT}`);
   console.log(`[BLAMUNE] Provider: ${config.api_provider}, Model: ${config.api_model}`);
