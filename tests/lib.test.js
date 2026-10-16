@@ -15,6 +15,7 @@ const { creerMemoire } = require('../lib/memoire');
 const { creerHistorique } = require('../lib/historique');
 const { creerResume } = require('../lib/resume');
 const { creerConfigIA } = require('../lib/config_ia');
+const { demarrerKeepalive } = require('../lib/keepalive');
 
 // Storage cloud desactive : ces tests ne doivent toucher aucun service.
 const storageFaux = { estConfigure: () => false, setMemoire() {}, setHistorique() {} };
@@ -402,4 +403,85 @@ test('resume : deux appels concurrents ne replient qu une fois', async (t) => {
     Array.from({ length: 10 }, (_, i) => ({ qui: 'moi', texte: 'msg' + i })));
   await Promise.all([resume.majResume('u_abc123', '2'), resume.majResume('u_abc123', '2')]);
   assert.strictEqual(appels, 1, 'le repliement a ete declenche deux fois');
+});
+
+// ============================= KEEPALIVE =============================
+
+const http = require('http');
+
+/** Serveur HTTP jetable qui compte les requetes recues. */
+function serveurCompteur(t) {
+  let hits = 0;
+  const srv = http.createServer((req, res) => {
+    hits++;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end('{"ok":true}');
+  });
+  return new Promise((resolve) => {
+    srv.listen(0, '127.0.0.1', () => {
+      const port = srv.address().port;
+      t.after(() => new Promise(r => srv.close(r)));
+      resolve({ port, hits: () => hits });
+    });
+  });
+}
+
+test('keepalive : ne rappelle pas quand un utilisateur est connecte', async (t) => {
+  const s = await serveurCompteur(t);
+  const ka = demarrerKeepalive({ port: s.port, estConnecte: () => true });
+  t.after(() => ka.arreter());
+  ka.rappel();
+  await new Promise(r => setTimeout(r, 250));
+  assert.strictEqual(s.hits(), 0, 'une requete a ete envoyee alors que quelqu un est actif');
+});
+
+test('keepalive : rappelle sur /health quand personne n est connecte', async (t) => {
+  const s = await serveurCompteur(t);
+  const ka = demarrerKeepalive({ port: s.port, estConnecte: () => false });
+  t.after(() => ka.arreter());
+  assert.strictEqual(ka.rappel(), true, 'le rappel devrait avoir ete declenche');
+  await new Promise(r => setTimeout(r, 300));
+  assert.strictEqual(s.hits(), 1);
+});
+
+test('keepalive : n empile pas les rappels si la reponse est lente', async (t) => {
+  // Port ferme : la connexion echoue, mais on veut surtout verifier que le
+  // verrou anti-emballement bloque le second appel.
+  const ka = demarrerKeepalive({ port: 1, estConnecte: () => false, logger: () => {} });
+  t.after(() => ka.arreter());
+  ka.rappel();
+  ka.rappel();   // doit etre ignore, le premier est encore en cours
+  ka.rappel();
+});
+
+test('keepalive : un rappel en echec ne casse pas le minuteur', async (t) => {
+  const erreurs = [];
+  const ka = demarrerKeepalive({
+    port: 1, estConnecte: () => false,
+    logger: (cat, msg) => erreurs.push(cat + ':' + msg),
+  });
+  t.after(() => ka.arreter());
+  ka.rappel();
+  await new Promise(r => setTimeout(r, 250));
+  assert.ok(erreurs.length >= 1, 'l echec aurait du etre journalise');
+});
+
+test('keepalive : KEEPALIVE=0 desactive tout', (t) => {
+  const sauvegarde = process.env.KEEPALIVE;
+  process.env.KEEPALIVE = '0';
+  t.after(() => {
+    if (sauvegarde === undefined) delete process.env.KEEPALIVE;
+    else process.env.KEEPALIVE = sauvegarde;
+  });
+  const ka = demarrerKeepalive({ port: 1, estConnecte: () => false });
+  assert.strictEqual(ka.intervalle, null, 'un minuteur a ete cree malgre KEEPALIVE=0');
+  assert.strictEqual(ka.rappel(), false);
+});
+
+test('keepalive : le minuteur ne bloque pas la sortie du processus', async (t) => {
+  const s = await serveurCompteur(t);
+  const ka = demarrerKeepalive({ port: s.port, estConnecte: () => false, periodeMs: 50 });
+  t.after(() => ka.arreter());
+  assert.ok(ka.intervalle && typeof ka.intervalle.unref === 'function',
+    'le minuteur doit etre unref pour ne pas empecher Node de s arreter');
 });

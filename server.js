@@ -22,6 +22,7 @@ const { creerRoutesConsultation } = require('./lib/routes/consultation');
 const { creerRoutesStatique } = require('./lib/routes/statique');
 const { creerRouteSend } = require('./lib/routes/send');
 const { creerGemini } = require('./lib/ia/gemini');
+const { demarrerKeepalive } = require('./lib/keepalive');
 const { creerResume } = require('./lib/resume');
 
 const app = express();
@@ -2224,6 +2225,16 @@ server.listen(PORT, () => {
   console.log(`[BLAMUNE] API Key: ${config.api_key ? 'Configuree' : 'NON CONFIGUREE'}`);
   console.log(`[BLAMUNE] Banque de repli : ${banqueReplis.taille()} situations`);
   console.log(`[BLAMUNE] Cloud: ${storage.estConfigure() ? 'JSONBin.io' : 'Local'}`);
+
+  // Keep-alive : Render endort l instance apres ~15 min sans requete. Le
+  // rappel ne part que si personne n est connecte ; le rappel EXTERNE du
+  // workflow .github/workflows/keepalive.yml reste indispensable, car
+  // celui-ci ne reveille pas une instance arretee (voir lib/keepalive.js).
+  demarrerKeepalive({
+    port: PORT,
+    estConnecte: () => Object.keys(connexionsActives).length > 0,
+    logger: loggerErreur,
+  });
 });
 }
 

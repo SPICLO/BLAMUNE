@@ -1,0 +1,70 @@
+# Rappel externe : empeche la mise en veille de l instance Render.
+#
+# Render endort un service gratuit apres ~15 minutes sans requete entrante.
+# Le serveur se rappelle lui-meme (lib/keepalive.js), mais un minuteur
+# interne ne s execute pas quand le processus dort : il ne peut donc pas
+# REVEILLER l instance. Ce workflow, lui, survit a notre arret et fait les
+# deux offices.
+#
+# L intervalle de cron est de 5 minutes : c'est le minimum accepte par
+# GitHub Actions, impossible de descendre a 2 ou 3 minutes. Cela reste tres
+# en deca des 15 minutes de Render.
+#
+# A savoir : les workflows planifies peuvent etre retardes de plusieurs
+# minutes, en particulier aux heures de pointe. C'est une marge de
+# securite, pas une garantie de regularite. Si le delai doit etre nul,
+# UptimeRobot reste le plus fiable (voir KEEPALIVE.md).
+#
+# L URL se configure dans Settings > Secrets and variables > Actions >
+# Variables > BLAMUNE_URL. Sans elle, la valeur de repli est utilisee.
+
+name: Keep-alive
+
+on:
+  schedule:
+    # Toutes les 5 minutes. Le premier intervalle '*' sert a ne tirer que
+    # aux minutes divisibles par 5.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Un seul keepalive a la fois : une execution qui traine ne doit pas
+  # empiler les suivantes.
+  group: keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: Ping /health
+    runs-on: ubuntu-latest
+    # Le service peut etre endormi : Render met parfois plusieurs dizaines
+    # de secondes a le reveiller. On accepte lent, on accepte un retry,
+    # mais pas l absence totale de reponse.
+    timeout-minutes: 3
+    steps:
+      - name: Determiner l'URL
+        id: cible
+        env:
+          BLAMUNE_URL: ${{ vars.BLAMUNE_URL }}
+        run: |
+          URL="${BLAMUNE_URL:-https://blamune.onrender.com}"
+          URL="${URL%/}"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Requete vers $URL/health"
+
+      - name: Ping
+        env:
+          CIBLE: ${{ steps.cible.outputs.url }}
+        run: |
+          # Les retries reprennent les erreurs transitoires, dont le moment
+          # exact ou Render reveille l instance : c'est precisement la ou le
+          # premier appel echoue presque toujours.
+          curl --silent --show-error --fail \
+               --retry 3 --retry-delay 10 --retry-connrefused \
+               --max-time 120 \
+               --output /dev/null \
+               --write-out "HTTP %{http_code} en %{time_total}s\n" \
+               "$CIBLE/health"
