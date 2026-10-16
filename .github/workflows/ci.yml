@@ -32,6 +32,9 @@ jobs:
           for f in server.js storage.js tests/run.js tests/unit.test.js \
                    tests/lib.test.js lib/rate_limit.js lib/memoire.js \
                    lib/historique.js lib/resume.js lib/config_ia.js \
+                   lib/routes/compte.js lib/routes/admin.js \
+                   lib/routes/consultation.js lib/routes/statique.js \
+                   lib/routes/send.js \
                    site/app.js site/sw.js admin/admin.js; do
             echo "check $f"
             node --check "$f"

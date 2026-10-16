@@ -16,6 +16,11 @@ const { checkRateLimit, checkUserRateLimit, purger: purgerRateLimits } = require
 const { creerHistorique } = require('./lib/historique');
 const { creerMemoire } = require('./lib/memoire');
 const { creerConfigIA } = require('./lib/config_ia');
+const { creerRoutesCompte } = require('./lib/routes/compte');
+const { creerRoutesAdmin } = require('./lib/routes/admin');
+const { creerRoutesConsultation } = require('./lib/routes/consultation');
+const { creerRoutesStatique } = require('./lib/routes/statique');
+const { creerRouteSend } = require('./lib/routes/send');
 const { creerResume } = require('./lib/resume');
 
 const app = express();
@@ -581,7 +586,7 @@ function autoApprentissage(uid, msg) {
   }
 
   // Anniversaire: "mon anniversaire c'est le 12 mai", "je suis ne le 3 mai 2005"
-  // (on compare sans accents : "fevrier" / "fÃ©vrier" marchent)
+  // (on compare sans accents : "fevrier" / "fÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©vrier" marchent)
   const clair = sansAccents(lower);
   const RECHERCHE_MOIS = 'janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre';
   m = clair.match(new RegExp('(?:mon anniversaire|mon jour de naissance)\\s*(?:c\'est|est|:)?\\s*(?:le\\s+)?(\\d{1,2})\\s+(?:de\\s+)?(' + RECHERCHE_MOIS + ')(?:\\s+(?:en\\s+)?(19\\d{2}|20\\d{2}))?'));
@@ -655,7 +660,7 @@ function autoApprentissage(uid, msg) {
     const humeur = m[2] || m[1];
     if (humeur && mem.humeur !== humeur) { mem.humeur = humeur; changed = true; }
   }
-  if (/(?:enleve|supprime|enlever|retire|enl[eÃ¨]ve)\s+(?:la\s+|l['\u2019\u0027]?\s*|les\s+)?humeur/i.test(lower)) { mem.humeur = ''; changed = true; }
+  if (/(?:enleve|supprime|enlever|retire|enl[eÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨]ve)\s+(?:la\s+|l['\u2019\u0027]?\s*|les\s+)?humeur/i.test(lower)) { mem.humeur = ''; changed = true; }
 
   // Souvenirs : moments marquants que BLAMUNE garde pour les conversations futures
   try {
@@ -1059,7 +1064,7 @@ function exporterSavoir() {
 // cours d'usage ne sont jamais supprimees.
 //
 // Pourquoi a chaque demarrage et seulement au premier : avec un import
-// unique (Â« si la base est vide Â»), une base deja creee conserve
+// unique (ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« si la base est vide ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â»), une base deja creee conserve
 // indefiniment le contenu d'un savoir.txt ancien. C'est ce qui a garde en
 // production des entrees polluees retirees du depot.
 (function synchroniserSavoirAuDemarrage() {
@@ -1180,7 +1185,7 @@ async function reponseSecours(msg, e) {
 // Google ; sinon on laisse la cascade changer de modele (chaque modele a son
 // propre quota) plutot que de faire patienter l'utilisateur 45 secondes.
 // `avecOutils` : la recherche web n'est demandee QUE par les messages de
-// conversation (appelerGemini) â€” jamais par resume/extraction, pour ne pas
+// conversation (appelerGemini) ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â jamais par resume/extraction, pour ne pas
 // facturer une recherche web a chaque tache de fond.
 async function modeleClassique(modele, contents, budget, patient, avecOutils) {
   const sansReflexion = !reflexionRefusee;
@@ -1600,10 +1605,10 @@ function contexteHeureEGO() {
 function getPromptBLAMUNE(humeur) {
   const humeurMap = {
     'joyeux': 'Tu es en pleine forme, tu ris facilement, tu es ultra positif et enthousiaste. Tout t\'amuse.',
-    'calme': 'Tu es zen, posÃ©, tu parles doucement. Tu es reflectif et paisible.',
+    'calme': 'Tu es zen, posÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©, tu parles doucement. Tu es reflectif et paisible.',
     'fatigue': 'Tu es mou, tu t\'ennuies un peu, tu reponds mollement. "bof", "j\'ai la flemme".',
     'energique': 'Tu es en pleine puissance, tu parles vite, tu es motive. Tout est possible.',
-    'triste': 'Tu es un peu down, mÃ©lancolique. Tu parles moins, tu es plus sentimental.',
+    'triste': 'Tu es un peu down, mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©lancolique. Tu parles moins, tu es plus sentimental.',
     'blagueur': 'Tu es un farceur, tu fais des jeux de mots, des vannes, tu rigoles tout le temps.'
   };
   const humeurText = humeur && humeurMap[humeur] ? '\n\nTON ETAT INTERIEUR : ' + humeurMap[humeur] + ' C\'est ce que TU ressens en ce moment, vis-le a ta facon. L\'humeur de l\'utilisateur peut etre differente de la tienne.' : '';
@@ -1758,7 +1763,7 @@ function blocSysteme(o) {
   // ci-dessous lui dit d'en faire quelque chose au lieu de l'ignorer.
   if (o.image) t += "\n\nIMAGE RECUE : il vient de t'envoyer une photo avec ce message. Regarde-la et reagis naturellement (decris ce que tu vois si ca a du sens).";
 
-  // Anniversaire : connu, datÃ©, on le prepare plutot que de le rater.
+  // Anniversaire : connu, datÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©, on le prepare plutot que de le rater.
   if (memoire.anniversaire) {
     const j = joursAvantAnniversaire(memoire.anniversaire);
     if (j === 0) t += `\n\nANNIVERSAIRE : c'est AUJOURD'HUI (${memoire.anniversaire}) ! Souhaite-lui un joyeux anniversaire, c'est le moment.`;
@@ -1970,7 +1975,7 @@ function detecterSouvenirs(etat, lower) {
     if (!p.re.test(propre)) continue;
     const now = Date.now();
     const dernier = etat.souvenirs[etat.souvenirs.length - 1];
-    // MÃªme souvenir dÃ©jÃ  notÃ© il y a moins de 3 h : on ne le rajoute pas.
+    // MÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âªme souvenir dÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©jÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  notÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© il y a moins de 3 h : on ne le rajoute pas.
     if (dernier && now - dernier.ts < 10800000 && dernier.texte === p.texte) continue;
     if (etat.souvenirs.some(s => s.texte === p.texte && now - s.ts < 86400000)) continue;
     etat.souvenirs.push({ ts: now, texte: p.texte });
@@ -2078,9 +2083,9 @@ function evenementProactif(uid) {
     return {
       cle: 'manque', type: 'manque',
       texte: variante([
-        "Tu m'as manquÃ©. Ã‡a fait " + jours + " jour" + (jours > 1 ? 's' : '') + " que t'as pas donnÃ© de nouvelles.",
+        "Tu m'as manquÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©. ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¡a fait " + jours + " jour" + (jours > 1 ? 's' : '') + " que t'as pas donnÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© de nouvelles.",
         "Plus de nouvelles depuis " + jours + " jours" + surnom + "... tout va bien ?",
-        "Je comptais les jours. " + jours + " jours de silence, Ã§a laisse des marques."
+        "Je comptais les jours. " + jours + " jours de silence, ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§a laisse des marques."
       ], uid + 'manque' + jours)
     };
   }
@@ -2092,9 +2097,9 @@ function evenementProactif(uid) {
       return {
         cle: 'promesse', type: 'promesse',
         texte: variante([
-          "Petit rappel : tu m'avais demandÃ© de ne pas oublier â€” Â« " + liste[0] + " Â». J'y pense encore.",
-          "Au fait, concernant Â« " + liste[0] + " Â» : je n'ai pas oubliÃ©.",
-          "Je te dois un rappel : Â« " + liste[0] + " Â». Ã‡a avance ?"
+          "Petit rappel : tu m'avais demandÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© de ne pas oublier ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« " + liste[0] + " ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â». J'y pense encore.",
+          "Au fait, concernant ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« " + liste[0] + " ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â» : je n'ai pas oubliÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©.",
+          "Je te dois un rappel : ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« " + liste[0] + " ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â». ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¡a avance ?"
         ], uid + 'promesse')
       };
     }
@@ -2141,7 +2146,7 @@ const { lireResume, supprimerResume, majResume } = creerResume({
 // Les regex attrapent les formes classiques ("je m'appelle Theo") et ratent
 // tout le reste : "c'est moi Maeva", une reponse "17 ans" a une question, ou
 // trois infos d'un coup. On demande alors au modele un objet JSON de mises a
-// jour â€” en tache de fond, apres la reponse, et SEULEMENT si les regex n'ont
+// jour ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â en tache de fond, apres la reponse, et SEULEMENT si les regex n'ont
 // rien trouve (sinon on paie un appel pour rien).
 const CHAMPS_EXTRACTION = ['nom', 'age', 'genre', 'ville', 'travail', 'plat', 'hobby',
   'sport', 'musique', 'serie', 'reve', 'aime', 'aimePas', 'motsFavoris', 'anniversaire'];
@@ -2235,822 +2240,92 @@ async function extraireFileExtraction(uid) {
 
 // ==================== ROUTES ====================
 
-// Health check
-app.get('/ping', (req, res) => {
-  const auth = extraireAuth(req);
-  const mode = auth.uid && modeParUser[auth.uid] ? modeParUser[auth.uid] : '2';
-  res.json({ ok: true, etat, mode });
+// Diagnostic et administration : implementation dans lib/routes/admin.js.
+// isAdminUid y reste prive : toutes les routes admin sont dans ce module,
+// donc le serveur n a plus a arbitrer qui a le droit.
+creerRoutesAdmin(app, {
+  racine: RACINE,
+  logsDir: LOGS_DIR,
+  usersDir: USERS_DIR,
+  // Reaffectes ailleurs : voir lib/routes/compte.js.
+  getComptes: () => comptes,
+  getStats: () => stats,
+  getConfig: () => config,
+  getEtat: () => etat,
+  connexionsActives, modeParUser,
+  savoirDb, lireMemoire, chargerHistorique,
+  etatAlertes, etatModele,
+  getIp, checkRateLimit, extraireAuth,
+  creerSauvegarde, appliquerSauvegarde, loggerErreur,
+  sauvegarderComptes, hashMdpScrypt, storage,
 });
 
-// Keep-alive health check (pour UptimeRobot/cron)
-app.get('/health', (req, res) => {
-  res.json({ ok: true, timestamp: Date.now(), uptime: process.uptime() });
+// Comptes, invites et push des connaissances depuis le bot local :
+// implementation dans lib/routes/compte.js.
+//
+// comptes et stats passent par des GETTERS : ces deux variables sont
+// reaffectees ailleurs (chargement disque, restauration de sauvegarde,
+// synchro cloud). Une reference injectee a l'initialisation deviendrait
+// obsolete apres une restauration.
+creerRoutesCompte(app, {
+  getIp, checkRateLimit, extraireAuth, extraireChamp,
+  getComptes: () => comptes,
+  getStats: () => stats,
+  sauvegarderComptes,
+  hashMdpScrypt, verifierMdp, rehacherMdp, genererEgo,
+  dossierUser, ecrireMemoire,
+  enregistrerJetonInvite, lireJetonInvite, hashJeton,
+  connexionsActives, apiHistoriqueParUser,
+  usersDir: USERS_DIR,
+  savoirDb, sansAccentsDB, savoirEnregistrer, storage,
 });
+// Envoi d un message : implementation dans lib/routes/send.js.
+// C est le dernier bout de route restant ici ; server.js ne definit plus
+// aucune route lui-meme, il ne fait que brancher les modules de lib/routes.
 
-// Helper: check if user is admin.
-// ADMIN_PSEUDO (defaut "admin") et, en option, ADMIN_UID pour figer l'uid.
-const ADMIN_PSEUDO = String(process.env.ADMIN_PSEUDO || 'admin').toLowerCase();
-const ADMIN_UID = String(process.env.ADMIN_UID || '');
-function isAdminUid(uid) {
-  for (const cle of Object.keys(comptes)) {
-    const c = comptes[cle];
-    if (c.uid !== uid) continue;
-    if (ADMIN_UID && c.uid !== ADMIN_UID) return false;
-    return String(c.pseudo || '').toLowerCase() === ADMIN_PSEUDO;
-  }
-  return false;
-}
-
-// Active connections (admin only)
-app.get('/connexions', (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
-  const now = Date.now();
-  const connexions = Object.values(connexionsActives).filter(c => now - c.derniereActivite < 300000);
-  res.json({ ok: true, connexions });
-});
-
-// Admin: all data
-app.get('/admin/data', (req, res) => {
-  const ip = getIp(req);
-  if (!checkRateLimit(`admin:${ip}`, 30)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  const auth = extraireAuth(req);
-  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
-  const now = Date.now();
-  const connexions = Object.values(connexionsActives).filter(c => now - c.derniereActivite < 300000);
-  const messages = [];
-  const usersDir = path.join(RACINE, 'users');
-  if (fs.existsSync(usersDir)) {
-    const dirs = fs.readdirSync(usersDir, { withFileTypes: true }).filter(d => d.isDirectory());
-    for (const d of dirs) {
-      for (const mode of ['1', '2']) {
-        const f = path.join(usersDir, d.name, `historique_mode${mode}.json`);
-        if (fs.existsSync(f)) {
-          try {
-            const hist = JSON.parse(fs.readFileSync(f, 'utf8'));
-            let pendingUser = null;
-            let pendingTime = null;
-            for (let i = 0; i < hist.length; i++) {
-              const h = hist[i];
-              if (h.qui === 'moi') {
-                if (pendingUser) {
-                  messages.push({ uid: d.name, pseudo: d.name, message: pendingUser, reponse: '', heure: pendingTime });
-                }
-                pendingUser = h.texte;
-                pendingTime = h.t ? new Date(h.t * 1000).toLocaleTimeString('fr-FR') : '-';
-              } else if (h.qui === 'bot') {
-                messages.push({ uid: d.name, pseudo: d.name, message: pendingUser || '', reponse: h.texte, heure: pendingTime || (h.t ? new Date(h.t * 1000).toLocaleTimeString('fr-FR') : '-') });
-                pendingUser = null;
-              }
-            }
-            if (pendingUser) {
-              messages.push({ uid: d.name, pseudo: d.name, message: pendingUser, reponse: '', heure: pendingTime });
-            }
-          } catch (e) {}
-        }
-      }
-    }
-  }
-  messages.sort((a, b) => {
-    const ta = a.heure || '';
-    const tb = b.heure || '';
-    return tb.localeCompare(ta);
-  });
-  const messagesLimite = messages.slice(0, 100);
-  const savoirTotal = [];
-  try {
-    for (const e of savoirDb.toutesAvecCategorie()) {
-      savoirTotal.push({ topic: e.cle, contenu: e.reponse, categorie: e.categorie });
-    }
-  } catch (e) {}
-  const vocabTotal = [];
-  try {
-    const f = path.join(RACINE, 'vocabulaire.txt');
-    if (fs.existsSync(f)) {
-      fs.readFileSync(f, 'utf8').split('\n').filter(l => l.trim()).forEach(l => vocabTotal.push(l.trim()));
-    }
-  } catch (e) {}
-  let profil = {};
-  try {
-    const usersDir2 = path.join(RACINE, 'users');
-    if (fs.existsSync(usersDir2)) {
-      const dirs2 = fs.readdirSync(usersDir2, { withFileTypes: true }).filter(d => d.isDirectory());
-      for (const d of dirs2) {
-        const mem = lireMemoire(d.name);
-        if (mem.nom || mem.age || mem.hobby || mem.plat || mem.aime || mem.aimePas || mem.genre || mem.humeur) {
-          profil = mem;
-          break;
-        }
-      }
-    }
-  } catch (e) {}
-  const modeGlobal = Object.keys(modeParUser).length > 0
-    ? modeParUser[Object.keys(modeParUser)[0]]
-    : '2';
-  res.json({
-    ok: true,
-    stats,
-    alertes: etatAlertes(),
-    modele: etatModele(),
-    connexions,
-    messages: messagesLimite,
-    messagesTotal: messages.length,
-    savoir: savoirTotal.slice(0, 100),
-    savoirTotal: savoirTotal.length,
-    vocabulaire: vocabTotal.slice(0, 100),
-    vocabulaireTotal: vocabTotal.length,
-    profil,
-    mode: modeGlobal,
-    config: {
-      api_provider: config.api_provider,
-      api_configured: !!config.api_key && config.api_key !== 'ego'
-    }
-  });
-});
-
-// Admin: users list
-app.get('/admin/users', (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
-  const users = [];
-  for (const cle of Object.keys(comptes)) {
-    const c = comptes[cle];
-    let msgCount = 0;
-    for (const mode of ['1', '2']) {
-      const f = path.join(USERS_DIR, c.uid, `historique_mode${mode}.json`);
-      if (fs.existsSync(f)) {
-        try { msgCount += JSON.parse(fs.readFileSync(f, 'utf8')).length; } catch (e) {}
-      }
-    }
-    users.push({
-      pseudo: c.pseudo,
-      email: c.email,
-      cree: c.cree || '-',
-      messages: msgCount
-    });
-  }
-  res.json({ ok: true, users });
-});
-
-// Journal des erreurs (admin) : les 200 dernieres lignes de logs/erreurs.log.
-// Sert a voir en prod ce qui a casse (modeles en echec, quota, plantages).
-app.get('/admin/logs', (req, res) => {
-  const ip = getIp(req);
-  if (!checkRateLimit(`admin:${ip}`, 30)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  const auth = extraireAuth(req);
-  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
-  let texte = '';
-  try {
-    const f = path.join(LOGS_DIR, 'erreurs.log');
-    if (fs.existsSync(f)) texte = fs.readFileSync(f, 'utf8');
-  } catch (e) {}
-  res.json({ ok: true, lignes: texte.split('\n').filter(l => l.trim()).slice(-200) });
-});
-
-// Sauvegarde complete (admin) : telecharge tout ce qui doit survivre a la
-// perte de l'instance Render. Meme reponse que celle envoyee au cloud.
-app.get('/admin/backup', (req, res) => {
-  const ip = getIp(req);
-  if (!checkRateLimit(`admin:${ip}`, 30)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  const auth = extraireAuth(req);
-  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
-  try {
-    const snap = creerSauvegarde();
-    const nom = 'blamune-sauvegarde-' + new Date().toISOString().slice(0, 10) + '.json';
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="' + nom + '"');
-    res.send(JSON.stringify(snap, null, 2));
-  } catch (e) {
-    loggerErreur('backup', e.message);
-    res.status(500).json({ ok: false, message: 'Erreur de sauvegarde' });
-  }
-});
-
-// Restauration (admin) : reecrit les fichiers de la sauvegarde puis
-// recharge comptes/invites/stats en memoire. Pas de redemarrage.
-app.post('/admin/restore', express.json({ limit: '50mb' }), (req, res) => {
-  const ip = getIp(req);
-  if (!checkRateLimit(`restore:${ip}`, 5)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  const auth = extraireAuth(req);
-  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
-  try {
-    const ecrits = appliquerSauvegarde(req.body);
-    console.log(`[BLAMUNE] Restauration : ${ecrits} fichier(s) reecrit(s)`);
-    res.json({ ok: true, fichiers: ecrits });
-  } catch (e) {
-    loggerErreur('restore', e.message);
-    res.status(400).json({ ok: false, message: e.message });
-  }
-});
-
-// All messages (admin only)
-app.get('/tous-les-messages', (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid) return res.status(401).json({ ok: false, error: 'Non autorise' });
-  let isAdmin = false;
-  for (const cle of Object.keys(comptes)) {
-    if (isAdminUid(auth.uid)) {
-      isAdmin = true; break;
-    }
-  }
-  const messages = [];
-  if (isAdmin) {
-    const usersDir = path.join(RACINE, 'users');
-    if (fs.existsSync(usersDir)) {
-      const dirs = fs.readdirSync(usersDir, { withFileTypes: true }).filter(d => d.isDirectory());
-      for (const d of dirs) {
-        for (const mode of ['1', '2']) {
-          const f = path.join(usersDir, d.name, `historique_mode${mode}.json`);
-          if (fs.existsSync(f)) {
-            try {
-              const hist = JSON.parse(fs.readFileSync(f, 'utf8'));
-              hist.forEach(h => messages.push({ uid: d.name, ...h }));
-            } catch (e) {}
-          }
-        }
-      }
-    }
-  } else {
-    for (const mode of ['1', '2']) {
-      const hist = chargerHistorique(auth.uid, mode);
-      hist.forEach(h => messages.push({ uid: auth.uid, ...h }));
-    }
-  }
-  res.json({ ok: true, messages });
-});
-
-// Register
-app.post('/register', (req, res) => {
-  const ip = getIp(req);
-  if (!checkRateLimit(`register:${ip}`, 10)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  const pseudo = (req.body.pseudo || '').trim().replace(/[<>"'\/\\]/g, '');
-  const mdp = req.body.mdp || '';
-  const email = (req.body.email || '').trim();
-  if (pseudo.length < 2) return res.status(400).json({ ok: false, message: 'Pseudo trop court (2 min).' });
-  if (mdp.length < 6) return res.status(400).json({ ok: false, message: 'Mot de passe trop court (6 min).' });
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ ok: false, message: 'Email invalide.' });
-  const cle = pseudo.toLowerCase();
-  if (comptes[cle]) return res.status(409).json({ ok: false, message: 'Ce pseudo est deja pris.' });
-  const sel = crypto.randomBytes(16).toString('hex');
-  const hash = hashMdpScrypt(mdp, sel);
-  const uid = 'u' + crypto.randomBytes(6).toString('hex');
-  const ego = genererEgo();
-  comptes[cle] = { pseudo, email, hash, sel, uid, ego, tokenCree: new Date().toISOString(), cree: new Date().toISOString().split('T')[0] };
-  sauvegarderComptes();
-  dossierUser(uid);
-  ecrireMemoire(uid, 'nom', pseudo);
-  stats.sessionsTotal++;
-  res.json({ ok: true, pseudo, uid, ego });
-});
-
-// Login
-app.post('/login', (req, res) => {
-  const ip = getIp(req);
-  if (!checkRateLimit(`login:${ip}`, 10)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  const pseudo = (req.body.pseudo || '').trim();
-  const email = (req.body.email || '').trim();
-  const mdp = req.body.mdp || '';
-  let compte = null;
-  if (email) {
-    const emailLower = email.toLowerCase();
-    for (const cle of Object.keys(comptes)) {
-      if (comptes[cle].email?.toLowerCase() === emailLower) { compte = comptes[cle]; break; }
-    }
-  } else if (pseudo) {
-    compte = comptes[pseudo.toLowerCase()];
-  }
-  if (!compte) return res.status(401).json({ ok: false, message: 'Email ou mot de passe incorrect.' });
-  if (compte.lockoutUntil && new Date(compte.lockoutUntil) > new Date()) {
-    return res.status(423).json({ ok: false, message: 'Compte verrouille. Reessayez plus tard.' });
-  }
-  if (!verifierMdp(mdp, compte)) {
-    compte.erreursLogin = (compte.erreursLogin || 0) + 1;
-    if (compte.erreursLogin >= 5) compte.lockoutUntil = new Date(Date.now() + 900000).toISOString();
-    sauvegarderComptes();
-    return res.status(401).json({ ok: false, message: 'Email ou mot de passe incorrect.' });
-  }
-  compte.erreursLogin = 0;
-  compte.lockoutUntil = null;
-  compte.tokenCree = new Date().toISOString();
-  // Migration : un ancien hash sha256 est remplace par scrypt des que le
-  // mot de passe est reconnu (une seule fois, puis c'est fini).
-  if (String(compte.hash).indexOf('scrypt$') !== 0) rehacherMdp(compte, mdp);
-  sauvegarderComptes();
-  ecrireMemoire(compte.uid, 'nom', compte.pseudo);
-  stats.sessionsTotal++;
-  res.json({ ok: true, pseudo: compte.pseudo, uid: compte.uid, ego: compte.ego });
-});
-
-// Invite (guest)
-app.post('/invite', (req, res) => {
-  const ip = getIp(req);
-  if (!checkRateLimit(`invite:${ip}`, 10)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  // 12 octets (96 bits) pour l'identite, 32 octets (256 bits) pour le jeton
-  // qui prouve qu'on est bien le proprietaire de ce uid.
-  const uid = 'inv_' + crypto.randomBytes(12).toString('hex');
-  const jeton = crypto.randomBytes(32).toString('hex');
-  const pseudo = 'Invite_' + crypto.randomBytes(3).toString('hex');
-  enregistrerJetonInvite(uid, jeton);
-  connexionsActives[uid] = { uid, pseudo, ip, debut: new Date().toISOString(), derniereActivite: Date.now() };
-  stats.sessionsTotal++;
-  res.json({ ok: true, uid, pseudo, jeton });
-});
-
-// Migration : une invite d'avant les jetons n'a que son uid. Elle l'envoie et
-// recoit un jeton (une seule fois connue : ensuite, plus d'echange sans le
-// jeton valide). Refuse pour un uid inconnu du serveur.
-app.post('/invite/jeton', (req, res) => {
-  const ip = getIp(req);
-  if (!checkRateLimit(`invite:${ip}`, 10)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  const uid = req.headers['x-uid'] || req.body?.uid || req.query?.uid || '';
-  const jetonClient = req.headers['x-jeton'] || req.body?.jeton || req.query?.jeton || '';
-  if (!/^inv_[0-9a-f]{24}$/.test(uid)) return res.status(401).json({ ok: false, message: 'Non autorise' });
-  const connu = !!connexionsActives[uid] || fs.existsSync(path.join(USERS_DIR, uid));
-  if (!connu) return res.status(401).json({ ok: false, message: 'Non autorise' });
-  const enregistrement = lireJetonInvite(uid);
-  if (enregistrement && (!jetonClient || hashJeton(jetonClient) !== enregistrement.h)) {
-    return res.status(401).json({ ok: false, message: 'Non autorise' });
-  }
-  const jeton = crypto.randomBytes(32).toString('hex');
-  enregistrerJetonInvite(uid, jeton);
-  res.json({ ok: true, jeton });
-});
-
-// Le bot local (bot.exe) pousse ses apprentissages ici : la connaissance
-// rejoint savoir.txt IMMERDIATEMENT (aucun commit ni deploy) et sert de
-// secours des le prochain message quand Gemini est en panne. Ecriture
-// protegee : authentification stricte (invite muni de son jeton ou compte
-// admin â€” pas d'invite legacy sans enregistrement) + debit limite.
-app.post('/savoir', (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
-  if (auth.uid.startsWith('inv_') && !lireJetonInvite(auth.uid))
-    return res.status(401).json({ ok: false, message: 'Non autorise' });
-  if (!checkRateLimit('savoir:' + auth.uid, 20))
-    return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  let cle = String(extraireChamp(req, 'cle') || '');
-  let reponse = String(extraireChamp(req, 'reponse') || '');
-  // "|", retours ligne : structure de savoir.txt, jamais dans les donnees.
-  cle = cle.replace(/[\r\n|]+/g, ' ').replace(/\s+/g, ' ').trim();
-  reponse = reponse.replace(/[\r\n|]+/g, ' ').replace(/\s+/g, ' ').trim();
-  if (!cle || !reponse) return res.status(400).json({ ok: false, message: 'Entree invalide.' });
-  if (cle.length > 100 || reponse.length > 500)
-    return res.status(400).json({ ok: false, message: 'Entree trop longue.' });
-  try {
-    const dejaConnue = !!savoirDb.parCle(sansAccentsDB(cle));
-    savoirEnregistrer(cle, reponse, null, 'bot-local');
-    storage.declencherSauvegarde();
-    res.json({ ok: true, remplace: dejaConnue });
-  } catch (e) {
-    res.status(500).json({ ok: false, message: 'Ecriture impossible.' });
-  }
-});
-
-// Logout
-app.post('/logout', (req, res) => {
-  const auth = extraireAuth(req);
-  if (auth.uid && connexionsActives[auth.uid]) delete connexionsActives[auth.uid];
-  if (auth.uid) {
-    delete apiHistoriqueParUser[auth.uid + '_1'];
-    delete apiHistoriqueParUser[auth.uid + '_2'];
-  }
-  res.json({ ok: true });
-});
-
-// Send message
 // Limites d'envoi : 30/min par IP et 20/min par compte en production,
 // surchargeables en test (RATE_SEND_IP / RATE_SEND_UID) comme QUOTA_ATTENTE_MAX_MS.
 const RATE_SEND_IP = parseInt(process.env.RATE_SEND_IP || '', 10) || 30;
 const RATE_SEND_UID = parseInt(process.env.RATE_SEND_UID || '', 10) || 20;
 
-app.post('/send', async (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
-  const ip = getIp(req);
-  if (!checkRateLimit(`send:${ip}`, RATE_SEND_IP)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  if (!checkUserRateLimit(auth.uid, RATE_SEND_UID)) return res.status(429).json({ ok: false, message: 'Trop de messages. Patiente un instant.' });
-
-  const msg = String(extraireChamp(req, 'msg') || '').trim();
-  const modeOverride = extraireChamp(req, 'mode');
-
-  // Photo jointe : data URL validee AVANT tout traitement (jpeg/png/webp/gif,
-  // 7 Mo de binaire max une fois decode). Le modele la voit (inline_data),
-  // l'historique garde seulement un marqueur (pas de base64 dans le cloud).
-  let imageParts = null;
-  const image = String(extraireChamp(req, 'image') || '').trim();
-  if (image) {
-    const m = image.match(/^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
-    const brut = m ? m[2] : '';
-    if (!m || brut.length < 50 || brut.length > 9000000) {
-      return res.status(400).json({ ok: false, message: 'Image invalide (jpeg, png, webp ou gif, 7 Mo max).' });
-    }
-    imageParts = { mime_type: m[1], data: brut };
-  }
-  if (!msg && !imageParts) return res.status(400).json({ ok: false, message: 'Message vide.' });
-  if (msg.length > 2000) return res.status(400).json({ ok: false, message: 'Message trop long (2000 max).' });
-  // Message vide mais photo presente : un texte minimal pour le modele.
-  const msgHisto = msg || (imageParts ? '(photo)' : msg);
-
-  const mode = (modeOverride === '1' || modeOverride === '2') ? modeOverride : (modeParUser[auth.uid] || '2');
-  modeParUser[auth.uid] = mode;
-
-  if (connexionsActives[auth.uid]) connexionsActives[auth.uid].derniereActivite = Date.now();
-  else {
-    connexionsActives[auth.uid] = { uid: auth.uid, pseudo: extraireChamp(req, 'pseudo') || auth.uid, ip: getIp(req), debut: new Date().toISOString(), derniereActivite: Date.now(), mode };
-  }
-
-  const debut = Date.now();
-  let reponses = [];
-  // Vrai si les regex ont deja appris quelque chose dans ce message (on ne
-  // paie alors pas l'extraction par le modele en plus).
-  let dejaAppris = false;
-  const nbMots = msg.split(/\s+/).filter(Boolean).length;
-
-  // Flux SSE : le client demande a voir la reponse s'ecrire au fur et a mesure.
-  const enFlux = extraireChamp(req, 'stream') === '1';
-  let coupe = false;
-  const surDelta = enFlux ? (t) => {
-    if (coupe || res.writableEnded || res.destroyed) return;
-    try { res.write('data: ' + JSON.stringify({ t: t }) + '\n\n'); } catch (e) {}
-  } : null;
-
-  if (enFlux) {
-    res.status(200);
-    res.set({
-      'Content-Type': 'text/event-stream; charset=utf-8',
-      'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no'
-    });
-    res.flushHeaders();
-    try { res.write(':BLAMUNE\n\n'); } catch (e) {}
-    res.on('error', function () {});
-    res.on('close', function () { if (!res.writableEnded) coupe = true; });
-  }
-
-  if (mode === '1') {
-    // EGO mode - Gemini API
-    const histoKey = auth.uid + '_1';
-    if (!apiHistoriqueParUser[histoKey]) apiHistoriqueParUser[histoKey] = [];
-    const histo = apiHistoriqueParUser[histoKey];
-    if (histo.length === 0) {
-      histo.push({ role: 'system', content: EGO_SYSTEM_PROMPT + contexteHeureEGO() });
-      // Restore history
-      const histFichier = chargerHistorique(auth.uid, '1');
-      const nbRestaurer = Math.min(histFichier.length, 10);
-      if (nbRestaurer > 0) {
-        const debutIdx = Math.max(0, histFichier.length - nbRestaurer);
-        for (let i = debutIdx; i < histFichier.length; i++) {
-          const e = histFichier[i];
-          histo.push({ role: e.qui === 'moi' ? 'user' : 'assistant', content: e.texte });
-        }
-      }
-    } else if (histo[0] && histo[0].role === 'system') {
-      // L'heure ecrite au premier message est fausse dix minutes plus tard :
-      // on rafraichit le system prompt avant chaque envoi.
-      histo[0].content = EGO_SYSTEM_PROMPT + contexteHeureEGO();
-    }
-    histo.push({ role: 'user', content: msgHisto, _lastTs: Date.now() });
-    while (histo.length > 50) histo.splice(1, 1);
-
-    try {
-      const reponse = await appelerGemini(msgHisto, histo, surDelta, imageParts);
-      const texte = nettoyerReponse(reponse);
-      histo.push({ role: 'assistant', content: texte, _lastTs: Date.now() });
-      reponses = [texte];
-    } catch (e) {
-      loggerErreur('EGO', e.message);
-      reponses = [await reponseSecours(msg, e)];
-    }
-  } else {
-    // BLAMUNE mode - Gemini with different personality
-    const histoKey = auth.uid + '_2';
-    if (!apiHistoriqueParUser[histoKey]) apiHistoriqueParUser[histoKey] = [];
-    const histo = apiHistoriqueParUser[histoKey];
-    // Nouvelle session si plus de 45 min sans activite (peu importe logout/restart) :
-    // BLAMUNE "vit" entre deux sessions et sent le temps qui passe.
-    const SEUIL_NOUVELLE_SESSION = 45 * 60 * 1000;
-    const maintenant = Date.now();
-    if (histo.length > 0) {
-      const derniereActivite = histo[histo.length - 1]._lastTs || 0;
-      if (derniereActivite && maintenant - derniereActivite > SEUIL_NOUVELLE_SESSION) histo.length = 0;
-    }
-
-    // 1) ON APPREND D'ABORD, PUIS ON CONSTRUIT LE PROMPT.
-    // Ainsi un surnom, une humeur ou un souvenir dit a l'instant M est deja
-    // connu de BLAMUNE dans la reponse qu'il est en train d'ecrire.
-    dejaAppris = autoApprentissage(auth.uid, msg);
-
-    // Etat et memoire APRES apprentissage : c'est la version que BLAMUNE voit.
-    const memoire = lireMemoire(auth.uid);
-    const etatBL = lireEtat(auth.uid);
-    // Compteur de messages : BLAMUNE sait combien ils se sont deja parle.
-    etatBL.messages = (etatBL.messages || 0) + 1;
-    // Resume de ce qui s'est passe avant la fenetre des 16 derniers echanges.
-    const resumeTexte = lireResume(auth.uid, '2').texte;
-    // L'ecart depuis la derniere conversation se calcule avant de le re-ecrire
-    // (dernierContact est mis a jour plus bas, a la fin du traitement).
-    const ecartContact = etatBL.dernierContact ? maintenant - etatBL.dernierContact : 0;
-    const continuite = texteContinuite(ecartContact);
-
-    if (histo.length === 0) {
-      if (!etatBL.premierContact) etatBL.premierContact = maintenant;
-      etatBL.sessions = (etatBL.sessions || 0) + 1;
-      sauvegarderEtat(auth.uid, etatBL);
-      histo._debut = maintenant;
-      histo._continuite = continuite;
-      histo.push({ role: 'system', content: '' });
-      const histFichier = chargerHistorique(auth.uid, '2');
-      const nbRestaurer = Math.min(histFichier.length, 10);
-      if (nbRestaurer > 0) {
-        const debutIdx = Math.max(0, histFichier.length - nbRestaurer);
-        for (let i = debutIdx; i < histFichier.length; i++) {
-          const e = histFichier[i];
-          histo.push({ role: e.qui === 'moi' ? 'user' : 'assistant', content: e.texte });
-        }
-      }
-    }
-
-    // LE PROMPT SYSTEME EST REECRIT A CHAQUE MESSAGE.
-    // C'est ce qui fait que BLAMUNE "vit" : l'heure avance pendant la
-    // discussion, un surnom appris il y a 10 secondes est deja utilise,
-    // l'humeur de l'utilisateur est prise en compte immediatement.
-    histo[0].content = blocSysteme({
-      memoire: memoire,
-      etat: etatBL,
-      debutSession: histo._debut || maintenant,
-      resume: resumeTexte,
-      intention: intentionDeMessage(msg),
-      image: !!imageParts
-    }) + (histo._continuite || '');
-
-    histo.push({ role: 'user', content: msgHisto, _lastTs: maintenant });
-    while (histo.length > 50) histo.splice(1, 1);
-
-    // Le temps passe aussi pendant la conversation : dernierContact = moment de cet echange.
-    // On garde aussi le compteur de messages mis a jour juste au-dessus.
-    try {
-      etatBL.dernierContact = maintenant;
-      if (!etatBL.premierContact) etatBL.premierContact = maintenant;
-      sauvegarderEtat(auth.uid, etatBL);
-    } catch (e) {}
-
-    try {
-      const reponse = await appelerGemini(msgHisto, histo, surDelta, imageParts);
-      const texte = nettoyerReponse(reponse);
-      histo.push({ role: 'assistant', content: texte, _lastTs: Date.now() });
-      reponses = [texte];
-    } catch (e) {
-      loggerErreur('BLAMUNE', e.message);
-      reponses = [await reponseSecours(msg, e)];
-    }
-  }
-
-  const duree = Date.now() - debut;
-  stats.messagesTotal++;
-  if (mode === '1') stats.messagesMode1++; else stats.messagesMode2++;
-  stats.tempsMoyen = Math.round((stats.tempsMoyen * (stats.messagesTotal - 1) + duree) / stats.messagesTotal);
-
-  // Save history (single batch write)
-  const hist = chargerHistorique(auth.uid, mode);
-  const entreeMoi = { qui: 'moi', texte: msg, t: Math.floor(Date.now() / 1000) };
-  if (imageParts) entreeMoi.image = true;
-  hist.push(entreeMoi);
-  reponses.forEach(r => hist.push({ qui: 'bot', texte: r, t: Math.floor(Date.now() / 1000) }));
-  sauvegarderHistorique(auth.uid, mode, hist);
-
-  // Taches de fond mode 2, lancees APRES la reponse : elles ne rallongent
-  // jamais l'attente de l'utilisateur. Juste apres un 429, reporterTache
-  // laisse la fenetre de quota gratuite se recharger avant de les lancer.
-  if (mode === '2') {
-    reporterTache(() => majResume(auth.uid, '2').catch(e => loggerErreur('resume', e.message)));
-    if (config.memoire_extraction && !dejaAppris && nbMots >= 6) {
-      reporterTache(() => extraireAvecModele(auth.uid, msg).catch(e => loggerErreur('extraction', e.message)));
-    }
-  }
-
-  if (enFlux) {
-    if (!coupe && !res.writableEnded && !res.destroyed) {
-      // Commentaire SSE ignore par le client : sert de diagnostic
-      // (modele utilise + duree totale de la requete).
-      try {
-        res.write(':diag modele=' + (dernierModeleOkConnu() || '?') +
-                  ' duree=' + duree + 'ms reflexion=' + (reflexionRefusee ? 'off-forcee' : 'off') + '\n\n');
-        res.write('data: ' + JSON.stringify({ fin: true, etat, reponses, confiance: 'haute' }) + '\n\n');
-      } catch (e) {}
-    }
-    try { res.end(); } catch (e) {}
-  } else {
-    res.json({ etat, reponses, confiance: 'haute' });
-  }
+creerRouteSend(app, {
+  getStats: () => stats,
+  getConfig: () => config,
+  getEtat: () => etat,
+  getReflexionRefusee: () => reflexionRefusee,
+  extraireAuth, extraireChamp, getIp, checkRateLimit, checkUserRateLimit,
+  modeParUser, connexionsActives, apiHistoriqueParUser,
+  egoSystemPrompt: EGO_SYSTEM_PROMPT, contexteHeureEGO,
+  chargerHistorique, sauvegarderHistorique,
+  autoApprentissage, lireMemoire, lireEtat, sauvegarderEtat,
+  lireResume, majResume, extraireAvecModele, reporterTache,
+  texteContinuite, blocSysteme, intentionDeMessage,
+  appelerGemini, nettoyerReponse, reponseSecours,
+  dernierModeleOkConnu, loggerErreur,
+  rateSendIp: RATE_SEND_IP, rateSendUid: RATE_SEND_UID,
 });
-
 // History
-app.get('/historique', (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
-  const mode = modeParUser[auth.uid] || '2';
-  const hist = chargerHistorique(auth.uid, mode);
-  // Seules les dernieres bulles voyagent : au-dela de 100, le rendu DOM
-  // fige la page au chargement (le fichier complet reste intact sur disque).
-  res.json({ ok: true, etat, mode, historique: hist.slice(-HISTO_AFFICHAGE_MAX), provider: config.api_provider });
+// Consultation cote utilisateur : implementation dans
+// lib/routes/consultation.js.
+// Aucun objet n est reaffecte par ces routes : on passe les references.
+creerRoutesConsultation(app, {
+  getEtat: () => etat,
+  getStats: () => stats,
+  getConfig: () => config,
+  modeParUser, apiHistoriqueParUser,
+  chargerHistorique, cheminHistorique, supprimerResume,
+  livrerProactif, checkRateLimit, loggerErreur,
+  extraireAuth, extraireChamp,
+  lireEtat, lireMemoire, ecrireMemoire, joursAvantAnniversaire,
+  savoirDb,
+  histoAffichageMax: HISTO_AFFICHAGE_MAX,
 });
 
-// Delete history
-app.delete('/historique', (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
-  const mode = modeParUser[auth.uid] || '2';
-  const f = cheminHistorique(auth.uid, mode);
-  try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (e) {}
-  // Le resume porte sur l'ancien historique : il ne doit pas survivre a son effacement.
-  supprimerResume(auth.uid, mode);
-  delete apiHistoriqueParUser[auth.uid + '_' + mode];
-  res.json({ etat, historique: [] });
-});
-
-// Message proactif : le client sonde en tache de fond, BLAMUNE ecrit le
-// premier quand un evenement le merite (anniversaire, absence, promesse).
-app.get('/proactif', (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
-  if (!checkRateLimit('proactif:' + auth.uid, 12)) return res.status(429).json({ ok: false, message: 'Trop de requetes.' });
-  try {
-    res.json({ ok: true, message: livrerProactif(auth.uid) });
-  } catch (e) {
-    loggerErreur('proactif', e.message);
-    res.json({ ok: true, message: null });
-  }
-});
-
-// Stats perso : /stats est admin, /stats-perso raconte SA vie a n'importe
-// qui (utilise par la commande /stats du client).
-app.get('/stats-perso', (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
-  const etatP = lireEtat(auth.uid);
-  const memoire = lireMemoire(auth.uid);
-  const jours = etatP.premierContact ? Math.floor((Date.now() - etatP.premierContact) / 86400000) : 0;
-  res.json({
-    ok: true,
-    messages: etatP.messages || 0,
-    sessions: etatP.sessions || 0,
-    jours,
-    premierContact: etatP.premierContact || 0,
-    dernierContact: etatP.dernierContact || 0,
-    mode: modeParUser[auth.uid] || '2',
-    anniversaire: memoire.anniversaire || '',
-    joursAnniversaire: memoire.anniversaire ? joursAvantAnniversaire(memoire.anniversaire) : -1,
-    proactifs: stats.proactifs || 0
-  });
-});
-
-// Mode
-app.post('/mode', (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
-  const m = extraireChamp(req, 'm');
-  if (m !== '1' && m !== '2') return res.status(400).json({ ok: false, message: 'Mode invalide (1 ou 2)' });
-  const ancienMode = modeParUser[auth.uid];
-  modeParUser[auth.uid] = m;
-  if (ancienMode && ancienMode !== m) {
-    delete apiHistoriqueParUser[auth.uid + '_' + ancienMode];
-  }
-  res.json({ etat, mode: m });
-});
-
-// Profile POST
-app.post('/profil', (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
-  const champ = extraireChamp(req, 'champ');
-  const valeur = extraireChamp(req, 'valeur');
-  const ok = ecrireMemoire(auth.uid, champ, valeur);
-  if (ok) res.json({ ok: true, message: 'Profil mis a jour.' });
-  else res.json({ ok: false, message: 'Champ inconnu : ' + champ });
-});
-
-// Profile GET
-app.get('/profil', (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid) return res.status(401).json({ ok: false, message: 'Non autorise' });
-  const memoire = lireMemoire(auth.uid);
-  let savoir = [];
-  try {
-    savoir = savoirDb.toutes().map(e => ({ cle: e.cle, reponse: e.reponse, categorie: e.categorie }));
-  } catch (e) {}
-  res.json({ profil: memoire, savoir });
-});
-
-// Stats (admin only)
-app.get('/stats', (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid) return res.status(403).json({ ok: false, message: 'Non autorise' });
-  let isAdmin = false;
-  for (const cle of Object.keys(comptes)) {
-    isAdmin = isAdminUid(auth.uid); break;
-  }
-  if (!isAdmin) return res.status(403).json({ ok: false, message: 'Non autorise' });
-  res.json({
-    ...stats,
-    apiProvider: config.api_provider,
-    apiConfigured: !!config.api_key && config.api_key !== 'ego',
-    sauvegarde: storage.etatSauvegarde(),
-    alertes: etatAlertes(),
-    modele: etatModele()
-  });
-});
-
-// Config API (admin only)
-app.post('/config-api', (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise (admin requis)' });
-  try {
-    if (req.body.api_key && req.body.api_key !== '***') config.api_key = req.body.api_key;
-    if (req.body.api_provider) config.api_provider = req.body.api_provider;
-    if (req.body.api_model) config.api_model = req.body.api_model;
-    if (req.body.api_url) config.api_url = req.body.api_url;
-    res.json({ ok: true, message: 'Configuration mise a jour.' });
-  } catch (e) {
-    res.json({ ok: false, message: 'Erreur de configuration' });
-  }
-});
-
-// Change admin password (admin only)
-app.post('/admin/change-mdp', (req, res) => {
-  const auth = extraireAuth(req);
-  if (!auth.uid || !isAdminUid(auth.uid)) return res.status(403).json({ ok: false, message: 'Non autorise' });
-  const nouveauMdp = (req.body.nouveau_mdp || '').trim();
-  if (nouveauMdp.length < 6) return res.status(400).json({ ok: false, message: 'Mot de passe trop court (6 min).' });
-  for (const cle of Object.keys(comptes)) {
-    if (comptes[cle].uid === auth.uid) {
-      const sel = crypto.randomBytes(16).toString('hex');
-      comptes[cle].sel = sel;
-      comptes[cle].hash = hashMdpScrypt(nouveauMdp, sel);
-      comptes[cle].erreursLogin = 0;
-      comptes[cle].lockoutUntil = null;
-      sauvegarderComptes();
-      return res.json({ ok: true, message: 'Mot de passe change.' });
-    }
-  }
-  res.status(404).json({ ok: false, message: 'Compte introuvable' });
-});
-
-// Static files
-const SITE_DIR = path.join(RACINE, 'site');
-const ADMIN_DIR = path.join(RACINE, 'admin');
-const BLOCKED_EXT = ['.ps1', '.bat', '.cmd', '.exe', '.dll', '.config', '.log', '.db', '.sqlite'];
-const MIME_TYPES = {
-  '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript',
-  '.ico': 'image/x-icon', '.png': 'image/png', '.jpg': 'image/jpeg',
-  '.svg': 'image/svg+xml', '.txt': 'text/plain', '.json': 'application/json', '.xml': 'application/xml'
-};
-
-// Admin panel
-app.get('/admin', (req, res) => {
-  res.set('Cache-Control', 'no-store');
-  const index = path.join(ADMIN_DIR, 'admin.html');
-  if (fs.existsSync(index)) return res.sendFile(index);
-  return res.status(404).send('Admin panel not found');
-});
-
-app.get('/admin/*', (req, res) => {
-  res.set('Cache-Control', 'no-store');
-  let filePath = req.path.replace(/^\/admin\/?/, '');
-  if (filePath === '/' || filePath === '' || filePath === 'admin.html') filePath = 'admin.html';
-  const ext = path.extname(filePath).toLowerCase();
-  if (BLOCKED_EXT.includes(ext)) return res.status(404).send('Non autorise');
-  const fullPath = path.join(ADMIN_DIR, filePath);
-  const resolved = path.resolve(fullPath);
-  if (!resolved.startsWith(path.resolve(ADMIN_DIR))) return res.status(403).send('Acces interdit');
-  if (!fs.existsSync(resolved)) return res.status(404).send('Page introuvable');
-  if (fs.statSync(resolved).isDirectory()) {
-    const index = path.join(resolved, 'admin.html');
-    if (fs.existsSync(index)) return res.sendFile(index);
-    return res.status(404).send('Page introuvable');
-  }
-  const mime = MIME_TYPES[ext] || 'application/octet-stream';
-  res.setHeader('Content-Type', mime);
-  res.sendFile(resolved);
-});
-
-// Site static files
-app.get('*', (req, res) => {
-  let filePath = req.path === '/' ? 'index.html' : req.path.replace(/^\//, '');
-  const ext = path.extname(filePath).toLowerCase();
-  if (BLOCKED_EXT.includes(ext)) return res.status(404).send('Non autorise');
-  const fullPath = path.join(SITE_DIR, filePath);
-  const resolved = path.resolve(fullPath);
-  if (!resolved.startsWith(path.resolve(SITE_DIR))) return res.status(403).send('Acces interdit');
-  if (!fs.existsSync(resolved)) return res.status(404).send('Page introuvable');
-  if (fs.statSync(resolved).isDirectory()) {
-    const index = path.join(resolved, 'index.html');
-    if (fs.existsSync(index)) return res.sendFile(index);
-    return res.status(404).send('Page introuvable');
-  }
-  const mime = MIME_TYPES[ext] || 'application/octet-stream';
-  res.setHeader('Content-Type', mime);
-  res.sendFile(resolved);
+// Fichiers statiques (site PWA + panneau admin) :
+// implementation dans lib/routes/statique.js.
+creerRoutesStatique(app, {
+  siteDir: path.join(RACINE, 'site'),
+  adminDir: path.join(RACINE, 'admin'),
 });
 
 // ==================== START ====================

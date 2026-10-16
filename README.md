@@ -61,29 +61,36 @@ PROJET/
 
 ### Modules extraits de `server.js`
 
-`server.js` fait encore ~2 906 lignes (routes et appels HTTP). Les briques
-sans etat partage ont ete sorties dans `lib/`, chacune **injectant ses
-dependances** (`dossierUser`, `storage`, `questionModele`...) plutot que de
-les importer. Consequence directe : elles sont testables sans demarrer le
-serveur — voir `tests/lib.test.js`.
+`server.js` fait encore ~2 228 lignes. Il ne définit plus **aucune route** :
+il branche des modules, qui reçoivent leurs dépendances par injection au
+lieu de les importer. Conséquence directe : ils sont testables sans démarrer
+le serveur — voir `tests/lib.test.js`.
 
-| Module | Role | Dependances injectees |
+**Règle d'injection :** tout ce qui est réaffecté quelque part passe par un
+**getter**, tout ce qui n'est muté que par propriété passe par référence. Une
+référence injectée à l'initialisation devient périmée après une restauration
+de sauvegarde — c'est le piège que `comptes` et `stats` posent, et la
+raison pour laquelle `getComptes()` / `getStats()` existent.
+
+| Module | Rôle | Lignes |
 |---|---|---|
-| `lib/config_ia.js` | Fournisseur, modeles de secours, rotation et dernier modele repondu | `racine`, `onModeleOk` (callback tardif), `loggerErreur` |
-| `lib/rate_limit.js` | Fenetre glissante par IP et par utilisateur, purge periodique | aucune |
-| `lib/memoire.js` | `users/<uid>/`, `memoire.txt` (format plat partage avec le bot C++) | `usersDir`, `storage` |
-| `lib/historique.js` | `historique_mode<1\|2>.json`, push cloud | `dossierUser`, `storage` |
-| `lib/resume.js` | Repliage des anciens echanges en tache de fond | `dossierUser`, `cheminHistorique`, `questionModele`, `nettoyerReponse`, `loggerErreur` |
+| `lib/config_ia.js` | Fournisseur, modèles de secours, rotation du dernier modèle répondu | 136 |
+| `lib/rate_limit.js` | Fenêtre glissante par IP et par utilisateur, purge périodique | 45 |
+| `lib/memoire.js` | `users/<uid>/`, `memoire.txt` (format plat partagé avec le bot C++) | 80 |
+| `lib/historique.js` | `historique_mode<1\|2>.json`, push cloud | 34 |
+| `lib/resume.js` | Repliage des anciens échanges en tâche de fond | 90 |
 
-Le reste (routes, appels HTTP aux fournisseurs, quota temps reel) est encore
-dans `server.js` : ces briques partagent un etat commun et doivent etre
-extraites ensemble, pas une par une.
+| Module de routes | Couvre | Lignes |
+|---|---|---|
+| `lib/routes/send.js` | `/send` — message → réponse, streaming SSE, apprentissage avant prompt | 251 |
+| `lib/routes/admin.js` | `/ping`, `/health`, `/connexions`, tout `/admin/*`, `/stats`, `/config-api` | 328 |
+| `lib/routes/compte.js` | `/register`, `/login`, `/logout`, `/invite`, `/savoir` | 166 |
+| `lib/routes/consultation.js` | `/historique`, `/proactif`, `/stats-perso`, `/mode`, `/profil` | 121 |
+| `lib/routes/statique.js` | Site PWA et panneau admin, avec garde-fous de traversée de chemin | 76 |
 
-`lib/config_ia.js` illustre pourquoi l'injection passe par un **callback**
-et non par les objets : `memoriserModeleOk` doit toucher `stats`, qui est
-defini plus bas dans `server.js`. Injecter la fonction `onModeleOk` evite
-d'avoir a deplacer tout le bloc STATE, tout en gardant une dependance
-explicite.
+La couche HTTP aux fournisseurs (Gemini, compatible OpenAI) reste dans
+`server.js` : elle partage quota, rotation de modèle et alertes, et sort
+maintenant que les routes ne sont plus le point d'accroche.
 ```
 
 ## Prerequis
