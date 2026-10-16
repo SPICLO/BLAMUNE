@@ -13,7 +13,17 @@
 services:
   # ---------------------------------------------------------------- Ollama
   ollama:
-    image: ollama/ollama:latest
+    # Epinglee par version ET par digest.
+    #
+    # "latest" est un risque concret ici : l'image a ete reconstruite le
+    # 2026-10-15, et Ollama publie frequemment. Un simple docker compose up
+    # peut donc installer une version differente de celle avec laquelle on a
+    # teste, sans que quoi que ce soit ne change dans le depot.
+    #
+    # Les deux services (ollama et ollama-init) doivent porter le MEME digest :
+    # ils partagent le volume ollama_data.
+    #   docker buildx imagetools inspect ollama/ollama:0.40.5
+    image: ollama/ollama:0.40.5@sha256:5d3a2f25f9825628daba94dc0b1d421c7d57d6c03ae5faa9ba050e058bab8241
     container_name: blamune-ollama
     restart: unless-stopped
     ports:
@@ -49,7 +59,8 @@ services:
   # Telecharge et Chauffe le modele une fois, puis sort. Sans ca, la
   # premiere conversation partirait d'un modele froid.
   ollama-init:
-    image: ollama/ollama:latest
+    # Meme digest que le service ollama ci-dessus, volontairement.
+    image: ollama/ollama:0.40.5@sha256:5d3a2f25f9825628daba94dc0b1d421c7d57d6c03ae5faa9ba050e058bab8241
     container_name: blamune-ollama-init
     depends_on:
       ollama:

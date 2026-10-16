@@ -2,7 +2,12 @@
 # Etape 1 : compilation de bot.cpp (portable Linux, gardes #ifdef _WIN32).
 # Etape 2 : image finale minimale avec le binaire, les donnees du bot et
 #           bot_service.py qui l'expose en HTTP.
-FROM debian:bookworm-slim AS build
+#
+# Les deux etapes sont epinglees par digest, et par le MEME digest : elles
+# doivent partager la meme base, sinon le binaire compile sur une Debian et
+# executé sur une autre. Le digest est celui de l'index multi-plateforme.
+#   docker buildx imagetools inspect debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587 AS build
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends g++ \
@@ -14,7 +19,7 @@ COPY bot.cpp .
 RUN g++ -std=c++14 -O2 -o bot bot.cpp
 
 
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates \

@@ -123,7 +123,53 @@ check("ouvrir_bot.bat compile bot.exe si absent",
       "build_bot.ps1" in bat,
       "bot.exe est ignore par git : un clone frais n'en a pas")
 
-section("5. Poids du depot")
+section("5. Reproductibilite du build")
+
+# Un build reproductible repose sur deux choses : des dependances installees
+# depuis le lockfile, et des images epinglees. Un tag seul peut etre
+# repousse : deux builds du meme commit ne produiraient pas la meme base.
+
+dockerfile = open("Dockerfile", encoding="utf-8").read()
+dockerfile_bot = open("Dockerfile.bot", encoding="utf-8").read()
+
+# On ne regarde que les instructions RUN : un commentaire qui cite
+# "npm install" pour expliquer pourquoi on fait autrement ne doit pas
+# faire echouer le controle.
+instructions_run = [l.strip() for l in dockerfile.splitlines()
+                    if l.strip().startswith("RUN ")]
+check("Dockerfile installe avec npm ci, pas npm install",
+      any("npm ci" in l for l in instructions_run)
+      and not any("npm install" in l for l in instructions_run),
+      "npm install resout les plages au moment du build : deux builds "
+      "differents pour un meme commit")
+
+for nom, contenu in (("Dockerfile", dockerfile), ("Dockerfile.bot", dockerfile_bot)):
+    lignes_from = [l.strip() for l in contenu.splitlines() if l.startswith("FROM ")]
+    sans_digest = [l for l in lignes_from if "@sha256:" not in l]
+    check(f"{nom} : chaque FROM epingle par digest",
+          not sans_digest,
+          ("sans digest : " + " | ".join(sans_digest)) if sans_digest else
+          f"{len(lignes_from)} etape(s) epinglee(s)")
+
+compose_texte = open("docker-compose.yml", encoding="utf-8").read()
+check("docker-compose.yml : aucune image en :latest",
+      ":latest" not in compose_texte,
+      "un pull peut installer une version differente de celle testee")
+
+images = re.findall(r"^\s*image:\s*(\S+)", compose_texte, re.M)
+check("docker-compose.yml : chaque image epinglee",
+      images and all("@sha256:" in i for i in images),
+      ", ".join(images))
+
+# ollama et ollama-init partagent le volume : des digests differents
+# pourraient melanger deux versions sur le meme volume.
+digests = [i.split("@")[-1] for i in images if i.startswith("ollama/ollama")]
+check("ollama et ollama-init sur le meme digest",
+      len(set(digests)) <= 1,
+      "ils partagent le volume ollama_data : des versions differentes "
+      "casseraient le modele")
+
+section("6. Poids du depot")
 
 total = 0
 for x in suivis:
