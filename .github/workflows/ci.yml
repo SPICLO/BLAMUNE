@@ -49,6 +49,11 @@ jobs:
       - name: Tests d'integration
         run: npm test
 
+      # Verifie qu'aucune route n'est capturee par un wildcard : le catcher
+      # app.get('*') doit rester le dernier enregistre.
+      - name: Routes : aucune route ombriquee
+        run: node tests/routes_smoke.test.js
+
       - name: Tests du service bot (Python)
         run: python tests/bot_service.test.py
 
