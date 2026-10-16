@@ -54,3 +54,24 @@ _grep_perso.txt
 fichiers_cpp.txt
 signatures_cpp.txt
 
+# --- Donnees locales d'un poste de travail ---
+# memoire.txt et profil.txt a la racine : bot.cpp ne les ecrit QUE dans le
+# cas du repli sans session (mode hors ligne, invite non identifie) -- voir
+# preparerCheminsUtilisateur(). Avec une session, tout passe par
+# users/<uid>/. Les deux lectures sont gardees par un test d'existence et le
+# bot recree les fichiers au besoin (bot.cpp ecrit profil.txt et
+# memoire.txt), donc un clone neuf demarre avec une memoire vide sans
+# echouer. Les versionner ne servait qu a publier les donnees de test de la
+# machine de developpement.
+memoire.txt
+profil.txt
+
+# brouillons de travail : lots de connaissances a enrichir a la main, jamais
+# lus par le code.
+enrichir_lot*.txt
+
+# ATTENTION : vocabulaire_partage.txt est volontairement VERSIONNE. Le bot le
+# lit (bot.cpp) et y ajoute les mots appris en mode 1, et Dockerfile.bot le
+# copie dans l'image avec COPY : le retirer du depot ferait echouer
+# "docker compose build".
+

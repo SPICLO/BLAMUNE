@@ -74,6 +74,25 @@ gitign = open(".gitignore", encoding="utf-8").read()
 for f in ["config.json", "comptes.json", "users/", ".blamune_session", "bot.exe", ".env"]:
     check(f"{f} ignore par git", f in gitign)
 
+# Donnees d'un poste de travail : memoire.txt/profil.txt racine ne servent
+# qu'au repli hors ligne (le bot les recree), et les brouillons enrichir_lot*
+# ne sont lus par aucun code. Les versionner publiait des donnees de test.
+suivis = set(subprocess.run(["git", "ls-files"], capture_output=True, text=True).stdout.split())
+for f in ["memoire.txt", "profil.txt", "enrichir_lot1.txt", "enrichir_lot2.txt"]:
+    check(f"{f} non suivi par git", f not in suivis,
+          "contient des donnees locales, pas de code")
+    # enrichir_lot1.txt et enrichir_lot2.txt sont couverts par un seul motif.
+    motif = re.sub(r"enrichir_lot\d", "enrichir_lot*", f)
+    check(f"{f} ignore par git", motif in gitign)
+
+# Contraire : vocabulaire_partage.txt DOIT rester versionne, Dockerfile.bot
+# le copie dans l'image. Le retirer ferait echouer docker compose build.
+check("vocabulaire_partage.txt reste suivi par git",
+      "vocabulaire_partage.txt" in suivis,
+      "Dockerfile.bot fait COPY de ce fichier : absent, le build echoue")
+check("Dockerfile.bot copie vocabulaire_partage.txt",
+      "COPY vocabulaire_partage.txt" in open("Dockerfile.bot", encoding="utf-8").read())
+
 section("3. Fichiers necessaires au serveur")
 
 lignes = subprocess.run(["git", "ls-files"], capture_output=True, text=True).stdout.split()
