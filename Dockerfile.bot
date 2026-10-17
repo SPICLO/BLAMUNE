@@ -7,6 +7,11 @@
 # doivent partager la meme base, sinon le binaire compile sur une Debian et
 # executé sur une autre. Le digest est celui de l'index multi-plateforme.
 #   docker buildx imagetools inspect debian:bookworm-slim
+#
+# python3 (etape 2) : requis par bot_service.py (CMD) et par le HEALTHCHECK.
+# Il N'EST PAS dans debian:bookworm-slim (variante minbase), il faut donc
+# l'installer ici — sinon le conteneur ne demarre jamais ("python3: not
+# found") et la stack docker compose attend un bot qui n'arrive pas.
 FROM debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587 AS build
 
 RUN apt-get update \
@@ -22,7 +27,7 @@ RUN g++ -std=c++14 -O2 -o bot bot.cpp
 FROM debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates \
+ && apt-get install -y --no-install-recommends python3 ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
