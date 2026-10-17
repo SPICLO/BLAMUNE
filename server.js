@@ -1460,9 +1460,19 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
     // Tout le parcours etait du quota : on attend puis on repasse une fois.
     if (passe === 0 && quotaPartout && estQuota(derniereErreur)) {
       const attenteMs = delaiAvantNouvellePasse(derniereErreur);
+      // PILIER DISPONIBLE : aucune attente d'aucune sorte. Attendre une
+      // fenetre de quota Gemini (souvent 15-45 s) figerait la conversation
+      // pendant que Groq/Pollinations repondent en 1-2 s. On rend la main
+      // a la suite du code : le pilier prend le relais immediatement,
+      // et Gemini redeviendra prioritaire des qu'il respire.
+      if (pool.actif()) {
+        loggerErreur('gemini', 'quota: ' + Math.round(attenteMs / 1000) +
+          ' s annoncee -> pilier de secours immediat (zero attente)');
+        break;
+      }
       if (attenteMs > QUOTA_ATTENTE_MSG_MAX) {
-        // Google demande 45 s ou plus : ca figerait la conversation, on
-        // prefere repondre tout de suite "reessaie dans une minute".
+        // Google demande trop d'attente : ca figerait la conversation, on
+        // rend la main (le repli repond tout de suite).
         loggerErreur('gemini', 'quota: attente de ' + Math.round(attenteMs / 1000) +
           ' s trop longue pour un message, on rend la main');
         break;
@@ -1563,7 +1573,7 @@ function openAIRequete(membreOuModele, messages, onDelta) {
   });
   const headers = { 'Content-Type': 'application/json' };
   if (membre.cle) headers['Authorization'] = 'Bearer ' + membre.cle;
-  const options = { method: 'POST', headers, timeout: 30000 };
+  const options = { method: 'POST', headers, timeout: 20000 };
   let fluxFait = false;
   const promesse = new Promise((resolve, reject) => {
     const req = requeter(url, options, (res) => {
