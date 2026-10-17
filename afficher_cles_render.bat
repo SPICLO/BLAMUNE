@@ -99,10 +99,29 @@ if defined ADMIN_MDP_VAL (
 )
 echo.
 echo ================================================================
-echo    Ensuite : Save Changes, puis Manual Deploy -"
-echo    Deploy latest commit. Verifie avec le site :
-echo    un message doit obtenir une vraie reponse IA.
+echo    Ensuite : Save Changes (Render redeploye tout seul),
+echo    puis verifie avec le site : un message doit obtenir
+echo    une vraie reponse IA.
 echo ================================================================
+echo.
+
+REM --- Copie fiable : un fichier texte a ouvrir, pas une selection console ---
+REM La selection a la souris dans cette console tronque les lignes longues :
+REM une cle coupee en deux se colle telle quelle dans Render et donne HTTP
+REM 401 sans expliquer pourquoi. Le fichier Notepad reste entier.
+powershell -NoProfile -Command "$t=Get-Content '.env' | Where-Object { $_ -match '^(API_POOL|API_KEYS|API_KEY|JSONBIN_API_KEY|JSONBIN_BIN_ID|QDRANT_URL|QDRANT_API_KEY|ADMIN_MDP)=' }; @('Copier chaque ligne ENTIEREMENT, du premier au dernier caractere, sans saut de ligne au milieu.') + $t | Set-Content -Path (Join-Path $env:TEMP 'cles_render_blamune.txt') -Encoding UTF8"
+if exist "%TEMP%\cles_render_blamune.txt" (
+    echo    Fichier fiable pour copier-coller : %TEMP%\cles_render_blamune.txt
+    echo    Il vient de s'ouvrir dans Notepad : selectionne LA LIGNE ENTIERE,
+    echo    copie, colle dans Render.        ^(Ce fichier contient des cles :
+    echo     ne l'envoie a personne^)
+    start "" notepad "%TEMP%\cles_render_blamune.txt"
+) else (
+    echo    AVERTISSEMENT : fichier de copie non genere -^ PowerShell a
+    echo    echoue. Copie a la souris DANS CETTE CONSOLE avec precaution :
+    echo    clic droit sur la barre de titre -^ Edition -^ Selectionner,
+    echo    puis Enter pour copier sans transition de ligne.
+)
 echo.
 pause
 exit /b 0
