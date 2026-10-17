@@ -23,7 +23,7 @@ const { creerRoutesStatique } = require('./lib/routes/statique');
 const { creerRouteSend } = require('./lib/routes/send');
 const { creerGemini } = require('./lib/ia/gemini');
 const { creerPoolIA } = require('./lib/pool_ia');
-const { creerQdrantFaits } = require('./lib/qdrant_faits');
+const { creerQdrantFaits, fnv1a } = require('./lib/qdrant_faits');
 const { demarrerKeepalive } = require('./lib/keepalive');
 const { creerResume } = require('./lib/resume');
 
@@ -984,6 +984,15 @@ function sauverCacheEmbed(cache) {
   catch (e) { loggerErreur('qdrant', 'cache embeddings: ' + e.message); }
 }
 
+// Empreinte du savoir : somme des hash des cles. Une entree ajoutee ou
+// retiree change l'empreinte (une edition de reponse non : majFait la
+// met a jour a chaud, elle ne passe pas le boot).
+function signatureSavoir(faits) {
+  let s = 0;
+  for (const f of faits) s = (s + fnv1a(sansAccentsDB(f.cle))) % 2147483647;
+  return s | 0;
+}
+
 // Un lot de textes -> lot de vecteurs (rotation des cles sur erreurs,
 // longue pause sur 429 : reessayer trop vite remplume le meme budget).
 function geminiEmbedLot(textes, taskType) {
@@ -1096,13 +1105,26 @@ function vecteurGemini(texte, taskType) {
         }
       }
       const indexables = faits.filter(f => Array.isArray(f.vecteur) && f.vecteur.length);
-      if (indexables.length) {
-        const r = await qdrantFaits.synchroniserTout(indexables);
-        if (r) console.log('[BLAMUNE] Qdrant : ' + r.total + ' faits indexes (Gemini ' +
+      if (!indexables.length) { loggerErreur('qdrant', 'aucun vecteur disponible ce boot'); return; }
+      // RESYNC CONDITIONNELLE : l'index est compare au savoir (nombre de
+      // points + signature des cles). Identique = on ne touche a rien
+      // (zero risque de socket hang up, zero latence au boot). Differents
+      // = raser puis rejouer depuis le cache (aucun appel d'embedding).
+      const s = await qdrantFaits.sante();
+      const signature = signatureSavoir(indexables);
+      if (s && s.statut === 'ok' && s.points === indexables.length
+          && cache._signature === signature) {
+        console.log('[BLAMUNE] Qdrant : index deja synchronise (' + s.points +
+          ' points, signature ok) : aucune ecriture');
+        return;
+      }
+      const r = await qdrantFaits.synchroniserTout(indexables);
+      if (r) {
+        cache._signature = signature;
+        sauverCacheEmbed(cache);
+        console.log('[BLAMUNE] Qdrant : ' + r.total + ' faits indexes (Gemini ' +
           EMBED_DIM + 'd, cache ' + (faits.length - repos.length) + '/' + faits.length +
           ' hits, travail total ' + Math.round((Date.now() - depart) / 1000) + ' s)');
-      } else {
-        loggerErreur('qdrant', 'aucun vecteur disponible ce boot');
       }
     } else {
       const r = await qdrantFaits.synchroniserTout(faits);
