@@ -22,6 +22,8 @@ const { creerRoutesConsultation } = require('./lib/routes/consultation');
 const { creerRoutesStatique } = require('./lib/routes/statique');
 const { creerRouteSend } = require('./lib/routes/send');
 const { creerGemini } = require('./lib/ia/gemini');
+const { creerPoolIA } = require('./lib/pool_ia');
+const { creerQdrantFaits } = require('./lib/qdrant_faits');
 const { demarrerKeepalive } = require('./lib/keepalive');
 const { creerResume } = require('./lib/resume');
 
@@ -86,7 +88,11 @@ app.use((req, res, next) => {
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:");
+  // WebGPU (IA hors-ligne dans le navigateur) : WebAssembly a besoin de
+  // 'wasm-unsafe-eval' (tokenizer de WebLLM) ; les poids du modele et sa
+  // config sont telecharges depuis Hugging Face via connect-src. Tout le
+  // code, lui, reste servi depuis 'self' (ic-ememe) : aucun script externe.
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://text.pollinations.ai https://huggingface.co https://*.huggingface.co https://*.hf.co; img-src 'self' data:");
   if (req.method === 'OPTIONS') return res.status(204).end();
   next();
 });
@@ -108,6 +114,29 @@ const { config, providerOpenAI, modeleActif, ordreModeles,
     sauverStats();
   },
   loggerErreur,
+});
+
+// ==================== POOL MULTI-FOURNISSEUR ====================
+// Anti-saturation : le fournisseur principal est tente en premier, puis les
+// membres d'API_POOL ("nom|url|cle|modele;..."). Un membre qui renvoie
+// 429/401/403/5xx repart en cooldown et un autre prend le relais ; celui qui
+// repond devient prioritaire (sticky). membrePrincipal est une FONCTION :
+// appelee a chaque ordre(), elle relit config vivante (URL/cle changes par
+// /config-api pris en compte sans redemarrage).
+function membrePrincipal() {
+  return {
+    nom: 'principal',
+    url: baseOpenAI(),
+    cle: config.api_key,
+    modele: modeleActif()
+  };
+}
+const pool = creerPoolIA({
+  sourcesEnv: process.env.API_POOL || '',
+  membrePrincipal,
+  cooldownMs: parseInt(process.env.API_POOL_COOLDOWN_MS || '', 10) || 60000,
+  cooldownAuthMs: parseInt(process.env.API_POOL_COOLDOWN_AUTH_MS || '', 10) || 600000,
+  logger: loggerErreur
 });
 
 // ==================== DATA ====================
@@ -903,13 +932,207 @@ function chargerSavoirSecours() {
 }
 chargerSavoirSecours();
 
+// ==================== INDEX SEMANTIQUE (Qdrant cloud) ====================
+// savoir.db repond aux mots-cles EXACTS ; Qdrant ajoute la couche
+// semantique : retrouver le fait pertinent quand la question n'emploie
+// pas les memes mots ("combien coute le blabla" -> fait range sous
+// "prix du blabla"). Sans QDRANT_URL/QDRANT_API_KEY, tout est silencieux
+// et le comportement precedent est impeccable. Cote cloud (Render), les
+// deux variables se posent dans le dashboard, rien ne depend du PC local.
+const qdrantFaits = creerQdrantFaits({
+  url: process.env.QDRANT_URL || '',
+  cleApi: process.env.QDRANT_API_KEY || '',
+  collection: process.env.QDRANT_COLLECTION || 'blamune-faits',
+  seuilRecherche: parseFloat(process.env.QDRANT_SEUIL || '') || 0.30,
+  actifForcer: process.env.QDRANT_ACTIV !== '0',
+  sansAccents: sansAccentsDB,
+  logger: loggerErreur
+});
+
+// Synchro COMPLET au demarrage (fond, jamais bloquant) : l'index est
+// jetable, source de verite = savoir.db. Recree tranquillement a chaque
+// boot, donc forcement coherent avec la base.
+
+// ==================== VECTEURS DE RECHERCHE (Gemini, optionnel) ====================
+// QDRANT_EMBED=gemini : les vecteurs viennent de gemini-embedding-001
+// (gratuit, quota D'EMBEDDING distinct du quota de chat des memes cles,
+// 768 dimensions). Sans cette variable, le module retombe sur son hachage
+// local 256 d : deja utile, un cran moins fin sur les synonymes.
+//
+// Le RPM d'embedding est TENDU (compte les items, parfois partage par
+// projet). Deux garde-fous structurels :
+//   1. CACHE DISQUE (cache_embeddings.json, cote RACINE) : le premier boot
+//      fait tout le travail (~13 min de fond pour 1266 faits), les boots
+//      suivants ne vectorisent que les faits NOUVEAUX : quelques secondes.
+//      Sur Render, le volume survit aux redemarrages : jamais de reconsumption.
+//   2. RESPIRATION : lots de 25, pause 15 s, et 65 s de patience sur un 429
+//      avant la cle suivante (les cles partagent parfois le meme budget).
+const EMBED_GEMINI = process.env.QDRANT_EMBED === 'gemini'
+  && qdrantFaits.actif()
+  && !!(String(process.env.API_KEYS || process.env.API_KEY || '').trim());
+const EMBED_MODELE = 'gemini-embedding-001';
+const EMBED_DIM = 768;
+const CHEMIN_CACHE_EMBED = path.join(RACINE, 'cache_embeddings.json');
+let embedCleIndex = 0;
+
+function chargerCacheEmbed() {
+  try { return JSON.parse(fs.readFileSync(CHEMIN_CACHE_EMBED, 'utf8')); }
+  catch (e) { return {}; }
+}
+function sauverCacheEmbed(cache) {
+  try { fs.writeFileSync(CHEMIN_CACHE_EMBED, JSON.stringify(cache)); }
+  catch (e) { loggerErreur('qdrant', 'cache embeddings: ' + e.message); }
+}
+
+// Un lot de textes -> lot de vecteurs (rotation des cles sur erreurs,
+// longue pause sur 429 : reessayer trop vite remplume le meme budget).
+function geminiEmbedLot(textes, taskType) {
+  const cles = String(process.env.API_KEYS || process.env.API_KEY || '')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  if (!cles.length) return Promise.resolve(null);
+  const demandes = textes.map((texte) => ({
+    model: 'models/' + EMBED_MODELE,
+    content: { parts: [{ text: String(texte).substring(0, 2000) }] },
+    taskType,
+    outputDimensionality: EMBED_DIM
+  }));
+  function essaiSurCle(i) {
+    if (i >= cles.length) {
+      loggerErreur('qdrant', 'embeddings: toutes les cles ont echoue sur ce lot');
+      return Promise.resolve(null);
+    }
+    const cle = cles[i];
+    return requeterHttp('https://generativelanguage.googleapis.com/v1beta/models/' +
+        EMBED_MODELE + ':batchEmbedContents',
+      { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cle },
+        body: JSON.stringify({ requests: demandes }) }, 60000)
+      .then((brut) => {
+        const j = JSON.parse(brut);
+        const ves = (j.embeddings || []).map(e => e.values);
+        if (ves.length !== textes.length) throw new Error('longueur embeddings != textes');
+        return ves;
+      })
+      .catch((e) => {
+        const quota = e && (e.statusCode === 429 || /429|rate limit|quota/i.test(e.message || ''));
+        const attente = quota ? 65000 : 3000;
+        const suivant = () => {
+          if (i + 1 < cles.length) {
+            loggerErreur('qdrant', 'embeddings lot: ' + e.message + (quota ? ' (pause 65 s appliquee)' : '') + ' -> cle suivante');
+            return essaiSurCle(i + 1);
+          }
+          loggerErreur('qdrant', 'embeddings lot: ' + e.message);
+          return Promise.resolve(null);
+        };
+        return attente > 0
+          ? new Promise(r => setTimeout(r, attente)).then(suivant)
+          : suivant();
+      });
+  }
+  embedCleIndex = (embedCleIndex + 1) % cles.length; // rotation sur les lots
+  return essaiSurCle(embedCleIndex);
+}
+
+// Vecteur pour UN texte (un seul embedContent, moins lourd qu'un lot).
+// taskType : 'RETRIEVAL_DOCUMENT' (index) ou 'RETRIEVAL_QUERY' (question).
+function vecteurGemini(texte, taskType) {
+  if (!EMBED_GEMINI) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const cles = String(process.env.API_KEYS || process.env.API_KEY || '')
+      .split(',').map(s => s.trim()).filter(Boolean);
+    const cle = cles[embedCleIndex % cles.length];
+    requeterHttp('https://generativelanguage.googleapis.com/v1beta/models/' +
+        EMBED_MODELE + ':embedContent',
+      { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cle },
+        body: JSON.stringify({
+          content: { parts: [{ text: String(texte).substring(0, 2000) }] },
+          taskType, outputDimensionality: EMBED_DIM
+        }) }, 30000)
+      .then((brut) => {
+        const j = JSON.parse(brut);
+        resolve(Array.isArray(j.embedding && j.embedding.values)
+          && j.embedding.values.length ? j.embedding.values : null);
+      })
+      .catch((e) => { loggerErreur('qdrant', 'embedding unitaire: ' + e.message); resolve(null); });
+  });
+}
+
+(function synchroniserQdrantAuDemarrage() {
+  if (!qdrantFaits.actif()) return;
+  const faits = savoirDb.toutes().filter(f => f.reponse && String(f.reponse).trim());
+  const depart = Date.now();
+  (async () => {
+    if (EMBED_GEMINI) {
+      // 1) CACHE : deja vectorise -> zero appel. 2) Reste : lots de 25
+      // avec respiration. Cache mis a jour au fil de l'eau (1 ecriture
+      // par lot) : un arret au milieu n'oublie que le lot en cours.
+      const cache = chargerCacheEmbed();
+      const repos = [];
+      for (const f of faits) {
+        const v = cache[sansAccentsDB(f.cle)];
+        if (Array.isArray(v) && v.length) f.vecteur = v;
+        else repos.push(f);
+      }
+      if (repos.length) {
+        console.log('[BLAMUNE] Qdrant : ' + (faits.length - repos.length) +
+          ' vecteurs depuis le cache, ' + repos.length + ' a calculer');
+      }
+      const FAISCEAU = 25;
+      for (let i = 0; i < repos.length; i += FAISCEAU) {
+        const morceau = repos.slice(i, i + FAISCEAU);
+        const ves = await geminiEmbedLot(
+          morceau.map(f => (f.cle + '. ' + f.reponse).substring(0, 2000)),
+          'RETRIEVAL_DOCUMENT');
+        if (!ves) {
+          // Vecteurs du cache utilises quand meme ; l'index des faits
+          // restants sera complete par le prochain boot.
+          sauverCacheEmbed(cache);
+          loggerErreur('qdrant', 'embeddings du boot interrompues (resync partielle, le cache garde le reste)');
+          break;
+        }
+        morceau.forEach((f, x) => { f.vecteur = ves[x]; cache[sansAccentsDB(f.cle)] = ves[x]; });
+        sauverCacheEmbed(cache);
+        if (i + FAISCEAU < repos.length) {
+          await new Promise(r => setTimeout(r, 15000));
+        }
+      }
+      const indexables = faits.filter(f => Array.isArray(f.vecteur) && f.vecteur.length);
+      if (indexables.length) {
+        const r = await qdrantFaits.synchroniserTout(indexables);
+        if (r) console.log('[BLAMUNE] Qdrant : ' + r.total + ' faits indexes (Gemini ' +
+          EMBED_DIM + 'd, cache ' + (faits.length - repos.length) + '/' + faits.length +
+          ' hits, travail total ' + Math.round((Date.now() - depart) / 1000) + ' s)');
+      } else {
+        loggerErreur('qdrant', 'aucun vecteur disponible ce boot');
+      }
+    } else {
+      const r = await qdrantFaits.synchroniserTout(faits);
+      if (r) console.log('[BLAMUNE] Qdrant : ' + r.total + ' faits indexes (recherche semantique locale)');
+    }
+  })().catch((e) => loggerErreur('qdrant', 'demarrage: ' + (e && e.message)));
+})();
+
 // Apres toute ecriture, on rafraichit le reflet en memoire et on regenere
-// l'export (pour git / bot local), sans bloquer la reponse.
+// l'export (pour git / bot local), sans bloquer la reponse. L'index
+// semantique Qdrant est mis a jour en tache de fond (meme regle).
 function savoirEnregistrer(cle, reponse, categorie, source) {
   const ok = savoirDb.repondre(cle, reponse, categorie);
   if (ok) {
     chargerSavoirSecours();
     exporterSavoir();
+    // majQdrant : uniquement si le fait AFFIRME quelque chose (meme regle
+    // que toutes()) — un mot-cle de categorie n'indexe rien a lire.
+    if (reponse && String(reponse).trim() && qdrantFaits.actif()) {
+      (async () => {
+        const fait = { cle, reponse, categorie };
+        if (EMBED_GEMINI) {
+          const v = await vecteurGemini((cle + '. ' + reponse).substring(0, 2000),
+            'RETRIEVAL_DOCUMENT');
+          if (!v) return; // embeddings indisponibles : le prochain boot resynchronisera
+          fait.vecteur = v;
+        }
+        await qdrantFaits.majFait(fait);
+      })().catch((e) => loggerErreur('qdrant', 'maj fait: ' + (e && e.message)));
+    }
   }
   return ok;
 }
@@ -964,11 +1187,37 @@ const CHEMIN_REPLIS = fs.existsSync(path.join(RACINE, 'replis.txt'))
   : path.join(__dirname, 'replis.txt');
 const banqueReplis = new BanqueReplis(RACINE, CHEMIN_REPLIS);
 
+// chercherSemantique : quand la question n'emploie pas les mots exacts du
+// fait, Qdrant retrouve le voisin le plus proche (cosinus >= seuil).
+// QDRANT_EMBED=gemini : le vecteur de la question vient de Gemini
+// (RETRIEVAL_QUERY, meme espace vectoriel que les faits indexes).
+// EN ECHEC reseau : '' (le repli continue), jamais d'exception.
+async function chercherSemantique(msg) {
+  try {
+    if (!qdrantFaits.actif()) return '';
+    let options;
+    if (EMBED_GEMINI) {
+      const v = await vecteurGemini(String(msg).substring(0, 2000), 'RETRIEVAL_QUERY');
+      if (!v) return ''; // pas de vecteur : pas de recherche, le repli continue
+      options = { vecteur: v };
+    }
+    const r = await qdrantFaits.chercher(msg, 3, options);
+    if (r && r.length && r[0].reponse) {
+      loggerErreur('qdrant', 'semantique: "' + msg + '" -> fait "' + r[0].cle +
+        '" (cosinus ' + r[0].score.toFixed(2) + ')');
+      return r[0].reponse;
+    }
+  } catch (e) { /* bonus seulement */ }
+  return '';
+}
+
 async function reponseSecours(msg, e) {
   const local = await appelerBotLocal(msg);
   if (local) return local;
   const rep = chercherSavoir(msg);
   if (rep) return rep;
+  const sem = await chercherSemantique(msg);
+  if (sem) return sem;
   const repli = banqueReplis.repli(msg);
   if (repli) return repli;
   return messageTechnique(e);
@@ -1212,12 +1461,9 @@ function baseOpenAI() {
   return u.replace(/\/chat\/completions$/i, '');
 }
 
-function optionsOpenAI() {
-  const headers = { 'Content-Type': 'application/json' };
-  // Ollama en local n'exige pas de cle : on n'envoie pas d'en-tete vide.
-  if (config.api_key) headers['Authorization'] = 'Bearer ' + config.api_key;
-  return { method: 'POST', headers, timeout: 30000 };
-}
+// Les en-tetes (Bearer facultatif pour Ollama, timeout) sont concus PAR
+// MEMBRE dans openAIRequete() depuis le pool multi-fournisseur : l'URL et
+// la cle d'un membre du pool n'ont rien a voir avec celle du principal.
 
 function construireMessages(histo, imageParts) {
   const messages = [];
@@ -1242,17 +1488,31 @@ function construireMessages(histo, imageParts) {
 }
 
 // Un appel unique. onDelta optionnel : fourni = reponse en flux (SSE).
-function openAIRequete(modele, messages, onDelta) {
-  const url = baseOpenAI() + '/chat/completions';
+// membreOuModele accepte deux formes :
+//   - un STRING (nom de modele) : l'URL et la cle viennent de config
+//     (chemin historique : cascade de modeles d'UN fournisseur) ;
+//   - un MEMBRE de pool { nom, url, cle, modele } : tout vient du membre
+//     (cascade MULTI-fournisseur).
+// En cas d'echec, err.fluxEntame indique si le client a deja recu du texte :
+// pas de rotation possible alors, le client afficherait deux reponses.
+function openAIRequete(membreOuModele, messages, onDelta) {
+  const membre = typeof membreOuModele === 'string'
+    ? { nom: 'principal', url: baseOpenAI(), cle: config.api_key, modele: membreOuModele }
+    : membreOuModele;
+  const url = String(membre.url || '').replace(/\/+$/, '') + '/chat/completions';
   const enFlux = typeof onDelta === 'function';
   const corps = JSON.stringify({
-    model: modele, messages,
+    model: membre.modele, messages,
     max_tokens: config.api_max_tokens,
     temperature: config.api_temperature,
     stream: enFlux
   });
-  return new Promise((resolve, reject) => {
-    const req = requeter(url, optionsOpenAI(), (res) => {
+  const headers = { 'Content-Type': 'application/json' };
+  if (membre.cle) headers['Authorization'] = 'Bearer ' + membre.cle;
+  const options = { method: 'POST', headers, timeout: 30000 };
+  let fluxFait = false;
+  const promesse = new Promise((resolve, reject) => {
+    const req = requeter(url, options, (res) => {
       if (res.statusCode !== 200) {
         let data = '';
         res.on('data', c => data += c);
@@ -1292,7 +1552,7 @@ function openAIRequete(modele, messages, onDelta) {
           try { json = JSON.parse(brut); } catch (e) { continue; }
           if (json.error) { fini = true; reject(new Error(json.error.message || 'erreur API')); return; }
           const delta = (json.choices && json.choices[0] && json.choices[0].delta) || {};
-          if (delta.content) { texte += delta.content; try { onDelta(texte); } catch (e) {} }
+          if (delta.content) { fluxFait = true; texte += delta.content; try { onDelta(texte); } catch (e) {} }
         }
       });
       res.on('end', () => { if (!fini) { fini = true; resolve(texte); } });
@@ -1303,33 +1563,87 @@ function openAIRequete(modele, messages, onDelta) {
     req.write(corps);
     req.end();
   });
+  return promesse.catch(e => {
+    try { e.fluxEntame = fluxFait; } catch (x) {}
+    throw e;
+  });
 }
 
-// Cascade de modeles pour le mode compatible OpenAI (principal puis secours).
+// Cascade pour le mode compatible OpenAI.
+// Pool actif (API_POOL) : cascade MULTI-fournisseur — principal, puis les
+// membres disponibles, cooldown auto sur 429/401/403/5xx, sticky sur celui
+// qui repond. Si le client a deja recu du texte (fluxEntame), plus aucune
+// rotation : on rethrowe sans polluer un autre fournisseur.
+// Pool inactif : comportement historique (cascade de modeles d'UN
+// fournisseur, ordreModeles()).
 async function appelerOpenAI(message, histo, onDelta, imageParts) {
   const messages = construireMessages(limiterHisto(histo, HISTO_API_MAX), imageParts);
-  const modeles = ordreModeles();
+
   let derniereErreur = null;
-  for (const modele of modeles) {
-    try {
-      const texte = await openAIRequete(modele, messages, onDelta);
-      if (texte) { memoriserModeleOk(modele); resoudreAlertes(); return texte; }
-      derniereErreur = new Error('Reponse vide');
-    } catch (e) {
-      derniereErreur = e;
-      const delai = delaiIndique(e);
-      if (delai || (e && e.statusCode === 429)) marquerQuota();
-      loggerErreur('ia', modele + ' KO: ' + e.message);
+
+  if (pool.actif()) {
+    // marquerQuota : le drapeau quota global sert aux taches de fond
+    // (reporterTache), on le tient a jour au passage du 429.
+    for (const membre of pool.ordre()) {
+      try {
+        const texte = await openAIRequete(membre, messages, onDelta);
+        if (texte) { pool.noteOk(membre.nom); resoudreAlertes(); return texte; }
+        derniereErreur = new Error('Reponse vide');
+      } catch (e) {
+        derniereErreur = e;
+        if (e && e.statusCode === 429) marquerQuota();
+        loggerErreur('ia', 'pool: ' + membre.nom + ' (' + membre.modele + ') KO: ' + e.message +
+          (e.fluxEntame ? ' [flux entame, pas de rotation]' : ' [cooldown/DAB]'));
+        if (e && e.fluxEntame) break;
+        pool.noteEchec(membre.nom, e);
+      }
+    }
+    // Tous les membres en cooldown : message clair et immediat, sans
+    // perdre 30 s x N membres a tours de bras.
+    if (!derniereErreur) {
+      derniereErreur = new Error('Pool IA : tous les fournisseurs en cooldown');
+    }
+  } else {
+    // Comportement historique : cascade de modeles d'UN fournisseur.
+    const modeles = ordreModeles();
+    for (const modele of modeles) {
+      try {
+        const texte = await openAIRequete(modele, messages, onDelta);
+        if (texte) { memoriserModeleOk(modele); resoudreAlertes(); return texte; }
+        derniereErreur = new Error('Reponse vide');
+      } catch (e) {
+        derniereErreur = e;
+        const delai = delaiIndique(e);
+        if (delai || (e && e.statusCode === 429)) marquerQuota();
+        loggerErreur('ia', modele + ' KO: ' + e.message);
+      }
     }
   }
-  const echec = derniereErreur ? derniereErreur.message : 'Tous les modeles ont echoue';
+
+  const echec = derniereErreur ? derniereErreur.message : 'Tous les fournisseurs ont echoue';
   alerter(estQuota(derniereErreur) ? 'quota' : 'technique', echec);
   throw new Error(echec);
 }
 
 // Question ponctuelle (resume, extraction) : un seul message, sans flux.
+// Pool actif : UNE tentative chez le premier membre disponible (pas de
+// cascade pour une tache de fond : elle ne doit jamais voler les tentatives
+// de la reponse en cours, meme philosophie que reporterTache).
 async function questionModele(consigne) {
   if (providerOpenAI()) {
+    if (pool.actif()) {
+      const membres = pool.ordre();
+      if (membres.length === 0) throw new Error('Pool IA : tous les fournisseurs en cooldown');
+      const membre = membres[0];
+      try {
+        const texte = await openAIRequete(membre, [{ role: 'user', content: consigne }], null);
+        pool.noteOk(membre.nom);
+        return texte;
+      } catch (e) {
+        pool.noteEchec(membre.nom, e);
+        throw e;
+      }
+    }
     return openAIRequete(modeleActif(), [{ role: 'user', content: consigne }], null);
   }
   return modeleClassique(modeleActif(),
@@ -2047,6 +2361,10 @@ creerRoutesAdmin(app, {
   getStats: () => stats,
   getConfig: () => config,
   getEtat: () => etat,
+  // Etat du pool IA (cooldowns par fournisseur) pour /health.
+  getPoolSante: () => pool.sante(),
+  // Etat de l'index semantique Qdrant pour /health.
+  getQdrantSante: () => qdrantFaits.sante(),
   connexionsActives, modeParUser,
   savoirDb, lireMemoire, chargerHistorique,
   etatAlertes, etatModele,

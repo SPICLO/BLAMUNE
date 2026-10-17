@@ -38,6 +38,16 @@ hors_ligne
 .protection_hash.json.bak_*
 savoir_nouvelles.txt
 
+# Proxy DeepSeek web -> API OpenAI (projet externe, jamais versionne ici :
+# il contient deepseek-auth.json qui vaut les cookies du compte, et un
+# profil Chrome prive). Pour le recuperer : git clone
+# https://github.com/atharvotech/FreeDeepseekAPI-EN.git deepproxy
+deepproxy/
+
+# Cache disque des vecteurs d'embedding (regenere au premier boot, voir
+# le bloc CACHE DISQUE dans server.js) ; ~12 Mo, jamais utile au depot.
+cache_embeddings.json
+
 # --- Sorties generees localement (non necessaires au deploiement) ---
 themes.txt
 themes_manquants.txt

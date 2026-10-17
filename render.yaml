@@ -28,20 +28,32 @@ services:
       # ---------- Reponse IA en ligne (optionnel) ----------
       # Le bot fonctionne a 100 % en local : ces variables ne servent que si
       # tu relies le mode 1 a une API. Voir KEEPALIVE.md.
+      #
+      # OPTION A : OpenRouter comme fournisseur principal. Un seul endpoint
+      # OpenAI-compatible, des modeles gratuits (:free), et bascule automatique
+      # sur API_MODELS si le principal est sature.
       - key: API_KEY
         sync: false
       - key: API_PROVIDER
-        value: gemini
-      - key: API_MODEL
-        value: gemini-3.5-flash
+        value: openrouter
       - key: API_URL
-        value: https://generativelanguage.googleapis.com/v1beta
+        value: https://openrouter.ai/api/v1
+      - key: API_MODEL
+        value: meta-llama/llama-3.1-8b-instruct:free
+      # Modeles de secours (separes par des virgules), essayes si le principal
+      # renvoie une erreur (quota sature, 429, indisponible...).
+      - key: API_MODELS
+        value: google/gemini-2.0-flash-exp:free,meta-llama/llama-3.1-8b-instruct
+      - key: API_MAX_TOKENS
+        value: 512
+      - key: API_TEMPERATURE
+        value: 0.7
       # ---------- Reglages optionnels (defauts sains, a ajuster si besoin) ----------
-      # Limites anti-abus (requetes par minute).
+      # Limites anti-abus (requetes par minute). Resserrs pour le plan gratuit.
       - key: RATE_SEND_IP
-        value: 30
-      - key: RATE_SEND_UID
         value: 20
+      - key: RATE_SEND_UID
+        value: 10
       # Attente max apres un "quota sature" (ms).
       - key: QUOTA_ATTENTE_MAX_MS
         value: 70000
@@ -50,9 +62,9 @@ services:
       # Extraction des faits par le modele (0 = regex seules).
       - key: MEMOIRE_EXTRACTION
         value: 1
-      # Recherche web (0 = desactivee).
+      # Recherche web (0 = desactivee pour economiser les appels IA en free).
       - key: RECHERCHE_WEB
-        value: 1
+        value: 0
       # Pseudo du compte admin (defaut : admin).
       - key: ADMIN_PSEUDO
         value: admin
