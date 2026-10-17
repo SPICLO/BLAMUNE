@@ -1,6 +1,6 @@
 // BLAMUNE Service Worker - offline cache
-const CACHE = 'blamune-v9';
-const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/manifest.json', '/logo.png'];
+const CACHE = 'blamune-v10';
+const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/ia-navigateur.js', '/manifest.json', '/logo.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
@@ -19,6 +19,11 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
+  // Requetes vers un autre domaine (Hugging Face : config et poids du
+  // modele IA hors-ligne) : on ne touche pas, et surtout on ne recopie PAS
+  // ces reponses dans notre cache (WebLLM possede le sien ; une copie ici
+  // ferait ~1 Go de perdu). Le bundle ia-webllm.mjs, lui, reste chez nous.
+  if (url.origin !== self.location.origin) return;
   // Ne pas cacher les requetes API ni les appels dynamiques
   if (url.pathname.startsWith('/send') || url.pathname.startsWith('/historique') ||
       url.pathname.startsWith('/mode') || url.pathname.startsWith('/register') ||

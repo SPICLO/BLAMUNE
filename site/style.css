@@ -1169,3 +1169,21 @@ html.console .auth-box::before {
   margin-top: 6px;
   object-fit: contain;
 }
+
+/* ---------------- IA HORS-LIGNE (bouton du header) ---------------- */
+#btnIANav {
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  color: var(--texte-doux);
+  padding: 4px 10px;
+  margin-left: 8px;
+  font-size: 12px;
+}
+#btnIANav svg { margin-right: 4px; }
+#btnIANav:hover { color: var(--texte); border-color: rgba(255, 255, 255, 0.16); }
+#btnIANav.actif {
+  color: #052033;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border-color: transparent;
+}
