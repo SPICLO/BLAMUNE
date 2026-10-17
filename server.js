@@ -1236,13 +1236,34 @@ async function chercherSemantique(msg) {
 async function reponseSecours(msg, e) {
   const local = await appelerBotLocal(msg);
   if (local) return local;
-  const rep = chercherSavoir(msg);
+  // Le savoir n'est consulte que si le message demande vraiment une
+  // information sur un sujet. Une question ouverte ("qu'est-ce qui se passe ?",
+  // "comment va la meteo") n'attend pas une definition : y repondre avec le
+  // fait qui partage un mot ("passe" -> la passe au foot) est une coincidence
+  // lexicale, pas une connaissance. Voir demandeInfo() plus bas.
+  const rep = demandeInfo(msg) ? chercherSavoir(msg) : '';
   if (rep) return rep;
   const sem = await chercherSemantique(msg);
   if (sem) return sem;
   const repli = banqueReplis.repli(msg);
   if (repli) return repli;
   return messageTechnique(e);
+}
+
+// Demande d'information sur un sujet : la forme de la phrase separe
+// "c'est quoi tokyo ?" (definition plausible) de "qu'est-ce qui se passe ?"
+// (situational, aucun sujet). Meme nettoyage que detecterSituation (replis.js)
+// : accents retires (sansAccents), apostrophes et tirets devenus espaces.
+const MOTIF_DEMANDE_INFO = /(qu est ce que|c est quoi|c quoi|que signifie|definition|definit|a quoi sert|sert a quoi|comment ca marche|comment marche|comment faut faire|comment on fait)/;
+
+function demandeInfo(msg) {
+  // sansAccents (definie plus bas pour detecterSouvenirs) ne normalise pas
+  // la casse ni les apostrophes : le motif vire les guillemets et les tirets.
+  const t = sansAccents(String(msg || '').toLowerCase())
+    .replace(/[\u2018\u2019'`]/g, ' ')
+    .replace(/[-_]/g, ' ')
+    .replace(/\s+/g, ' ');
+  return MOTIF_DEMANDE_INFO.test(t);
 }
 
 // --- Reponse classique : tout d'un coup (repli si le flux echoue) ---

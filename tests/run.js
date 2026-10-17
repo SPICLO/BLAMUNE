@@ -918,8 +918,22 @@ const MDP_ENCODED = encodeURIComponent(ADMIN_MDP_TEST);
       'savoir.txt repondu pendant le quota: ' + texteS.substring(0, 150));
     assert(!/Beaucoup de monde/i.test(texteS),
       'message quota evite quand savoir connait la question: ' + texteS.substring(0, 150));
+    // Toujours pendant la panne : une question ouverte ne doit PAS recevoir
+    // une definition qui n'attend qu'un mot commun ("se passe" -> la passe au
+    // foot). Ca releve de la coincidence, pas de la connaissance : la chaine
+    // de secours doit aller jusqu'au repli honnete.
+    const ouvert = await envoyer("qu'est-ce qui se passe ?");
+    assert.strictEqual(ouvert.status, 200,
+      'question ouverte: HTTP ' + ouvert.status + ' ' + String(ouvert.texte).substring(0, 150));
+    const texteO = ((ouvert.json && ouvert.json.reponses) || []).join(' ');
+    assert(texteO.trim().length > 0, 'question ouverte: reponse vide');
+    assert(!/ballon|Transmission du ballon/i.test(texteO),
+      'definition hors sujet ("passe" au foot) servie: ' + texteO.substring(0, 150));
+    assert(!/capitale du japon/i.test(texteO),
+      'definition sans rapport servie a une question ouverte: ' + texteO.substring(0, 150));
     quotaGeneralRestant = 0;
     ok.push('savoir.txt en secours pendant la panne quota (question connue repondue)');
+    ok.push('question ouverte en secours : repli honnete, pas de definition hors sujet');
 
     // 23. Savoir AUTO : le bot local (POST /savoir) pousse ses
     //     apprentissages : ecriture immediate dans savoir.txt (aucun commit
