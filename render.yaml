@@ -50,6 +50,25 @@ services:
         value: 512
       - key: API_TEMPERATURE
         value: 0.7
+      # ---------- Pool de secours (pilier invisible) ----------
+      # Quand la cascade de cles Gemini est epuisee (cle morte, quota
+      # partout, reseau), server.js tente automatiquement ces membres,
+      # DANS L'ORDRE, pour EGO comme pour BLAMUNE. Le visiteur ne voit
+      # rien : meme chat, meme UX. Celui qui repond redevient prioritaire
+      # (sticky) : performance et survie ensemble.
+      #   - groq : 30 requetes/min gratuites, modeles GPT-OSS tres rapides
+      #     (cle gratuite sur console.groq.com/keys) ;
+      #   - pollinations : sans aucun compte, modele libre GPT-OSS 20B
+      #     (quotite anonyme : ~1 reponse / 30 s par IP de sortie).
+      # A coller DANS LE DASHBOARD (rendable sync:false : il contient une
+      # cle). Le raccourci : afficher_cles_render.bat imprime cette ligne
+      # prete a copier depuis le .env local.
+      - key: API_POOL
+        sync: false
+      - key: API_POOL_COOLDOWN_MS
+        value: 60000
+      - key: API_POOL_COOLDOWN_AUTH_MS
+        value: 600000
       # ---------- Reglages optionnels (defauts sains, a ajuster si besoin) ----------
       # Limites anti-abus (requetes par minute). Resserrs pour le plan gratuit.
       - key: RATE_SEND_IP

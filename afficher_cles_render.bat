@@ -29,11 +29,13 @@ if not exist ".env" (
 
 REM --- Lecture brute de .env ---
 set "CLE_GEMINI="
+set "CLE_DIRECTE="
 set "QDRANT_URL_VAL="
 set "QDRANT_CLE_VAL="
 set "JSONBIN_CLE_VAL="
 set "JSONBIN_BIN_VAL="
 set "ADMIN_MDP_VAL="
+set "POOL_VAL="
 
 for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
     if /i "%%A"=="API_KEYS" set "TOUTES_CLES=%%B"
@@ -43,6 +45,7 @@ for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
     if /i "%%A"=="JSONBIN_API_KEY" set "JSONBIN_CLE_VAL=%%B"
     if /i "%%A"=="JSONBIN_BIN_ID" set "JSONBIN_BIN_VAL=%%B"
     if /i "%%A"=="ADMIN_MDP" set "ADMIN_MDP_VAL=%%B"
+    if /i "%%A"=="API_POOL" set "POOL_VAL=%%B"
 )
 
 REM --- Premiere cle de la liste (partage le quota, la rotation reste cote serveur) ---
@@ -52,31 +55,40 @@ if defined TOUTES_CLES (
 if not defined CLE_GEMINI set "CLE_GEMINI=!CLE_DIRECTE!"
 
 echo.
-echo ==================================================================
-echo    VALEURS A COLLER DANS RENDER : ton service ^(blamune^)
-echo    puis Environment -^> Add environment variable
-echo ==================================================================
+echo ================================================================
+echo    VALEURS A COLLER DANS RENDER : service blamune
+echo    Environment -" Add environment variable
+echo ================================================================
 echo.
-echo --- OBLIGATOIRE ---------------------------------------------------
+echo --- OBLIGATOIRE ------------------------------------------------
 echo.
 echo   API_KEY =
 echo     !CLE_GEMINI!
-echo     ^(cle Gemini, commence par AIza... Si ce n'est pas le cas,
-echo      cree une cle sur aistudio.google.com/app/apikey^)
+echo     ^(cle Gemini gratuite ; si elle est morte ou pas AIza...,
+echo      cree-en une sur aistudio.google.com/app/apikey^)
 echo.
 echo   JSONBIN_API_KEY =
 call :afficher "!JSONBIN_CLE_VAL!"
 echo   JSONBIN_BIN_ID =
 call :afficher "!JSONBIN_BIN_VAL!"
 echo.
-echo --- OPTIONNEL : memoire vectorielle du savoir ----------------------
+echo --- OPTIONNEL : pilier de secours (Groq + GPT-OSS) -------------
+echo.
+echo   API_POOL =
+if not defined POOL_VAL set "POOL_VAL=(absente du .env local)"
+echo     !POOL_VAL!
+echo     ^(contient ta cle Groq : colle cette ligne telle quelle.
+echo      Le serveur ne l'utilise QU'APRES l'epuisement des cles
+echo      Gemini - invisible pour les visiteurs^)
+echo.
+echo --- OPTIONNEL : memoire vectorielle du savoir ------------------
 echo.
 echo   QDRANT_URL =
 call :afficher "!QDRANT_URL_VAL!"
 echo   QDRANT_API_KEY =
 call :afficher "!QDRANT_CLE_VAL!"
 echo.
-echo --- OPTIONnel : mot de passe admin ---------------------------------
+echo --- OPTIONNEL : mot de passe admin -----------------------------
 echo.
 if defined ADMIN_MDP_VAL (
     echo   ADMIN_MDP =
@@ -86,11 +98,11 @@ if defined ADMIN_MDP_VAL (
     echo               ^(affiche une fois dans les logs Render^).
 )
 echo.
-echo ==================================================================
-echo    Ensuite : Save Changes, puis Manual Deploy -^>
+echo ================================================================
+echo    Ensuite : Save Changes, puis Manual Deploy -"
 echo    Deploy latest commit. Verifie avec le site :
 echo    un message doit obtenir une vraie reponse IA.
-echo ==================================================================
+echo ================================================================
 echo.
 pause
 exit /b 0

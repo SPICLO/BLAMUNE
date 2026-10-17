@@ -1394,6 +1394,13 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
   // Fournisseur compatible OpenAI : on delegue (le reste du fichier reste
   // centre sur le format Gemini historique).
   if (providerOpenAI()) return appelerOpenAI(message, histo, onDelta, imageParts);
+  // Memoire du flux : si UN SEUL fragment a deja atteint la bulle du
+  // visiteur, plus aucun repli ne doit relancer une reponse (doublon).
+  let fluxDejaLivree = false;
+  const surDeltaCompte = typeof onDelta === 'function'
+    ? function (t) { fluxDejaLivree = true; onDelta(t); }
+    : null;
+  const needsFlux = typeof onDelta === 'function';
   const contents = construireContenus(limiterHisto(histo, HISTO_API_MAX), imageParts);
   const modeles = ordreModeles();
   let derniereErreur = null;
@@ -1411,7 +1418,7 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
   }
 
   for (let passe = 0; passe < 2; passe++) {
-    let fluxActif = typeof onDelta === 'function';
+    let fluxActif = needsFlux;
     let quotaPartout = true;
     // Une seule reprise sur erreur transitoire pour TOUTE la passe,
     // quel que soit le nombre de modeles essayes en cascade.
@@ -1420,7 +1427,7 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
     for (const modele of modeles) {
       if (fluxActif) {
         try {
-          const texte = await modeleEnFlux(modele, contents, onDelta, budget, true);
+          const texte = await modeleEnFlux(modele, contents, surDeltaCompte, budget, true);
           if (texte) { memoriserModeleOk(modele); resoudreAlertes(); return texte; }
           derniereErreur = new Error('Reponse vide');
           quotaPartout = false;
@@ -1438,7 +1445,7 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
         if (texte) {
           memoriserModeleOk(modele);
           resoudreAlertes();
-          if (typeof onDelta === 'function') { try { onDelta(texte); } catch (e) {} }
+          if (needsFlux) { try { surDeltaCompte(texte); } catch (e) {} }
           return texte;
         }
         derniereErreur = new Error('Reponse vide');
@@ -1469,7 +1476,32 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
     }
     break;
   }
+
+  // ---- PILIER DE SECOURS (invisible pour le visiteur) -------------------
+  // La cascade Gemini est epuisee (clee morte, quota partout, reseau).
+  // Si un pool alternatif est configure, on le tente AVANT de rendre la
+  // main : EGO et BLAMUNE continuent de repondre via Groq/Pollinations
+  // sans que personne ne voie la difference. Deux garde-fous :
+  //  - rien n'a deja ete ecrit dans la bulle (jamais de doublon) ;
+  //  - si le pool echoue aussi, on remonte l'erreur d'ORIGINE Gemini
+  //    (les alertes quota/technique gardent leur sens).
   const echec = derniereErreur ? derniereErreur.message : 'Tous les modeles Gemini ont echoue';
+  if (pool.actif() && !fluxDejaLivree) {
+    try {
+      const texte = await appelerOpenAI(message, histo, needsFlux ? onDelta : null, imageParts);
+      if (texte) {
+        loggerErreur('ia', 'pilier de secours : reponse OK apres ' + echec);
+        resoudreAlertes();
+        return texte;
+      }
+    } catch (e) {
+      loggerErreur('ia', 'pilier de secours KO aussi (' + e.message + ') : repli local');
+      if (e && e.fluxEntame) {
+        // Un delta du repli a deja ete pousse : ne pas repartir ailleurs.
+        throw e;
+      }
+    }
+  }
   alerter(estQuota(derniereErreur) ? 'quota' : 'technique', echec);
   throw new Error(echec);
 }
