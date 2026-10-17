@@ -29,21 +29,23 @@ services:
       # Le bot fonctionne a 100 % en local : ces variables ne servent que si
       # tu relies le mode 1 a une API. Voir KEEPALIVE.md.
       #
-      # OPTION A : OpenRouter comme fournisseur principal. Un seul endpoint
-      # OpenAI-compatible, des modeles gratuits (:free), et bascule automatique
-      # sur API_MODELS si le principal est sature.
+      # Principal : Gemini (cle gratuite : aistudio.google.com/app/apikey).
+      # La cle elle-meme (API_KEY) se definit DANS LE DASHBOARD Render,
+      # jamais ici. Attention a ne PAS y coller une cle OpenRouter
+      # (sk-or-...) : l'API Gemini la refuse avec un 400, et la cascade
+      # retombe silencieusement sur le bot local.
       - key: API_KEY
         sync: false
       - key: API_PROVIDER
-        value: openrouter
+        value: gemini
       - key: API_URL
-        value: https://openrouter.ai/api/v1
+        value: https://generativelanguage.googleapis.com/v1beta
       - key: API_MODEL
-        value: meta-llama/llama-3.1-8b-instruct:free
-      # Modeles de secours (separes par des virgules), essayes si le principal
-      # renvoie une erreur (quota sature, 429, indisponible...).
+        value: gemini-3.6-flash
+      # Modele de secours (essayes si le principal renvoie une erreur :
+      # quota sature, 429, indisponible...).
       - key: API_MODELS
-        value: google/gemini-2.0-flash-exp:free,meta-llama/llama-3.1-8b-instruct
+        value: gemini-3.5-flash-lite
       - key: API_MAX_TOKENS
         value: 512
       - key: API_TEMPERATURE
@@ -65,6 +67,27 @@ services:
       # Recherche web (0 = desactivee pour economiser les appels IA en free).
       - key: RECHERCHE_WEB
         value: 0
+      # ---------- Memoire vectorielle du savoir (Qdrant, activable) ----------
+      # Retrouve un fait du savoir.db meme si la question emploie d'autres
+      # mots. La liaison Qdrant elle-meme se definit DANS LE DASHBOARD
+      # (QDRANT_URL et QDRANT_API_KEY, sync:false). Tant qu'elle n'y est
+      # pas, la valeur QDRANT_ACTIV=1 reste sans effet : qdrant_faits.js
+      # reste inactif sans URL/cle, coute zero requete, zero risque.
+      - key: QDRANT_ACTIV
+        value: 1
+      - key: QDRANT_COLLECTION
+        value: blamune-faits
+      - key: QDRANT_SEUIL
+        value: 0.30
+      # Vectorisation des faits par gemini-embedding-001 (gratuit, quota
+      # D'EMBEDDING distinct du quota de chat ; sans l'activer : hachage
+      # local 256 d, plus grossier mais zero quota). Absent = hachage local.
+      - key: QDRANT_EMBED
+        value: gemini
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
       # Pseudo du compte admin (defaut : admin).
       - key: ADMIN_PSEUDO
         value: admin
