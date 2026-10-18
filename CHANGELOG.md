@@ -8,6 +8,26 @@ versions antérieures sont visibles dans `git log`.
 
 ### Ajouté
 
+- **RAG sur le chemin nominal** : la base de connaissances (SQLite + index
+  sémantique Qdrant) ne servait **qu'en secours** (IA en panne) — le reste du
+  temps, BLAMUNE pouvait inventer sur un fait que la base pourtant connu.
+  Désormais, le fait pertinent accompagne la question dans le prompt
+  système, en mode BLAMUNE comme en mode EGO. Sans surcoût pour le chat
+  ordinaire : la couche ne se consulte que sur une vraie question
+  (point d'interrogation, demande d'info, motif de début de question),
+  la couche sémantique est plafonnée à 2,5 s (`Promise.race`), et un
+  contexte vide laisse le prompt byte-identique à avant.
+- **Enseignement explicite de faits** : « retiens que X est Y » /
+  « apprends que… » / « sache que… » écrit en base dès le message
+  (sujet sans article, jamais un pronom ni une phrase à la première
+  personne, source `auto`), et la question du même tour en profite déjà.
+- **Mode clair** : bouton dans l'en-tête, choix mémorisé dans le navigateur
+  (`blamune_theme`), appliqué dès le premier rendu (écran de connexion
+  compris), `<meta name="theme-color">` mis à jour.
+- **Export de l'historique** : un clic télécharge un `.txt` lisible
+  (rôles, horodatages, textes) construit localement dans le navigateur ;
+  rien ne part sur un serveur tiers.
+
 - `README.md` : point d'entrée du projet (installation, variables, tests, déploiement).
 - `build_bot.ps1` / `build_bot.bat` : scripts reproductibles pour recompiler `bot.exe`.
 - `requirements.txt` : dépendances Python des scripts locaux.
@@ -36,6 +56,18 @@ versions antérieures sont visibles dans `git log`.
   `BOT_SERVICE_TIMEOUT_MS`.
 
 ### Modifié
+
+- `server.js` démembre en trois modules supplémentaires (style
+  `creerX({deps})` identique aux routes existantes) : `lib/ia/openai.js`
+  (fournisseurs compatibles OpenAI), `lib/service_bot.js` (bot C++ local
+  - HTTP) et `lib/savoir.js` (base de connaissances, embeddings disk-cache,
+    banque de replis). Le README documente désormais les neuf modules `lib/`.
+- Prettier appliqué à tout le dépôt (`npm run format:check` dans les portes
+  de commit), bundle vendor `site/ia-webllm.mjs` exclu via `.prettierignore`.
+- Tests unitaires portés à 78 (dont 8 nouveaux pour `lib/ia/openai.js`),
+  tests d'intégration à 50 (2 nouveaux pour le RAG nominal : injection
+  mode 2 et mode EGO, rien sur le chat ordinaire, « retiens que… » exploité
+  dans la minute).
 
 - `config.json.example` : modèle aligné sur le défaut du serveur (`gemini-3.5-flash`).
 - `render.yaml` : variables optionnelles documentées (limites, quota, admin).

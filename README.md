@@ -130,7 +130,7 @@ Trois limites, à connaître :
 
 ### Modules extraits de `server.js`
 
-`server.js` fait encore ~2 228 lignes. Il ne définit plus **aucune route** :
+`server.js` fait encore ~2 500 lignes. Il ne définit plus **aucune route** :
 il branche des modules, qui reçoivent leurs dépendances par injection au
 lieu de les importer. Conséquence directe : ils sont testables sans démarrer
 le serveur — voir `tests/lib.test.js`.
@@ -141,14 +141,17 @@ référence injectée à l'initialisation devient périmée après une restaurat
 de sauvegarde — c'est le piège que `comptes` et `stats` posent, et la
 raison pour laquelle `getComptes()` / `getStats()` existent.
 
-| Module              | Rôle                                                                          | Lignes |
-| ------------------- | ----------------------------------------------------------------------------- | ------ |
-| `lib/config_ia.js`  | Fournisseur, modèles de secours, rotation du dernier modèle répondu           | 136    |
-| `lib/rate_limit.js` | Fenêtre glissante par IP et par utilisateur, purge périodique                 | 45     |
-| `lib/memoire.js`    | `users/<uid>/`, `memoire.txt` (format plat partagé avec le bot C++)           | 80     |
-| `lib/historique.js` | `historique_mode<1\|2>.json`, push cloud                                      | 34     |
-| `lib/resume.js`     | Repliage des anciens échanges en tâche de fond                                | 90     |
-| `lib/ia/gemini.js`  | Transport Gemini, historique envoyé au modèle, reprise sur 429, état de quota | 269    |
+| Module               | Rôle                                                                          | Lignes |
+| -------------------- | ----------------------------------------------------------------------------- | ------ |
+| `lib/config_ia.js`   | Fournisseur, modèles de secours, rotation du dernier modèle répondu           | 136    |
+| `lib/rate_limit.js`  | Fenêtre glissante par IP et par utilisateur, purge périodique                 | 45     |
+| `lib/memoire.js`     | `users/<uid>/`, `memoire.txt` (format plat partagé avec le bot C++)           | 80     |
+| `lib/historique.js`  | `historique_mode<1\|2>.json`, push cloud                                      | 34     |
+| `lib/resume.js`      | Repliage des anciens échanges en tâche de fond                                | 90     |
+| `lib/ia/gemini.js`   | Transport Gemini, historique envoyé au modèle, reprise sur 429, état de quota | 269    |
+| `lib/ia/openai.js`   | Fournisseurs compatibles OpenAI (Groq, DeepSeek, Ollama…), même cascade 429   | 270    |
+| `lib/service_bot.js` | Bot C++ local via HTTP, cache LRU 5 min des messages récurrents               | 122    |
+| `lib/savoir.js`      | Base de connaissances : SQLite, embeddings + Qdrant, banque de replis         | 605    |
 
 | Module de routes             | Couvre                                                                      | Lignes |
 | ---------------------------- | --------------------------------------------------------------------------- | ------ |
@@ -158,13 +161,15 @@ raison pour laquelle `getComptes()` / `getStats()` existent.
 | `lib/routes/consultation.js` | `/historique`, `/proactif`, `/stats-perso`, `/mode`, `/profil`              | 121    |
 | `lib/routes/statique.js`     | Site PWA et panneau admin, avec garde-fous de traversée de chemin           | 76     |
 
-La couche HTTP reste partiellement dans `server.js` : le fournisseur
-compatible OpenAI, le service du bot C++ et le secours « savoir ».
-`lib/ia/gemini.js` est déjà sorti, parce qu'il possède un état transversal
-(rotation des clés, drapeaux de retraitement, instant du dernier 429) que le
-reste de la couche doit lire et écrire. Les trois blocs restants sont plus
-facilement extractibles dans cet ordre : le fournisseur OpenAI d'abord, puis
-le service du bot, puis le secours savoir.
+La couche HTTP est intégralement extraite : Gemini (`lib/ia/gemini.js`, sorti
+le premier car il possède un état transversal — rotation des clés, drapeaux
+de retraitement, instant du dernier 429 — que le reste de la couche lit et
+écrit), puis le fournisseur compatible OpenAI (`lib/ia/openai.js`), le
+service du bot C++ (`lib/service_bot.js`) et le secours savoir
+(`lib/savoir.js`). Restent dans `server.js` l'assemblage des modules, la
+construction des prompts (`blocSysteme`, rituels, intentions) et
+l'apprentissage automatique local (`autoApprentissage` : nom, âge, révê,
+anniversaire, promesses, et depuis peu les faits « retiens que… »).
 
 ````
 
