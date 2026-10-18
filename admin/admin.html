@@ -1,174 +1,230 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0b1020">
-<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
-<title>Dashmin - Admin</title>
-<link rel="icon" href="data:,">
-<link rel="stylesheet" href="/admin/admin.css?v=5">
-</head>
-<body>
-
-<!-- ECRAN DE CONNEXION ADMIN -->
-<div id="loginScreen">
-  <div class="login-box">
-    <div class="login-avatar">D</div>
-    <h1>Dashmin</h1>
-    <p class="login-sub">Connexion admin requise</p>
-    <form id="loginAdminForm">
-      <input type="text" id="loginPseudo" placeholder="Pseudo" autocomplete="username" required>
-      <input type="password" id="loginMdp" placeholder="Mot de passe" autocomplete="current-password" required>
-      <button type="submit" class="btn-primary btn-full">Se connecter</button>
-      <p id="loginErreur" class="erreur masquee"></p>
-    </form>
-  </div>
-</div>
-
-<!-- DASHBOARD -->
-<div id="dashboard" class="masquee">
-  <header>
-    <div class="header-gauche">
-      <div class="avatar-admin">B</div>
-      <h1>Dashmin</h1>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b1020" />
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
+    <title>Dashmin - Admin</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/admin/admin.css?v=5" />
+  </head>
+  <body>
+    <!-- ECRAN DE CONNEXION ADMIN -->
+    <div id="loginScreen">
+      <div class="login-box">
+        <div class="login-avatar">D</div>
+        <h1>Dashmin</h1>
+        <p class="login-sub">Connexion admin requise</p>
+        <form id="loginAdminForm">
+          <input
+            type="text"
+            id="loginPseudo"
+            placeholder="Pseudo"
+            autocomplete="username"
+            required
+          />
+          <input
+            type="password"
+            id="loginMdp"
+            placeholder="Mot de passe"
+            autocomplete="current-password"
+            required
+          />
+          <button type="submit" class="btn-primary btn-full">Se connecter</button>
+          <p id="loginErreur" class="erreur masquee"></p>
+        </form>
+      </div>
     </div>
-    <div class="header-droite">
-      <span id="uptime" class="badge"></span>
-      <button id="btnRefresh" class="btn-secondary" type="button">Actualiser</button>
-      <button id="btnReload" class="btn-secondary" type="button">Recharger</button>
-      <button id="btnLogout" class="btn-danger" type="button">Deconnexion</button>
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="masquee">
+      <header>
+        <div class="header-gauche">
+          <div class="avatar-admin">B</div>
+          <h1>Dashmin</h1>
+        </div>
+        <div class="header-droite">
+          <span id="uptime" class="badge"></span>
+          <button id="btnRefresh" class="btn-secondary" type="button">Actualiser</button>
+          <button id="btnReload" class="btn-secondary" type="button">Recharger</button>
+          <button id="btnLogout" class="btn-danger" type="button">Deconnexion</button>
+        </div>
+      </header>
+
+      <main>
+        <!-- ALERTE QUOTA / MODELE : visible sans ouvrir les logs -->
+        <div id="alerteBanniere" class="banniere-alerte" style="display: none"></div>
+
+        <!-- STATS -->
+        <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-chiffre" id="statMessages">0</div>
+            <div class="stat-label">Messages total</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-chiffre" id="statSessions">0</div>
+            <div class="stat-label">Sessions</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-chiffre" id="statDemarrages">0</div>
+            <div class="stat-label">Demarrages</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-chiffre" id="statTemps">0ms</div>
+            <div class="stat-label">Temps moyen</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-chiffre" id="statUtilisateurs">0</div>
+            <div class="stat-label">Utilisateurs</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-chiffre" id="statEnLigne">0</div>
+            <div class="stat-label">En ligne</div>
+          </div>
+          <div class="stat-card">
+            <div
+              class="stat-chiffre"
+              id="statModele"
+              style="font-size: 14px; word-break: break-all"
+            >
+              -
+            </div>
+            <div class="stat-label">Modele actif</div>
+          </div>
+        </section>
+
+        <!-- UTILISATEURS CONNECTES -->
+        <section class="panel">
+          <h2>Utilisateurs connectes <span class="subtitle" id="connexionsCount"></span></h2>
+          <div id="connexionsContenu" class="panel-body">
+            <p class="vide">Chargement...</p>
+          </div>
+        </section>
+
+        <!-- UTILISATEURS INSCRITS -->
+        <section class="panel">
+          <h2>Utilisateurs inscrits <span class="subtitle" id="inscritsCount"></span></h2>
+          <div id="inscritsContenu" class="panel-body">
+            <p class="vide">Chargement...</p>
+          </div>
+        </section>
+
+        <!-- TOUS LES MESSAGES -->
+        <section class="panel">
+          <h2>Tous les messages <span class="subtitle" id="tousMessagesCount"></span></h2>
+          <div id="tousMessagesContenu" class="panel-body historique">
+            <p class="vide">Chargement...</p>
+          </div>
+        </section>
+
+        <!-- PROFIL UTILISATEUR -->
+        <section class="panel">
+          <h2>Profil utilisateur <span class="subtitle">(ce que l'IA a appris)</span></h2>
+          <div id="profilContenu" class="panel-body">
+            <p class="vide">Chargement...</p>
+          </div>
+        </section>
+
+        <!-- SAVOIR -->
+        <section class="panel">
+          <h2>Savoir <span class="subtitle" id="savoirCount"></span></h2>
+          <div id="savoirContenu" class="panel-body">
+            <p class="vide">Chargement...</p>
+          </div>
+        </section>
+
+        <!-- VOCABULAIRE -->
+        <section class="panel">
+          <h2>Vocabulaire <span class="subtitle" id="vocabCount"></span></h2>
+          <div id="vocabContenu" class="panel-body">
+            <p class="vide">Chargement...</p>
+          </div>
+        </section>
+
+        <!-- CONFIG API -->
+        <section class="panel">
+          <h2>Configuration API</h2>
+          <div id="configContenu" class="panel-body">
+            <p class="vide">Chargement...</p>
+          </div>
+        </section>
+
+        <!-- SAUVEGARDE -->
+        <section class="panel">
+          <h2>
+            Sauvegarde &amp; restauration
+            <span class="subtitle">toutes les donnees du serveur</span>
+          </h2>
+          <div
+            class="panel-body"
+            style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"
+          >
+            <button id="btnBackup" class="btn-secondary" type="button">
+              Telecharger la sauvegarde
+            </button>
+            <button id="btnRestore" class="btn-secondary" type="button">
+              Restaurer un fichier
+            </button>
+            <input
+              type="file"
+              id="fichierRestore"
+              accept="application/json,.json"
+              style="display: none"
+            />
+            <span id="backupMessage" style="font-size: 12px; color: var(--texte-doux)"></span>
+          </div>
+          <p style="font-size: 12px; color: var(--texte-doux); padding: 0 16px 14px; margin: 0">
+            La sauvegarde contient les comptes, les jetons d'invite, les memoires, les historiques,
+            les etats et les stats (jamais la cle API). La restauration reecrit les fichiers
+            immediatement, sans redemarrer le serveur.
+          </p>
+        </section>
+
+        <!-- CHANGER MDP -->
+        <section class="panel">
+          <h2>Changer le mot de passe</h2>
+          <div
+            class="panel-body"
+            style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"
+          >
+            <input
+              type="password"
+              id="nouveauMdp"
+              placeholder="Nouveau mot de passe (6+ chars)"
+              style="
+                flex: 1;
+                min-width: 200px;
+                padding: 8px 12px;
+                background: var(--surface);
+                border: 1px solid var(--bordure);
+                border-radius: 8px;
+                color: var(--texte);
+                font-size: 13px;
+                outline: none;
+              "
+            />
+            <button id="btnChangeMdp" class="btn-secondary" type="button">Changer</button>
+            <span id="mdpMessage" style="font-size: 12px; color: var(--texte-doux)"></span>
+          </div>
+        </section>
+      </main>
     </div>
-  </header>
 
-  <main>
-    <!-- ALERTE QUOTA / MODELE : visible sans ouvrir les logs -->
-    <div id="alerteBanniere" class="banniere-alerte" style="display:none"></div>
-
-    <!-- STATS -->
-    <section class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-chiffre" id="statMessages">0</div>
-        <div class="stat-label">Messages total</div>
+    <script src="/admin/admin.js?v=6"></script>
+    <noscript>
+      <div
+        style="
+          max-width: 400px;
+          margin: 80px auto;
+          text-align: center;
+          color: #e2e8f0;
+          font-family: sans-serif;
+        "
+      >
+        <h2 style="color: #f87171">JavaScript requis</h2>
+        <p>Activez JavaScript pour utiliser Dashmin.</p>
       </div>
-      <div class="stat-card">
-        <div class="stat-chiffre" id="statSessions">0</div>
-        <div class="stat-label">Sessions</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-chiffre" id="statDemarrages">0</div>
-        <div class="stat-label">Demarrages</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-chiffre" id="statTemps">0ms</div>
-        <div class="stat-label">Temps moyen</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-chiffre" id="statUtilisateurs">0</div>
-        <div class="stat-label">Utilisateurs</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-chiffre" id="statEnLigne">0</div>
-        <div class="stat-label">En ligne</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-chiffre" id="statModele" style="font-size:14px;word-break:break-all;">-</div>
-        <div class="stat-label">Modele actif</div>
-      </div>
-    </section>
-
-    <!-- UTILISATEURS CONNECTES -->
-    <section class="panel">
-      <h2>Utilisateurs connectes <span class="subtitle" id="connexionsCount"></span></h2>
-      <div id="connexionsContenu" class="panel-body">
-        <p class="vide">Chargement...</p>
-      </div>
-    </section>
-
-    <!-- UTILISATEURS INSCRITS -->
-    <section class="panel">
-      <h2>Utilisateurs inscrits <span class="subtitle" id="inscritsCount"></span></h2>
-      <div id="inscritsContenu" class="panel-body">
-        <p class="vide">Chargement...</p>
-      </div>
-    </section>
-
-    <!-- TOUS LES MESSAGES -->
-    <section class="panel">
-      <h2>Tous les messages <span class="subtitle" id="tousMessagesCount"></span></h2>
-      <div id="tousMessagesContenu" class="panel-body historique">
-        <p class="vide">Chargement...</p>
-      </div>
-    </section>
-
-    <!-- PROFIL UTILISATEUR -->
-    <section class="panel">
-      <h2>Profil utilisateur <span class="subtitle">(ce que l'IA a appris)</span></h2>
-      <div id="profilContenu" class="panel-body">
-        <p class="vide">Chargement...</p>
-      </div>
-    </section>
-
-    <!-- SAVOIR -->
-    <section class="panel">
-      <h2>Savoir <span class="subtitle" id="savoirCount"></span></h2>
-      <div id="savoirContenu" class="panel-body">
-        <p class="vide">Chargement...</p>
-      </div>
-    </section>
-
-    <!-- VOCABULAIRE -->
-    <section class="panel">
-      <h2>Vocabulaire <span class="subtitle" id="vocabCount"></span></h2>
-      <div id="vocabContenu" class="panel-body">
-        <p class="vide">Chargement...</p>
-      </div>
-    </section>
-
-    <!-- CONFIG API -->
-    <section class="panel">
-      <h2>Configuration API</h2>
-      <div id="configContenu" class="panel-body">
-        <p class="vide">Chargement...</p>
-      </div>
-    </section>
-
-    <!-- SAUVEGARDE -->
-    <section class="panel">
-      <h2>Sauvegarde &amp; restauration <span class="subtitle">toutes les donnees du serveur</span></h2>
-      <div class="panel-body" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <button id="btnBackup" class="btn-secondary" type="button">Telecharger la sauvegarde</button>
-        <button id="btnRestore" class="btn-secondary" type="button">Restaurer un fichier</button>
-        <input type="file" id="fichierRestore" accept="application/json,.json" style="display:none;">
-        <span id="backupMessage" style="font-size:12px;color:var(--texte-doux);"></span>
-      </div>
-      <p style="font-size:12px;color:var(--texte-doux);padding:0 16px 14px;margin:0;">
-        La sauvegarde contient les comptes, les jetons d'invite, les memoires,
-        les historiques, les etats et les stats (jamais la cle API).
-        La restauration reecrit les fichiers immediatement, sans redemarrer le serveur.
-      </p>
-    </section>
-
-    <!-- CHANGER MDP -->
-    <section class="panel">
-      <h2>Changer le mot de passe</h2>
-      <div class="panel-body" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <input type="password" id="nouveauMdp" placeholder="Nouveau mot de passe (6+ chars)" style="flex:1;min-width:200px;padding:8px 12px;background:var(--surface);border:1px solid var(--bordure);border-radius:8px;color:var(--texte);font-size:13px;outline:none;">
-        <button id="btnChangeMdp" class="btn-secondary" type="button">Changer</button>
-        <span id="mdpMessage" style="font-size:12px;color:var(--texte-doux);"></span>
-      </div>
-    </section>
-
-  </main>
-</div>
-
-<script src="/admin/admin.js?v=6"></script>
-<noscript>
-  <div style="max-width:400px;margin:80px auto;text-align:center;color:#e2e8f0;font-family:sans-serif;">
-    <h2 style="color:#f87171;">JavaScript requis</h2>
-    <p>Activez JavaScript pour utiliser Dashmin.</p>
-  </div>
-</noscript>
-
-</body>
+    </noscript>
+  </body>
 </html>

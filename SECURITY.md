@@ -23,18 +23,18 @@ utilisateurs, déni de service par requête.
 
 ## Ce qui protège l'application
 
-| Mesure | Où |
-|---|---|
-| Mots de passe en scrypt + sel aléatoire | `hashMdpScrypt`, migration automatique des anciens hachages sha256 |
-| **Aucun mot de passe dans le dépôt** | `ADMIN_MDP`, sinon génération aléatoire |
-| Verrouillage après 5 échecs de connexion (15 min) | route `/login` |
-| Jeton secret par invite (256 bits, stocké **haché**) | `lib/routes/compte.js` |
-| Un uid d'invite seul ne suffit plus : le jeton est exigé | `extraireAuth` |
-| Limititation de débit par IP, par clé et par utilisateur | `lib/rate_limit.js` |
-| Rôle admin par `ADMIN_PSEUDO` / `ADMIN_UID` | `isAdminUid` |
-| En-têtes CSP, X-Frame-Options, HSTS | `server.js`, middleware |
-| Extensions sensibles non servies + garde anti-traversée | `lib/routes/statique.js` |
-| Fichiers de configuration servis en 404 | middleware |
+| Mesure                                                   | Où                                                                 |
+| -------------------------------------------------------- | ------------------------------------------------------------------ |
+| Mots de passe en scrypt + sel aléatoire                  | `hashMdpScrypt`, migration automatique des anciens hachages sha256 |
+| **Aucun mot de passe dans le dépôt**                     | `ADMIN_MDP`, sinon génération aléatoire                            |
+| Verrouillage après 5 échecs de connexion (15 min)        | route `/login`                                                     |
+| Jeton secret par invite (256 bits, stocké **haché**)     | `lib/routes/compte.js`                                             |
+| Un uid d'invite seul ne suffit plus : le jeton est exigé | `extraireAuth`                                                     |
+| Limititation de débit par IP, par clé et par utilisateur | `lib/rate_limit.js`                                                |
+| Rôle admin par `ADMIN_PSEUDO` / `ADMIN_UID`              | `isAdminUid`                                                       |
+| En-têtes CSP, X-Frame-Options, HSTS                      | `server.js`, middleware                                            |
+| Extensions sensibles non servies + garde anti-traversée  | `lib/routes/statique.js`                                           |
+| Fichiers de configuration servis en 404                  | middleware                                                         |
 
 ## Points connus, à traiter avant une exposition publique
 

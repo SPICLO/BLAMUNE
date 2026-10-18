@@ -25,8 +25,10 @@ const path = require('path');
 // ---------- Détection de la situation ----------
 
 function sansAccents(s) {
-  return String(s == null ? '' : s).normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return String(s == null ? '' : s)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 }
 
 // Ordre = priorité. Les premiers tests sont les plus spécifiques.
@@ -34,19 +36,49 @@ const REGLES = [
   ['blague', /(ptdr|mdr|\blol\b|ahaha|haha+|hihi|je rigole|blague|drôle|drole|funny)/],
   // « c'est gentil » = remerciement ; « t'es gentil » = compliment. D'où
   // l'ancre obligatoire sur "c'est" pour ne pas tout mélanger.
-['remerciement', /(merci|merci beaucoup|remercie|thanks|thx|c'est gentil|c'est gentille|t merci|gentiment)/],
-  ['au_revoir', /(au revoir|a bientot|bisou|bonne journee|bonne soiree|a demain|on se parle plus tard|ciao|salut a toi)/],
+  [
+    'remerciement',
+    /(merci|merci beaucoup|remercie|thanks|thx|c'est gentil|c'est gentille|t merci|gentiment)/
+  ],
+  [
+    'au_revoir',
+    /(au revoir|a bientot|bisou|bonne journee|bonne soiree|a demain|on se parle plus tard|ciao|salut a toi)/
+  ],
   // Salutation : ancrée sur le DÉBUT du message seulement, sinon
   // « salut, comment ça va ? » serait classé « question » et répondrait
   // « je ne sais pas » au lieu d'accuser réception.
-  ['salut', /^(salut|bonjour|bonsoir|hello|hey|coucou|salutation|yo)\b\s*(?![a-z]{4,})|^(ca va|comment ca va|comment vas tu|comment allez vous|salut a tous)\b/],
-  ['question_bot', /(qui es tu|qui est ce|qui es-ce|t es qui|t'es qui|tu es qui|c est quoi blamune|qu es ce que tu es|tu es quoi|t es quoi|ton nom|comment tu t appelles)/],
-  ['colere', /(je suis en colere|je m enerve|ca m agace|ca me saoule|c'est horrible|j'en peux plus|je rage|ras le bol)/],
-  ['tristesse', /(je suis triste|je me sens mal|je pleure|je suis seul|j'ai besoin de parler|desole|pas bien|je m'ennuie|perdu|abattu)/],
-  ['fatigue', /(je suis (fatigue|creve|epuise)|je suis fatigue|creve|epuise|fatigue|e puise|j'ai pas d'energie|besoin de dormir|a dormir|c est long|trop long)/],
-  ['complement', /(t es gentil|t es bien|je t'aime|j'adore ce que tu fais|tu es awesome|tu gères|bravo pour|t'es intelligent)/],
-  ['encouragement', /(je dois mais j ai pas envie|je sens que je vais pas y arriver|aide moi a|je veux mais|je bloque|je m enfonce)/],
-  ['question', /[?]\s*$|^(pourquoi|c est quoi|cest quoi|comment|comment je|est ce que|qu est ce que|ou |quand |qui |quel |quelle )/],
+  [
+    'salut',
+    /^(salut|bonjour|bonsoir|hello|hey|coucou|salutation|yo)\b\s*(?![a-z]{4,})|^(ca va|comment ca va|comment vas tu|comment allez vous|salut a tous)\b/
+  ],
+  [
+    'question_bot',
+    /(qui es tu|qui est ce|qui es-ce|t es qui|t'es qui|tu es qui|c est quoi blamune|qu es ce que tu es|tu es quoi|t es quoi|ton nom|comment tu t appelles)/
+  ],
+  [
+    'colere',
+    /(je suis en colere|je m enerve|ca m agace|ca me saoule|c'est horrible|j'en peux plus|je rage|ras le bol)/
+  ],
+  [
+    'tristesse',
+    /(je suis triste|je me sens mal|je pleure|je suis seul|j'ai besoin de parler|desole|pas bien|je m'ennuie|perdu|abattu)/
+  ],
+  [
+    'fatigue',
+    /(je suis (fatigue|creve|epuise)|je suis fatigue|creve|epuise|fatigue|e puise|j'ai pas d'energie|besoin de dormir|a dormir|c est long|trop long)/
+  ],
+  [
+    'complement',
+    /(t es gentil|t es bien|je t'aime|j'adore ce que tu fais|tu es awesome|tu gères|bravo pour|t'es intelligent)/
+  ],
+  [
+    'encouragement',
+    /(je dois mais j ai pas envie|je sens que je vais pas y arriver|aide moi a|je veux mais|je bloque|je m enfonce)/
+  ],
+  [
+    'question',
+    /[?]\s*$|^(pourquoi|c est quoi|cest quoi|comment|comment je|est ce que|qu est ce que|ou |quand |qui |quel |quelle )/
+  ],
   ['vide', /^[?.!,;:]*$|^[a-z]{1,2}$/]
 ];
 
@@ -60,7 +92,8 @@ function detecterSituation(msg) {
     // empechaient les motifs de reconnaitre la question.
     .replace(/[-_/]/g, ' ')
     .replace(/[''`]/g, ' ')
-    .replace(/\s+/g, ' ').trim();
+    .replace(/\s+/g, ' ')
+    .trim();
   // L'apostrophe a été remplacée par un espace ci-dessus : on cherche donc
   // « je m appelle », pas « je m'appelle ».
   const presentation = /\b(je m appelle|je m.appelle|je me nomme|mon prenom|je suis [a-z])/.test(m);
@@ -107,9 +140,10 @@ class BanqueReplis {
         if (pos <= 0) continue;
         const cle = sansAccents(ligne.substring(0, pos).trim());
         if (!cle) continue;
-        const variantes = ligne.substring(pos + 1)
+        const variantes = ligne
+          .substring(pos + 1)
           .split(';;')
-          .map(v => v.trim())
+          .map((v) => v.trim())
           .filter(Boolean);
         if (variantes.length) bank.set(cle, variantes);
       }
@@ -131,7 +165,7 @@ class BanqueReplis {
     if (!variantes || !variantes.length) return '';
     if (variantes.length === 1) return variantes[0];
     const precedents = this.dernierParSituation.get(situation) || [];
-    const disponibles = variantes.filter(v => precedents.indexOf(v) < 0);
+    const disponibles = variantes.filter((v) => precedents.indexOf(v) < 0);
     const choix = (disponibles.length ? disponibles : variantes)[
       Math.floor(Math.random() * (disponibles.length ? disponibles.length : variantes.length))
     ];

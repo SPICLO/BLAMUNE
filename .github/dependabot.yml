@@ -9,11 +9,11 @@ version: 2
 updates:
   # --- JavaScript : dependances et outils de developpement ---
   - package-ecosystem: npm
-    directory: "/"
+    directory: '/'
     schedule:
       interval: weekly
       day: monday
-      time: "06:00"
+      time: '06:00'
     open-pull-requests-limit: 5
     labels:
       - dependabot
@@ -27,11 +27,11 @@ updates:
 
   # --- Python : outils locaux (pyarrow pour les personas parquet) ---
   - package-ecosystem: pip
-    directory: "/"
+    directory: '/'
     schedule:
       interval: weekly
       day: monday
-      time: "06:30"
+      time: '06:30'
     open-pull-requests-limit: 3
     labels:
       - dependabot
@@ -41,30 +41,30 @@ updates:
   # et docker-compose.yml). Dependabot sait mettre a jour un epinglage
   # digest, mais il faut lui dire ou le digest est ecrit.
   - package-ecosystem: docker
-    directory: "/Dockerfile"
+    directory: '/Dockerfile'
     schedule:
       interval: weekly
       day: monday
-      time: "07:00"
+      time: '07:00'
     open-pull-requests-limit: 3
     labels:
       - dependabot
   - package-ecosystem: docker
-    directory: "/Dockerfile.bot"
+    directory: '/Dockerfile.bot'
     schedule:
       interval: weekly
       day: monday
-      time: "07:00"
+      time: '07:00'
     open-pull-requests-limit: 3
     labels:
       - dependabot
 
   # --- La CI elle-meme ---
   - package-ecosystem: github-actions
-    directory: "/"
+    directory: '/'
     schedule:
       interval: weekly
       day: monday
-      time: "07:30"
+      time: '07:30'
     labels:
       - dependabot

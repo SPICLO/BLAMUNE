@@ -45,8 +45,14 @@ test('config.json.example : modele aligne sur le defaut du serveur', () => {
 test('.env.example documente toutes les variables process.env du code', () => {
   const env = lire('.env.example');
   const utilises = new Set();
-  for (const f of ['server.js', 'storage.js', 'lib/rate_limit.js', 'lib/memoire.js',
-    'lib/historique.js', 'lib/resume.js']) {
+  for (const f of [
+    'server.js',
+    'storage.js',
+    'lib/rate_limit.js',
+    'lib/memoire.js',
+    'lib/historique.js',
+    'lib/resume.js'
+  ]) {
     const re = /process\.env\.([A-Z0-9_]+)/g;
     let m;
     while ((m = re.exec(lire(f))) !== null) utilises.add(m[1]);
@@ -70,7 +76,14 @@ test('.gitignore ignore les sorties volumineuses et les secrets', () => {
 });
 
 test('fichiers cles du depot presents', () => {
-  for (const f of ['README.md', 'LICENSE', 'CHANGELOG.md', '.env.example', 'Dockerfile', '.nvmrc']) {
+  for (const f of [
+    'README.md',
+    'LICENSE',
+    'CHANGELOG.md',
+    '.env.example',
+    'Dockerfile',
+    '.nvmrc'
+  ]) {
     assert.ok(fs.existsSync(path.join(RACINE, f)), 'fichier manquant : ' + f);
   }
 });

@@ -15,21 +15,33 @@ const RACINE = path.resolve(__dirname, '..');
 function librePort() {
   return new Promise((res, rej) => {
     const s = net.createServer();
-    s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); });
+    s.listen(0, '127.0.0.1', () => {
+      const p = s.address().port;
+      s.close(() => res(p));
+    });
     s.on('error', rej);
   });
 }
 
 function requete(port, chemin, methode, entetes) {
   return new Promise((resolve) => {
-    const req = http.request({
-      host: '127.0.0.1', port, path: chemin, method: methode || 'GET', headers: entetes || {},
-    }, (res) => {
-      let corps = '';
-      res.on('data', d => corps += d);
-      res.on('end', () => resolve({ code: res.statusCode, type: res.headers['content-type'] || '', corps }));
-    });
-    req.on('error', e => resolve({ code: 0, type: '', corps: String(e) }));
+    const req = http.request(
+      {
+        host: '127.0.0.1',
+        port,
+        path: chemin,
+        method: methode || 'GET',
+        headers: entetes || {}
+      },
+      (res) => {
+        let corps = '';
+        res.on('data', (d) => (corps += d));
+        res.on('end', () =>
+          resolve({ code: res.statusCode, type: res.headers['content-type'] || '', corps })
+        );
+      }
+    );
+    req.on('error', (e) => resolve({ code: 0, type: '', corps: String(e) }));
     req.end();
   });
 }
@@ -43,24 +55,30 @@ function requete(port, chemin, methode, entetes) {
   fs.cpSync(path.join(RACINE, 'site'), path.join(dataDir, 'site'), { recursive: true });
   fs.cpSync(path.join(RACINE, 'admin'), path.join(dataDir, 'admin'), { recursive: true });
   const env = Object.assign({}, process.env, {
-    NODE_ENV: 'test', PORT: String(port), BLAMUNE_DATA_DIR: dataDir,
+    NODE_ENV: 'test',
+    PORT: String(port),
+    BLAMUNE_DATA_DIR: dataDir
   });
-  const srv = spawn(process.execPath, [path.join(RACINE, 'server.js')],
-    { cwd: RACINE, env, stdio: 'pipe' });
+  const srv = spawn(process.execPath, [path.join(RACINE, 'server.js')], {
+    cwd: RACINE,
+    env,
+    stdio: 'pipe'
+  });
   let journal = '';
-  srv.stdout.on('data', d => journal += d);
-  srv.stderr.on('data', d => journal += d);
+  srv.stdout.on('data', (d) => (journal += d));
+  srv.stderr.on('data', (d) => (journal += d));
 
   // Attente du serveur
   let pret = false;
   for (let i = 0; i < 60 && !pret; i++) {
     const r = await requete(port, '/ping', 'GET');
     pret = r.code === 200;
-    if (!pret) await new Promise(r => setTimeout(r, 250));
+    if (!pret) await new Promise((r) => setTimeout(r, 250));
   }
   if (!pret) {
     console.log('ECHEC : le serveur ne demarre pas.\n' + journal);
-    srv.kill(); process.exit(1);
+    srv.kill();
+    process.exit(1);
   }
 
   // Chaque cas : chemin, methode, ce qu on attend du corps.
@@ -100,10 +118,11 @@ function requete(port, chemin, methode, entetes) {
     ['/app.js', 'GET', 'js', 'asset du site'],
     ['/nexiste_pas', 'GET', '404', 'catcher : page inconnue'],
     ['/protection.ps1', 'GET', 'bloque', 'extension sensible refusee'],
-    ['/savoir.db', 'GET', 'bloque', 'base refusee'],
+    ['/savoir.db', 'GET', 'bloque', 'base refusee']
   ];
 
-  let ok = 0, ko = [];
+  let ok = 0,
+    ko = [];
   for (const [chemin, methode, attendu, libelle] of CAS) {
     const r = await requete(port, chemin, methode);
     let bon = false;
@@ -112,11 +131,22 @@ function requete(port, chemin, methode, entetes) {
     else if (attendu === 'js') bon = r.type.includes('javascript');
     else if (attendu === '404') bon = r.code === 404 && /introuvable/i.test(r.corps);
     else if (attendu === 'bloque') bon = r.code === 404 && /Non autorise/i.test(r.corps);
-    if (bon) { ok++; console.log('  [OK ] ' + libelle.padEnd(36) + chemin); }
-    else {
+    if (bon) {
+      ok++;
+      console.log('  [OK ] ' + libelle.padEnd(36) + chemin);
+    } else {
       ko.push(libelle + ' (' + chemin + ')');
-      console.log('  [KO ] ' + libelle.padEnd(36) + chemin +
-        ' -> ' + r.code + ' ' + r.type + ' | ' + r.corps.slice(0, 70).replace(/\s+/g, ' '));
+      console.log(
+        '  [KO ] ' +
+          libelle.padEnd(36) +
+          chemin +
+          ' -> ' +
+          r.code +
+          ' ' +
+          r.type +
+          ' | ' +
+          r.corps.slice(0, 70).replace(/\s+/g, ' ')
+      );
     }
   }
 
@@ -132,15 +162,20 @@ function requete(port, chemin, methode, entetes) {
   async function poster(chemin, corps, entetes) {
     const h = Object.assign({}, entetes || {}, {
       'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(JSON.stringify(corps)),
+      'Content-Length': Buffer.byteLength(JSON.stringify(corps))
     });
     return new Promise((resolve) => {
-      const req = http.request({ host: '127.0.0.1', port, path: chemin, method: 'POST', headers: h }, (res) => {
-        let t = '';
-        res.on('data', d => t += d);
-        res.on('end', () => resolve({ code: res.statusCode, type: res.headers['content-type'] || '', corps: t }));
-      });
-      req.on('error', e => resolve({ code: 0, type: '', corps: String(e) }));
+      const req = http.request(
+        { host: '127.0.0.1', port, path: chemin, method: 'POST', headers: h },
+        (res) => {
+          let t = '';
+          res.on('data', (d) => (t += d));
+          res.on('end', () =>
+            resolve({ code: res.statusCode, type: res.headers['content-type'] || '', corps: t })
+          );
+        }
+      );
+      req.on('error', (e) => resolve({ code: 0, type: '', corps: String(e) }));
       req.write(JSON.stringify(corps));
       req.end();
     });
@@ -148,11 +183,19 @@ function requete(port, chemin, methode, entetes) {
 
   const enTete = (ego, uid) => ({ 'X-EGO': ego || '', 'X-UID': uid || '' });
   const session = (corps) => {
-    try { const d = JSON.parse(corps); return { ego: d.ego, uid: d.uid }; } catch (e) { return {}; }
+    try {
+      const d = JSON.parse(corps);
+      return { ego: d.ego, uid: d.uid };
+    } catch (e) {
+      return {};
+    }
   };
 
-  const compte = await poster('/register',
-    { pseudo: 'testeur', mdp: 'motdepasse1', email: 'testeur@exemple.fr' }, {});
+  const compte = await poster(
+    '/register',
+    { pseudo: 'testeur', mdp: 'motdepasse1', email: 'testeur@exemple.fr' },
+    {}
+  );
   const u = session(compte.corps);
   const hUtilisateur = enTete(u.ego, u.uid);
 
@@ -169,7 +212,9 @@ function requete(port, chemin, methode, entetes) {
         if (String(c[cle].pseudo || '').toLowerCase() === pseudoAdmin) return c[cle];
       }
       return null;
-    } catch (e) { return null; }
+    } catch (e) {
+      return null;
+    }
   }
 
   const adminCompte = compteAdmin();
@@ -181,8 +226,20 @@ function requete(port, chemin, methode, entetes) {
     ['/mode', 'POST', hUtilisateur, { m: '2' }, 'mode : retour en BLAMUNE'],
     ['/profil', 'POST', hUtilisateur, { champ: 'ville', valeur: 'Bordeaux' }, 'profil : ecriture'],
     ['/profil', 'POST', hUtilisateur, { champ: 'ville', valeur: 'Lyon' }, 'profil : reecriture'],
-    ['/profil', 'POST', hUtilisateur, { champ: 'ville', valeur: '' }, 'profil : valeur vide refusee'],
-    ['/profil', 'POST', hUtilisateur, { champ: 'inexistant', valeur: 'x' }, 'profil : champ inconnu'],
+    [
+      '/profil',
+      'POST',
+      hUtilisateur,
+      { champ: 'ville', valeur: '' },
+      'profil : valeur vide refusee'
+    ],
+    [
+      '/profil',
+      'POST',
+      hUtilisateur,
+      { champ: 'inexistant', valeur: 'x' },
+      'profil : champ inconnu'
+    ],
     ['/profil', 'GET', hUtilisateur, null, 'profil : lecture'],
     ['/historique', 'GET', hUtilisateur, null, 'historique (session reelle)'],
     ['/stats-perso', 'GET', hUtilisateur, null, 'stats perso (session reelle)'],
@@ -194,11 +251,17 @@ function requete(port, chemin, methode, entetes) {
     ['/admin/backup', 'GET', hAdmin, null, 'sauvegarde (admin)'],
     ['/stats', 'GET', hAdmin, null, 'stats (admin)'],
     ['/config-api', 'POST', hAdmin, { api_model: 'modele-test' }, 'config API (admin)'],
-    ['/admin/change-mdp', 'POST', hAdmin, { nouveau_mdp: 'nouveaumdp1' }, 'changement de mdp (admin)'],
+    [
+      '/admin/change-mdp',
+      'POST',
+      hAdmin,
+      { nouveau_mdp: 'nouveaumdp1' },
+      'changement de mdp (admin)'
+    ],
     ['/admin/change-mdp', 'POST', hAdmin, { nouveau_mdp: 'court' }, 'mdp admin trop court refuse'],
     ['/admin/restore', 'POST', hAdmin, {}, 'restauration refusee : corps vide'],
     ['/logout', 'POST', hUtilisateur, {}, 'deconnexion'],
-    ['/logout', 'POST', hUtilisateur, {}, 'deconnexion repetee'],
+    ['/logout', 'POST', hUtilisateur, {}, 'deconnexion repetee']
   ];
 
   console.log('');
@@ -211,29 +274,45 @@ function requete(port, chemin, methode, entetes) {
     ko.push('compte admin');
   } else {
     for (const [chemin, methode, entetes, corps, libelle] of AUTH) {
-      const r = methode === 'GET'
-        ? await requete(port, chemin, 'GET', entetes)
-        : await poster(chemin, corps, entetes);
+      const r =
+        methode === 'GET'
+          ? await requete(port, chemin, 'GET', entetes)
+          : await poster(chemin, corps, entetes);
       // La route doit s'executer : ni refus d'authentification, ni erreur
       // serveur. Un 400 metier reste acceptable (corps volontairement vide).
-      const executee = r.type.includes('application/json')
-        && r.code !== 401 && r.code !== 403 && r.code !== 500;
-      if (executee) { ok++; console.log('  [OK ] ' + libelle.padEnd(36) + methode + ' ' + chemin + ' -> ' + r.code); }
-      else {
+      const executee =
+        r.type.includes('application/json') && r.code !== 401 && r.code !== 403 && r.code !== 500;
+      if (executee) {
+        ok++;
+        console.log('  [OK ] ' + libelle.padEnd(36) + methode + ' ' + chemin + ' -> ' + r.code);
+      } else {
         ko.push(libelle + ' (' + methode + ' ' + chemin + ')');
-        console.log('  [KO ] ' + libelle.padEnd(36) + methode + ' ' + chemin +
-          ' -> ' + r.code + ' ' + r.type + ' | ' + r.corps.slice(0, 70).replace(/\s+/g, ' '));
+        console.log(
+          '  [KO ] ' +
+            libelle.padEnd(36) +
+            methode +
+            ' ' +
+            chemin +
+            ' -> ' +
+            r.code +
+            ' ' +
+            r.type +
+            ' | ' +
+            r.corps.slice(0, 70).replace(/\s+/g, ' ')
+        );
       }
     }
   }
 
   // Attendre la FIN du processus avant de nettoyer : SQLite garde le fichier
   // ouvert, et un rm dans la foulée echoue en EBUSY.
-  const termine = new Promise(r => srv.on('exit', r));
+  const termine = new Promise((r) => srv.on('exit', r));
   srv.kill();
   await termine;
-  await new Promise(r => setTimeout(r, 300));
-  try { fs.rmSync(dataDir, { recursive: true, force: true }); } catch (e) {
+  await new Promise((r) => setTimeout(r, 300));
+  try {
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  } catch (e) {
     console.log('  (nettoyage du dossier temporaire ignore : ' + e.code + ')');
   }
 

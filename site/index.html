@@ -1,145 +1,301 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b1020">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="BLAMUNE">
-<meta name="mobile-web-app-capable" content="yes">
-<title>BLAMUNE - Chat IA</title>
-<meta name="description" content="BLAMUNE, ton ami IA. Discute avec une intelligence artificielle, apprends-lui des choses et garde ton historique.">
-<meta name="keywords" content="BLAMUNE, chat, IA, intelligence artificielle, assistant, conversation, Gemini">
-<meta name="author" content="BLAMUNE">
-<meta name="google-site-verification" content="jWcesFGrzD6m8ibz115fMduS2tF4UEXjuop6TnuOEps" />
-<meta name="msvalidate.01" content="0A3A836FFFA92BC0E8413191939DDB8C" />
-<meta name="robots" content="index, follow">
-<link rel="canonical" href="https://blamune.onrender.com/">
-<link rel="icon" href="favicon.ico" sizes="any">
-<link rel="icon" type="image/png" href="icon-192.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="style.css">
-<!-- Open Graph -->
-<meta property="og:title" content="BLAMUNE - Chat IA">
-<meta property="og:description" content="Ton ami IA. Discute, apprends, garde ton historique.">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://blamune.onrender.com">
-<!-- Twitter Card -->
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="BLAMUNE - Chat IA">
-<meta name="twitter:description" content="Ton ami IA. Discute, apprends, garde ton historique.">
-</head>
-<body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1020" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="BLAMUNE" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>BLAMUNE - Chat IA</title>
+    <meta
+      name="description"
+      content="BLAMUNE, ton ami IA. Discute avec une intelligence artificielle, apprends-lui des choses et garde ton historique."
+    />
+    <meta
+      name="keywords"
+      content="BLAMUNE, chat, IA, intelligence artificielle, assistant, conversation, Gemini"
+    />
+    <meta name="author" content="BLAMUNE" />
+    <meta name="google-site-verification" content="jWcesFGrzD6m8ibz115fMduS2tF4UEXjuop6TnuOEps" />
+    <meta name="msvalidate.01" content="0A3A836FFFA92BC0E8413191939DDB8C" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://blamune.onrender.com/" />
+    <link rel="icon" href="favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="stylesheet" href="style.css" />
+    <!-- Open Graph -->
+    <meta property="og:title" content="BLAMUNE - Chat IA" />
+    <meta
+      property="og:description"
+      content="Ton ami IA. Discute, apprends, garde ton historique."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://blamune.onrender.com" />
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="BLAMUNE - Chat IA" />
+    <meta
+      name="twitter:description"
+      content="Ton ami IA. Discute, apprends, garde ton historique."
+    />
+  </head>
+  <body>
+    <!-- ECRAN D'AUTHENTIFICATION -->
+    <div id="ecranAuth">
+      <div class="auth-box">
+        <div class="auth-avatar"><img src="logo.png" alt="BLAMUNE" /></div>
+        <h2>Bienvenue sur BLAMUNE</h2>
+        <p class="auth-sous">
+          Connecte-toi pour garder ton historique et personnaliser ton experience.
+        </p>
 
-<!-- ECRAN D'AUTHENTIFICATION -->
-<div id="ecranAuth">
-  <div class="auth-box">
-    <div class="auth-avatar"><img src="logo.png" alt="BLAMUNE"></div>
-    <h2>Bienvenue sur BLAMUNE</h2>
-    <p class="auth-sous">Connecte-toi pour garder ton historique et personnaliser ton experience.</p>
+        <div id="authPrincipal">
+          <div id="authFormLogin" class="auth-form">
+            <div class="champ">
+              <input
+                id="authEmail"
+                type="email"
+                placeholder="Ton email"
+                autocomplete="email"
+                maxlength="100"
+                aria-label="Ton email"
+              />
+            </div>
+            <div class="champ">
+              <input
+                id="authMdp"
+                type="password"
+                placeholder="Mot de passe"
+                autocomplete="current-password"
+                maxlength="100"
+                aria-label="Mot de passe"
+              />
+            </div>
+            <button id="btnLogin" class="auth-btn" type="button">Se connecter</button>
+            <p class="auth-err" id="authErrLogin"></p>
+            <p class="auth-switch">
+              Pas encore de compte ? <a href="#" id="authShowRegister">Creer un compte</a>
+            </p>
+          </div>
 
-    <div id="authPrincipal">
+          <div id="authFormRegister" class="auth-form" style="display: none">
+            <div class="champ">
+              <input
+                id="authPseudoReg"
+                type="text"
+                placeholder="Choisis un pseudo"
+                autocomplete="username"
+                maxlength="30"
+                aria-label="Choisis un pseudo"
+              />
+            </div>
+            <div class="champ">
+              <input
+                id="authEmailReg"
+                type="email"
+                placeholder="Ton email"
+                autocomplete="email"
+                maxlength="100"
+                aria-label="Ton email"
+              />
+            </div>
+            <div class="champ">
+              <input
+                id="authMdpReg"
+                type="password"
+                placeholder="Choisis un mot de passe"
+                autocomplete="new-password"
+                maxlength="100"
+                aria-label="Choisis un mot de passe"
+              />
+            </div>
+            <button id="btnRegister" class="auth-btn" type="button">Creer mon compte</button>
+            <p class="auth-err" id="authErrRegister"></p>
+            <p class="auth-switch">
+              Deja un compte ? <a href="#" id="authShowLogin">Se connecter</a>
+            </p>
+          </div>
 
-      <div id="authFormLogin" class="auth-form">
-        <div class="champ">
-          <input id="authEmail" type="email" placeholder="Ton email" autocomplete="email" maxlength="100" aria-label="Ton email">
+          <div class="auth-sep"><span>ou</span></div>
+          <button id="btnInvite" class="auth-btn auth-invite" type="button">
+            Continuer en tant qu'invite
+          </button>
+          <p class="auth-note">L'invite ne sauvegarde pas tes messages.</p>
         </div>
-        <div class="champ">
-          <input id="authMdp" type="password" placeholder="Mot de passe" autocomplete="current-password" maxlength="100" aria-label="Mot de passe">
+
+        <div id="authSuccess" class="auth-success" aria-live="polite">
+          <div class="success-ring">
+            <svg class="success-check" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+              <circle class="success-check-circle" cx="32" cy="32" r="23"></circle>
+              <path class="success-check-mark" d="M20 32 28.5 40 44 24"></path>
+            </svg>
+          </div>
+          <p class="success-texte" id="authSuccessTexte"></p>
         </div>
-        <button id="btnLogin" class="auth-btn" type="button">Se connecter</button>
-        <p class="auth-err" id="authErrLogin"></p>
-        <p class="auth-switch">Pas encore de compte ? <a href="#" id="authShowRegister">Creer un compte</a></p>
       </div>
-
-      <div id="authFormRegister" class="auth-form" style="display:none">
-        <div class="champ">
-          <input id="authPseudoReg" type="text" placeholder="Choisis un pseudo" autocomplete="username" maxlength="30" aria-label="Choisis un pseudo">
-        </div>
-        <div class="champ">
-          <input id="authEmailReg" type="email" placeholder="Ton email" autocomplete="email" maxlength="100" aria-label="Ton email">
-        </div>
-        <div class="champ">
-          <input id="authMdpReg" type="password" placeholder="Choisis un mot de passe" autocomplete="new-password" maxlength="100" aria-label="Choisis un mot de passe">
-        </div>
-        <button id="btnRegister" class="auth-btn" type="button">Creer mon compte</button>
-        <p class="auth-err" id="authErrRegister"></p>
-        <p class="auth-switch">Deja un compte ? <a href="#" id="authShowLogin">Se connecter</a></p>
-      </div>
-
-      <div class="auth-sep"><span>ou</span></div>
-      <button id="btnInvite" class="auth-btn auth-invite" type="button">Continuer en tant qu'invite</button>
-      <p class="auth-note">L'invite ne sauvegarde pas tes messages.</p>
-
     </div>
 
-    <div id="authSuccess" class="auth-success" aria-live="polite">
-      <div class="success-ring">
-        <svg class="success-check" viewBox="0 0 64 64" fill="none" aria-hidden="true">
-          <circle class="success-check-circle" cx="32" cy="32" r="23"></circle>
-          <path class="success-check-mark" d="M20 32 28.5 40 44 24"></path>
-        </svg>
-      </div>
-      <p class="success-texte" id="authSuccessTexte"></p>
-    </div>
-  </div>
-</div>
-
-<!-- HEADER + CHAT (caches tant que pas auth) -->
-<div id="appContenu">
-<header id="tete">
-  <div class="infos">
-    <div class="avatar avatar-bot" aria-hidden="true"><img src="logo.png" alt=""></div>
-    <div class="titres">
-      <h1>BLAMUNE</h1>
-      <div class="statut" id="statut">
-        <span class="point" id="pointStatut"></span>
-        <span id="texteStatut">Connexion...</span>
-      </div>
-    </div>
-  </div>
-  <div id="boutons">
-    <span id="noteInvite" style="display:none;color:var(--texte-doux);font-size:11px;margin-right:8px;" aria-hidden="true">Mode invite</span>
-    <div class="segmente" role="group" aria-label="Mode de l'IA">
-      <div id="piluleMode" aria-hidden="true"></div>
-      <button id="mode1" title="EGO : IA Gemini, conversation intelligente" aria-pressed="false" type="button">EGO</button>
-      <button id="mode2" title="BLAMUNE : conversation decouverte" class="actif" aria-pressed="true" type="button">BLAMUNE</button>
-    </div>
-    <button id="btnDeconnexion" title="Deconnexion" type="button" style="display:none;margin-left:8px;background:var(--surface);border:1px solid var(--bordure);border-radius:8px;color:var(--texte-doux);padding:4px 10px;font-size:12px;cursor:pointer;">Deconnexion</button>
-    <!-- IA hors-ligne : mini modele WebGPU charge dans le navigateur du
+    <!-- HEADER + CHAT (caches tant que pas auth) -->
+    <div id="appContenu">
+      <header id="tete">
+        <div class="infos">
+          <div class="avatar avatar-bot" aria-hidden="true"><img src="logo.png" alt="" /></div>
+          <div class="titres">
+            <h1>BLAMUNE</h1>
+            <div class="statut" id="statut">
+              <span class="point" id="pointStatut"></span>
+              <span id="texteStatut">Connexion...</span>
+            </div>
+          </div>
+        </div>
+        <div id="boutons">
+          <span
+            id="noteInvite"
+            style="display: none; color: var(--texte-doux); font-size: 11px; margin-right: 8px"
+            aria-hidden="true"
+            >Mode invite</span
+          >
+          <div class="segmente" role="group" aria-label="Mode de l'IA">
+            <div id="piluleMode" aria-hidden="true"></div>
+            <button
+              id="mode1"
+              title="EGO : IA Gemini, conversation intelligente"
+              aria-pressed="false"
+              type="button"
+            >
+              EGO
+            </button>
+            <button
+              id="mode2"
+              title="BLAMUNE : conversation decouverte"
+              class="actif"
+              aria-pressed="true"
+              type="button"
+            >
+              BLAMUNE
+            </button>
+          </div>
+          <button
+            id="btnDeconnexion"
+            title="Deconnexion"
+            type="button"
+            style="
+              display: none;
+              margin-left: 8px;
+              background: var(--surface);
+              border: 1px solid var(--bordure);
+              border-radius: 8px;
+              color: var(--texte-doux);
+              padding: 4px 10px;
+              font-size: 12px;
+              cursor: pointer;
+            "
+          >
+            Deconnexion
+          </button>
+          <!-- IA hors-ligne : mini modele WebGPU charge dans le navigateur du
          visiteur. Reste invisible si le navigateur n'a pas WebGPU ; cachee
          tant que pas auth ? Non : utile AVANT connexion (mode invite). -->
-    <button id="btnIANav" title="IA hors-ligne : charge un mini modele dans ton navigateur, pour discuter meme si le serveur est injoignable" type="button" style="display:none;font-size:12px;cursor:pointer;" aria-pressed="false">
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:16px;height:16px;vertical-align:-3px;"><path d="M11 21h-1l1-7H7.5c-.88 0-.33-.75-.31-.78C8.48 10.94 10.42 7.54 13.01 3h1l-1 7h3.51c.4 0 .62.19.4.66C12.97 17.55 11 21 11 21z"/></svg>
-      <span id="btnIANavTexte">IA hors-ligne</span>
-    </button>
-  </div>
-</header>
+          <button
+            id="btnIANav"
+            title="IA hors-ligne : charge un mini modele dans ton navigateur, pour discuter meme si le serveur est injoignable"
+            type="button"
+            style="display: none; font-size: 12px; cursor: pointer"
+            aria-pressed="false"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+              style="width: 16px; height: 16px; vertical-align: -3px"
+            >
+              <path
+                d="M11 21h-1l1-7H7.5c-.88 0-.33-.75-.31-.78C8.48 10.94 10.42 7.54 13.01 3h1l-1 7h3.51c.4 0 .62.19.4.66C12.97 17.55 11 21 11 21z"
+              />
+            </svg>
+            <span id="btnIANavTexte">IA hors-ligne</span>
+          </button>
+        </div>
+      </header>
 
-<main id="chat" aria-live="polite"><noscript><p style="text-align:center;padding:40px;color:#9fb3c8;">JavaScript est requis pour utiliser BLAMUNE.</p></noscript></main>
+      <main id="chat" aria-live="polite">
+        <noscript
+          ><p style="text-align: center; padding: 40px; color: #9fb3c8">
+            JavaScript est requis pour utiliser BLAMUNE.
+          </p></noscript
+        >
+      </main>
 
-<footer id="barre">
-  <div id="apercuPhoto" class="apercu-photo" style="display:none" aria-live="polite">
-    <img id="apercuPhotoImg" alt="Photo choisie">
-    <span id="apercuPhotoNom" class="apercu-photo-nom"></span>
-    <button id="apercuPhotoAnnuler" class="apercu-photo-x" type="button" title="Retirer la photo" aria-label="Retirer la photo">&times;</button>
-  </div>
-  <input id="zone" type="text" placeholder="Écris un message..." autocomplete="off" autocapitalize="sentences" spellcheck="false" maxlength="2000" enterkeyhint="send" aria-label="Écris un message">
-  <input id="fichierImage" type="file" accept="image/*" style="display:none" aria-hidden="true" tabindex="-1">
-  <button id="btnImage" title="Envoyer une photo" type="button" aria-label="Envoyer une photo">
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
-  </button>
-  <button id="btnVoix" title="Mode vocal : dicter tes messages et entendre les reponses" type="button" aria-label="Mode vocal" aria-pressed="false">
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>
-  </button>
-  <button id="envoyer" title="Envoyer (Entrée)" type="button" aria-label="Envoyer">
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-  </button>
-</footer>
-</div>
+      <footer id="barre">
+        <div id="apercuPhoto" class="apercu-photo" style="display: none" aria-live="polite">
+          <img id="apercuPhotoImg" alt="Photo choisie" />
+          <span id="apercuPhotoNom" class="apercu-photo-nom"></span>
+          <button
+            id="apercuPhotoAnnuler"
+            class="apercu-photo-x"
+            type="button"
+            title="Retirer la photo"
+            aria-label="Retirer la photo"
+          >
+            &times;
+          </button>
+        </div>
+        <input
+          id="zone"
+          type="text"
+          placeholder="Écris un message..."
+          autocomplete="off"
+          autocapitalize="sentences"
+          spellcheck="false"
+          maxlength="2000"
+          enterkeyhint="send"
+          aria-label="Écris un message"
+        />
+        <input
+          id="fichierImage"
+          type="file"
+          accept="image/*"
+          style="display: none"
+          aria-hidden="true"
+          tabindex="-1"
+        />
+        <button
+          id="btnImage"
+          title="Envoyer une photo"
+          type="button"
+          aria-label="Envoyer une photo"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path
+              d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"
+            />
+          </svg>
+        </button>
+        <button
+          id="btnVoix"
+          title="Mode vocal : dicter tes messages et entendre les reponses"
+          type="button"
+          aria-label="Mode vocal"
+          aria-pressed="false"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path
+              d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"
+            />
+          </svg>
+        </button>
+        <button id="envoyer" title="Envoyer (Entrée)" type="button" aria-label="Envoyer">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" />
+          </svg>
+        </button>
+      </footer>
+    </div>
 
-<script src="ia-navigateur.js"></script>
-<script src="app.js"></script>
-</body>
+    <script src="ia-navigateur.js"></script>
+    <script src="app.js"></script>
+  </body>
 </html>

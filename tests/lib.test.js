@@ -22,7 +22,9 @@ const storageFaux = { estConfigure: () => false, setMemoire() {}, setHistorique(
 
 function dossierTmp(t) {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'blamune-lib-'));
-  t.after(() => { fs.rmSync(d, { recursive: true, force: true }); });
+  t.after(() => {
+    fs.rmSync(d, { recursive: true, force: true });
+  });
   return d;
 }
 
@@ -84,7 +86,10 @@ test('memoire : lecture d un utilisateur inconnu rend tous les champs vides', (t
 });
 
 test('memoire : ecrire puis relire un champ', (t) => {
-  const { lireMemoire, ecrireMemoire } = creerMemoire({ usersDir: dossierTmp(t), storage: storageFaux });
+  const { lireMemoire, ecrireMemoire } = creerMemoire({
+    usersDir: dossierTmp(t),
+    storage: storageFaux
+  });
   assert.strictEqual(ecrireMemoire('u_abc123', 'ville', 'Bordeaux'), true);
   assert.strictEqual(lireMemoire('u_abc123').ville, 'Bordeaux');
 });
@@ -96,8 +101,10 @@ test('memoire : un champ inconnu ou une valeur vide est refuse', (t) => {
 });
 
 test('memoire : motsFavoris reste une liste a travers un aller-retour', (t) => {
-  const { lireMemoire, sauvegarderMemoireComplete } =
-    creerMemoire({ usersDir: dossierTmp(t), storage: storageFaux });
+  const { lireMemoire, sauvegarderMemoireComplete } = creerMemoire({
+    usersDir: dossierTmp(t),
+    storage: storageFaux
+  });
   sauvegarderMemoireComplete('u_abc123', { nom: 'Theo', motsFavoris: ['chat', 'nuit'] });
   const mem = lireMemoire('u_abc123');
   assert.deepStrictEqual(mem.motsFavoris, ['chat', 'nuit']);
@@ -112,8 +119,11 @@ test('memoire : un ancien fichier a 9 lignes reste lisible', (t) => {
   // nom, plat, hobby, motsFavoris, genre, aime, aimePas, age, humeur.
   // Les champs ajoutes ensuite (humeurUser, ville...) sont en fin de liste,
   // donc pas de decalage : les 9 lignes se lisent a l'identique.
-  fs.writeFileSync(path.join(d, 'memoire.txt'),
-    'Theo\npizza\nfoot\nmot,mot2\nmasculin\nchat\nfroid\n25\njoyeux', 'utf8');
+  fs.writeFileSync(
+    path.join(d, 'memoire.txt'),
+    'Theo\npizza\nfoot\nmot,mot2\nmasculin\nchat\nfroid\n25\njoyeux',
+    'utf8'
+  );
   const { lireMemoire } = creerMemoire({ usersDir: root, storage: storageFaux });
   const mem = lireMemoire('u_ancien01');
   assert.strictEqual(mem.nom, 'Theo');
@@ -138,17 +148,25 @@ test('historique : le chemin depend du mode', (t) => {
 
 test('historique : aller-retour ecriture / lecture', (t) => {
   const { dossierUser } = creerMemoire({ usersDir: dossierTmp(t), storage: storageFaux });
-  const { chargerHistorique, sauvegarderHistorique } =
-    creerHistorique({ dossierUser, storage: storageFaux });
+  const { chargerHistorique, sauvegarderHistorique } = creerHistorique({
+    dossierUser,
+    storage: storageFaux
+  });
   assert.deepStrictEqual(chargerHistorique('u_abc123', '2'), [], 'historique absent != []');
-  const h = [{ qui: 'moi', texte: 'salut' }, { qui: 'blamune', texte: 'coucou' }];
+  const h = [
+    { qui: 'moi', texte: 'salut' },
+    { qui: 'blamune', texte: 'coucou' }
+  ];
   sauvegarderHistorique('u_abc123', '2', h);
   assert.deepStrictEqual(chargerHistorique('u_abc123', '2'), h);
 });
 
 test('historique : un historique corrompu ne leve pas', (t) => {
-  const { dossierUser, } = creerMemoire({ usersDir: dossierTmp(t), storage: storageFaux });
-  const { cheminHistorique, chargerHistorique } = creerHistorique({ dossierUser, storage: storageFaux });
+  const { dossierUser } = creerMemoire({ usersDir: dossierTmp(t), storage: storageFaux });
+  const { cheminHistorique, chargerHistorique } = creerHistorique({
+    dossierUser,
+    storage: storageFaux
+  });
   fs.writeFileSync(cheminHistorique('u_abc123', '2'), '{pas du json', 'utf8');
   assert.deepStrictEqual(chargerHistorique('u_abc123', '2'), []);
 });
@@ -164,12 +182,23 @@ test('historique : sans uid on renvoie un tableau vide', (t) => {
 // creerConfigIA lit process.env a chaque appel. Un seul mecanisme les
 // restaure : deux mecanismes imbriques se marchaient dessus, l'un
 // restaurant l'environnement pendant que l'autre le vidait.
-const ENV_IA = ['API_KEY', 'API_PROVIDER', 'API_MODEL', 'API_URL',
-  'API_MAX_TOKENS', 'API_TEMPERATURE', 'MEMOIRE_EXTRACTION', 'RECHERCHE_WEB'];
+const ENV_IA = [
+  'API_KEY',
+  'API_PROVIDER',
+  'API_MODEL',
+  'API_URL',
+  'API_MAX_TOKENS',
+  'API_TEMPERATURE',
+  'MEMOIRE_EXTRACTION',
+  'RECHERCHE_WEB'
+];
 
 function isoleEnvIA(t, env) {
   const saved = {};
-  for (const k of ENV_IA) { saved[k] = process.env[k]; delete process.env[k]; }
+  for (const k of ENV_IA) {
+    saved[k] = process.env[k];
+    delete process.env[k];
+  }
   Object.assign(process.env, env || {});
   t.after(() => {
     for (const k of ENV_IA) {
@@ -181,7 +210,8 @@ function isoleEnvIA(t, env) {
 
 function configDeTest(t, { configJson = null, env = {} } = {}) {
   const root = dossierTmp(t);
-  if (configJson) fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify(configJson), 'utf8');
+  if (configJson)
+    fs.writeFileSync(path.join(root, 'config.json'), JSON.stringify(configJson), 'utf8');
   isoleEnvIA(t, env);
   return creerConfigIA({ racine: root, onModeleOk: () => {}, loggerErreur: () => {} });
 }
@@ -197,7 +227,7 @@ test('config IA : valeurs par defaut sans env ni config.json', (t) => {
 test('config IA : l environnement prime sur config.json', (t) => {
   const { config } = configDeTest(t, {
     configJson: { api_model: 'depuis-fichier', api_provider: 'groq' },
-    env: { API_MODEL: 'depuis-env' },
+    env: { API_MODEL: 'depuis-env' }
   });
   assert.strictEqual(config.api_model, 'depuis-env', 'API_MODEL doit primer');
   // Non surcharge par l'env : le fichier garde la main.
@@ -223,7 +253,7 @@ test('config IA : un config.json corrompu ne fait pas tomber le serveur', (t) =>
   const { config } = creerConfigIA({
     racine: root,
     onModeleOk: () => {},
-    loggerErreur: (cat) => erreurs.push(cat),
+    loggerErreur: (cat) => erreurs.push(cat)
   });
   assert.strictEqual(config.api_provider, 'gemini', 'les defauts doivent rester');
   assert.ok(erreurs.includes('config'), 'le journal doit avoir etre prevenu');
@@ -263,7 +293,9 @@ test('config IA : memoriserModeleOk signale une seule fois', (t) => {
   isoleEnvIA(t);
   const vus = [];
   const { memoriserModeleOk, ordreModeles } = creerConfigIA({
-    racine: root, onModeleOk: (m) => vus.push(m), loggerErreur: () => {},
+    racine: root,
+    onModeleOk: (m) => vus.push(m),
+    loggerErreur: () => {}
   });
   const secours = ordreModeles()[1];
   memoriserModeleOk(secours);
@@ -277,7 +309,9 @@ test('config IA : un modele inconnu n est jamais memorise', (t) => {
   isoleEnvIA(t);
   const vus = [];
   const { memoriserModeleOk, dernierModeleOkConnu } = creerConfigIA({
-    racine: root, onModeleOk: (m) => vus.push(m), loggerErreur: () => {},
+    racine: root,
+    onModeleOk: (m) => vus.push(m),
+    loggerErreur: () => {}
   });
   memoriserModeleOk('modele-qui-nexiste-pas');
   assert.strictEqual(dernierModeleOkConnu(), '');
@@ -289,7 +323,9 @@ test('config IA : restaureModeleOk ne reecrit pas la persistance', (t) => {
   isoleEnvIA(t);
   const vus = [];
   const { restaureModeleOk, dernierModeleOkConnu, ordreModeles } = creerConfigIA({
-    racine: root, onModeleOk: (m) => vus.push(m), loggerErreur: () => {},
+    racine: root,
+    onModeleOk: (m) => vus.push(m),
+    loggerErreur: () => {}
   });
   const secours = ordreModeles()[1];
   restaureModeleOk(secours);
@@ -309,11 +345,16 @@ test('config IA : lit bien l env, et la restauration rend la main', (t) => {
   // par isoleEnvIA ici.
   const avant = process.env.API_PROVIDER;
   const saved = {};
-  for (const k of ENV_IA) { saved[k] = process.env[k]; delete process.env[k]; }
+  for (const k of ENV_IA) {
+    saved[k] = process.env[k];
+    delete process.env[k];
+  }
   process.env.API_PROVIDER = 'ollama';
   try {
     const { providerOpenAI } = creerConfigIA({
-      racine: dossierTmp(t), onModeleOk: () => {}, loggerErreur: () => {},
+      racine: dossierTmp(t),
+      onModeleOk: () => {},
+      loggerErreur: () => {}
     });
     assert.strictEqual(providerOpenAI(), true, 'la config doit avoir lu API_PROVIDER');
   } finally {
@@ -328,12 +369,16 @@ test('config IA : lit bien l env, et la restauration rend la main', (t) => {
 
 function resumeDeTest(t, questionModele) {
   const { dossierUser } = creerMemoire({ usersDir: dossierTmp(t), storage: storageFaux });
-  const { cheminHistorique, sauvegarderHistorique } = creerHistorique({ dossierUser, storage: storageFaux });
+  const { cheminHistorique, sauvegarderHistorique } = creerHistorique({
+    dossierUser,
+    storage: storageFaux
+  });
   const resume = creerResume({
-    dossierUser, cheminHistorique,
+    dossierUser,
+    cheminHistorique,
     questionModele: questionModele || (async () => 'resume test'),
     nettoyerReponse: (t2) => t2,
-    loggerErreur: () => {},
+    loggerErreur: () => {}
   });
   return { resume, sauvegarderHistorique };
 }
@@ -346,7 +391,10 @@ test('resume : lecture d un resume absent rend des valeurs neutres', (t) => {
 test('resume : ecrire puis relire', (t) => {
   const { resume } = resumeDeTest(t);
   resume.ecrireResume('u_abc123', '2', { texte: 'On avait parle foot', couverts: 10 });
-  assert.deepStrictEqual(resume.lireResume('u_abc123', '2'), { texte: 'On avait parle foot', couverts: 10 });
+  assert.deepStrictEqual(resume.lireResume('u_abc123', '2'), {
+    texte: 'On avait parle foot',
+    couverts: 10
+  });
 });
 
 test('resume : supprimer un resume absent ne leve pas', (t) => {
@@ -356,7 +404,10 @@ test('resume : supprimer un resume absent ne leve pas', (t) => {
 
 test('resume : sous le seuil, rien n est replie', async (t) => {
   let appels = 0;
-  const { resume, sauvegarderHistorique } = resumeDeTest(t, async () => { appels++; return 'x'; });
+  const { resume, sauvegarderHistorique } = resumeDeTest(t, async () => {
+    appels++;
+    return 'x';
+  });
   sauvegarderHistorique('u_abc123', '2', [{ qui: 'moi', texte: 'a' }]);
   await resume.majResume('u_abc123', '2');
   assert.strictEqual(appels, 0, 'le modele ne doit pas etre appele sous le seuil');
@@ -365,7 +416,10 @@ test('resume : sous le seuil, rien n est replie', async (t) => {
 
 test('resume : au seuil, le bloc est replie et couvert', async (t) => {
   const { resume, sauvegarderHistorique } = resumeDeTest(t);
-  const h = Array.from({ length: 10 }, (_, i) => ({ qui: i % 2 ? 'blamune' : 'moi', texte: 'msg' + i }));
+  const h = Array.from({ length: 10 }, (_, i) => ({
+    qui: i % 2 ? 'blamune' : 'moi',
+    texte: 'msg' + i
+  }));
   sauvegarderHistorique('u_abc123', '2', h);
   await resume.majResume('u_abc123', '2');
   const r = resume.lireResume('u_abc123', '2');
@@ -388,19 +442,25 @@ test('resume : un historique raccourci invalide le resume', async (t) => {
   resume.ecrireResume('u_abc123', '2', { texte: 'ancien', couverts: 30 });
   sauvegarderHistorique('u_abc123', '2', [{ qui: 'moi', texte: 'seul' }]);
   await resume.majResume('u_abc123', '2');
-  assert.deepStrictEqual(resume.lireResume('u_abc123', '2'), { texte: '', couverts: 0 },
-    'le resume obsolete aurait du etre purge');
+  assert.deepStrictEqual(
+    resume.lireResume('u_abc123', '2'),
+    { texte: '', couverts: 0 },
+    'le resume obsolete aurait du etre purge'
+  );
 });
 
 test('resume : deux appels concurrents ne replient qu une fois', async (t) => {
   let appels = 0;
   const { resume, sauvegarderHistorique } = resumeDeTest(t, async () => {
     appels++;
-    await new Promise(r => setTimeout(r, 20));
+    await new Promise((r) => setTimeout(r, 20));
     return 'resume';
   });
-  sauvegarderHistorique('u_abc123', '2',
-    Array.from({ length: 10 }, (_, i) => ({ qui: 'moi', texte: 'msg' + i })));
+  sauvegarderHistorique(
+    'u_abc123',
+    '2',
+    Array.from({ length: 10 }, (_, i) => ({ qui: 'moi', texte: 'msg' + i }))
+  );
   await Promise.all([resume.majResume('u_abc123', '2'), resume.majResume('u_abc123', '2')]);
   assert.strictEqual(appels, 1, 'le repliement a ete declenche deux fois');
 });
@@ -420,7 +480,7 @@ function serveurCompteur(t) {
   return new Promise((resolve) => {
     srv.listen(0, '127.0.0.1', () => {
       const port = srv.address().port;
-      t.after(() => new Promise(r => srv.close(r)));
+      t.after(() => new Promise((r) => srv.close(r)));
       resolve({ port, hits: () => hits });
     });
   });
@@ -431,7 +491,7 @@ test('keepalive : ne rappelle pas quand un utilisateur est connecte', async (t) 
   const ka = demarrerKeepalive({ port: s.port, estConnecte: () => true });
   t.after(() => ka.arreter());
   ka.rappel();
-  await new Promise(r => setTimeout(r, 250));
+  await new Promise((r) => setTimeout(r, 250));
   assert.strictEqual(s.hits(), 0, 'une requete a ete envoyee alors que quelqu un est actif');
 });
 
@@ -440,7 +500,7 @@ test('keepalive : rappelle sur /health quand personne n est connecte', async (t)
   const ka = demarrerKeepalive({ port: s.port, estConnecte: () => false });
   t.after(() => ka.arreter());
   assert.strictEqual(ka.rappel(), true, 'le rappel devrait avoir ete declenche');
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise((r) => setTimeout(r, 300));
   assert.strictEqual(s.hits(), 1);
 });
 
@@ -450,19 +510,20 @@ test('keepalive : n empile pas les rappels si la reponse est lente', async (t) =
   const ka = demarrerKeepalive({ port: 1, estConnecte: () => false, logger: () => {} });
   t.after(() => ka.arreter());
   ka.rappel();
-  ka.rappel();   // doit etre ignore, le premier est encore en cours
+  ka.rappel(); // doit etre ignore, le premier est encore en cours
   ka.rappel();
 });
 
 test('keepalive : un rappel en echec ne casse pas le minuteur', async (t) => {
   const erreurs = [];
   const ka = demarrerKeepalive({
-    port: 1, estConnecte: () => false,
-    logger: (cat, msg) => erreurs.push(cat + ':' + msg),
+    port: 1,
+    estConnecte: () => false,
+    logger: (cat, msg) => erreurs.push(cat + ':' + msg)
   });
   t.after(() => ka.arreter());
   ka.rappel();
-  await new Promise(r => setTimeout(r, 250));
+  await new Promise((r) => setTimeout(r, 250));
   assert.ok(erreurs.length >= 1, 'l echec aurait du etre journalise');
 });
 
@@ -482,6 +543,8 @@ test('keepalive : le minuteur ne bloque pas la sortie du processus', async (t) =
   const s = await serveurCompteur(t);
   const ka = demarrerKeepalive({ port: s.port, estConnecte: () => false, periodeMs: 50 });
   t.after(() => ka.arreter());
-  assert.ok(ka.intervalle && typeof ka.intervalle.unref === 'function',
-    'le minuteur doit etre unref pour ne pas empecher Node de s arreter');
+  assert.ok(
+    ka.intervalle && typeof ka.intervalle.unref === 'function',
+    'le minuteur doit etre unref pour ne pas empecher Node de s arreter'
+  );
 });

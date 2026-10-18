@@ -24,11 +24,15 @@ const JSONBIN_API_URL = process.env.JSONBIN_API_URL || 'https://api.jsonbin.io';
 const JSONBIN_BIN_ID = (process.env.JSONBIN_BIN_ID || '').trim();
 // .bin-id vit avec les donnees : sur Render il est ephemere, d'ou l'importance
 // de JSONBIN_BIN_ID, mais en local il evite de creer un bin a chaque run.
-const RACINE_DATA = process.env.BLAMUNE_DATA_DIR ? path.resolve(process.env.BLAMUNE_DATA_DIR) : __dirname;
+const RACINE_DATA = process.env.BLAMUNE_DATA_DIR
+  ? path.resolve(process.env.BLAMUNE_DATA_DIR)
+  : __dirname;
 const FICHIER_BIN_ID = path.join(RACINE_DATA, '.bin-id');
 
 let binIdFichier = '';
-try { binIdFichier = fs.readFileSync(FICHIER_BIN_ID, 'utf8').trim(); } catch (e) {}
+try {
+  binIdFichier = fs.readFileSync(FICHIER_BIN_ID, 'utf8').trim();
+} catch (e) {}
 let binIdCourant = JSONBIN_BIN_ID;
 let _binPromise = null;
 
@@ -56,8 +60,12 @@ let derniereTaille = null;
 // Comment le bin a ete choisi (diagnostic dans /stats).
 let decouverte = null;
 
-function enregistrerFabrique(fn) { fabriqueSauvegarde = fn; }
-function getSauvegarde() { return data.sauvegarde; }
+function enregistrerFabrique(fn) {
+  fabriqueSauvegarde = fn;
+}
+function getSauvegarde() {
+  return data.sauvegarde;
+}
 
 function planifierSauvegarde() {
   if (_saveTimer) clearTimeout(_saveTimer);
@@ -81,10 +89,13 @@ function jsonbinRequest(method, chemin, corps, entetes) {
       port: url.port || (url.protocol === 'https:' ? 443 : 80),
       path: url.pathname + url.search,
       method,
-      headers: Object.assign({
-        'Content-Type': 'application/json',
-        'X-Master-Key': JSONBIN_API_KEY
-      }, entetes || {}),
+      headers: Object.assign(
+        {
+          'Content-Type': 'application/json',
+          'X-Master-Key': JSONBIN_API_KEY
+        },
+        entetes || {}
+      ),
       timeout: 15000
     };
     if (bodyStr) options.headers['Content-Length'] = Buffer.byteLength(bodyStr);
@@ -92,20 +103,32 @@ function jsonbinRequest(method, chemin, corps, entetes) {
     const transport = url.protocol === 'https:' ? https : http;
     const req = transport.request(options, (res) => {
       let chunks = [];
-      res.on('data', c => chunks.push(c));
+      res.on('data', (c) => chunks.push(c));
       res.on('end', () => {
         const raw = Buffer.concat(chunks).toString();
         try {
           const json = JSON.parse(raw);
           if (res.statusCode >= 200 && res.statusCode < 300) resolve(json);
-          else reject(new Error(`${method} ${chemin} -> HTTP ${res.statusCode}: ${json.message || raw.substring(0, 160)}`));
+          else
+            reject(
+              new Error(
+                `${method} ${chemin} -> HTTP ${res.statusCode}: ${json.message || raw.substring(0, 160)}`
+              )
+            );
         } catch (e) {
-          reject(new Error(`${method} ${chemin} -> HTTP ${res.statusCode}: ${raw.substring(0, 160) || '(reponse vide)'}`));
+          reject(
+            new Error(
+              `${method} ${chemin} -> HTTP ${res.statusCode}: ${raw.substring(0, 160) || '(reponse vide)'}`
+            )
+          );
         }
       });
     });
     req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Timeout'));
+    });
     if (bodyStr) req.write(bodyStr);
     req.end();
   });
@@ -116,9 +139,19 @@ async function binSemblable(id) {
   try {
     const r = await jsonbinRequest('GET', `/v3/b/${id}`);
     const rec = r && r.record !== undefined ? r.record : r;
-    return !!(rec && typeof rec === 'object' && !Array.isArray(rec) &&
-      (rec.application === 'blamune' || rec.sauvegarde || rec.comptes || rec.memories || rec.historiques));
-  } catch (e) { return false; }
+    return !!(
+      rec &&
+      typeof rec === 'object' &&
+      !Array.isArray(rec) &&
+      (rec.application === 'blamune' ||
+        rec.sauvegarde ||
+        rec.comptes ||
+        rec.memories ||
+        rec.historiques)
+    );
+  } catch (e) {
+    return false;
+  }
 }
 
 // Liste les ids des bins non classes : c'est la vraie route de l'API v3
@@ -139,7 +172,8 @@ async function listerNosBins() {
     }
     const dernier = bins[bins.length - 1];
     const idDernier = dernier && (dernier.record || dernier.id || dernier.binId || dernier._id);
-    if (typeof idDernier !== 'string' || !idDernier || idDernier === curseur || bins.length < 10) break;
+    if (typeof idDernier !== 'string' || !idDernier || idDernier === curseur || bins.length < 10)
+      break;
     curseur = idDernier;
   }
   return ids;
@@ -147,7 +181,11 @@ async function listerNosBins() {
 
 // Trouve le bin existant, ou en cree un. Jamais de bin cree a chaque sauvegarde.
 async function trouverOuCreerBin() {
-  if (JSONBIN_BIN_ID) { binIdCourant = JSONBIN_BIN_ID; decouverte = { source: 'env' }; return binIdCourant; }
+  if (JSONBIN_BIN_ID) {
+    binIdCourant = JSONBIN_BIN_ID;
+    decouverte = { source: 'env' };
+    return binIdCourant;
+  }
   // Un .bin-id local connu, apres validation de son contenu.
   if (binIdFichier && (await binSemblable(binIdFichier))) {
     binIdCourant = binIdFichier;
@@ -172,7 +210,10 @@ async function trouverOuCreerBin() {
     decouverte = { source: 'liste', erreur: e.message };
     console.log(`[storage] liste bins KO: ${e.message}`);
   }
-  if (!listeOk && binIdFichier) { binIdCourant = binIdFichier; return binIdCourant; }
+  if (!listeOk && binIdFichier) {
+    binIdCourant = binIdFichier;
+    return binIdCourant;
+  }
   // L'API refuse un corps vide (400 "Bin cannot be blank") : on cree le bin
   // deja remplit avec les donnees du moment.
   const r = await jsonbinRequest('POST', '/v3/b', data, { 'X-Bin-Name': 'blamune' });
@@ -180,7 +221,9 @@ async function trouverOuCreerBin() {
   if (!id) throw new Error('creation du bin impossible');
   binIdCourant = id;
   decouverte = Object.assign({}, decouverte, { creation: id });
-  try { fs.writeFileSync(FICHIER_BIN_ID, id, 'utf8'); } catch (e) {}
+  try {
+    fs.writeFileSync(FICHIER_BIN_ID, id, 'utf8');
+  } catch (e) {}
   console.log(`[storage] Bin cree: ${id}`);
   console.log(`[storage] Pour figer ce bin: ajoute JSONBIN_BIN_ID=${id} (Render > Environment)`);
   return binIdCourant;
@@ -189,7 +232,10 @@ async function trouverOuCreerBin() {
 function binId() {
   if (binIdCourant) return Promise.resolve(binIdCourant);
   if (!_binPromise) {
-    _binPromise = trouverOuCreerBin().catch(e => { _binPromise = null; throw e; });
+    _binPromise = trouverOuCreerBin().catch((e) => {
+      _binPromise = null;
+      throw e;
+    });
   }
   return _binPromise;
 }
@@ -205,10 +251,18 @@ async function sauvegarderTout() {
         const s = fabriqueSauvegarde();
         // Jamais d'ecrasement du cloud par un disque vide : une instance
         // perdue avant restauration ne doit pas effacer la sauvegarde.
-        const utile = s && s.fichiers &&
-          (s.fichiers['comptes.json'] || Object.keys(s.fichiers).some(k => k.indexOf('users/') === 0));
-        if (utile) { data.sauvegarde = s; _snapDate = Date.now(); }
-      } catch (e) { console.log('[storage] Snapshot impossible:', e.message); }
+        const utile =
+          s &&
+          s.fichiers &&
+          (s.fichiers['comptes.json'] ||
+            Object.keys(s.fichiers).some((k) => k.indexOf('users/') === 0));
+        if (utile) {
+          data.sauvegarde = s;
+          _snapDate = Date.now();
+        }
+      } catch (e) {
+        console.log('[storage] Snapshot impossible:', e.message);
+      }
     }
     const charge = JSON.stringify(data);
     derniereTaille = Buffer.byteLength(charge);
@@ -225,7 +279,9 @@ async function sauvegarderTout() {
 async function chargerDuCloud() {
   if (!JSONBIN_API_KEY) return false;
   let id;
-  try { id = await binId(); } catch (e) {
+  try {
+    id = await binId();
+  } catch (e) {
     console.log('[storage] Pas de bin accessible:', e.message);
     return false;
   }
@@ -234,10 +290,15 @@ async function chargerDuCloud() {
     const r = await jsonbinRequest('GET', `/v3/b/${id}`);
     const rec = r && r.record !== undefined ? r.record : r;
     if (rec && typeof rec === 'object' && !Array.isArray(rec)) {
-      data = Object.assign({ application: 'blamune', comptes: {}, historiques: {}, memories: {}, sauvegarde: null }, rec);
+      data = Object.assign(
+        { application: 'blamune', comptes: {}, historiques: {}, memories: {}, sauvegarde: null },
+        rec
+      );
       data.application = 'blamune';
-      console.log(`[storage] Charge depuis le cloud: ${Object.keys(data.comptes || {}).length} comptes`
-        + (data.sauvegarde ? `, sauvegarde du ${data.sauvegarde.date}` : ''));
+      console.log(
+        `[storage] Charge depuis le cloud: ${Object.keys(data.comptes || {}).length} comptes` +
+          (data.sauvegarde ? `, sauvegarde du ${data.sauvegarde.date}` : '')
+      );
       return true;
     }
     return false;
@@ -257,8 +318,13 @@ function initialiser() {
   return chargerDuCloud();
 }
 
-function getComptes() { return data.comptes; }
-function setComptes(c) { data.comptes = c; planifierSauvegarde(); }
+function getComptes() {
+  return data.comptes;
+}
+function setComptes(c) {
+  data.comptes = c;
+  planifierSauvegarde();
+}
 
 function getHistorique(uid, mode) {
   return data.historiques[`${uid}_${mode}`] || [];
@@ -268,7 +334,9 @@ function setHistorique(uid, mode, hist) {
   planifierSauvegarde();
 }
 
-function getMemoire(uid) { return data.memories[uid] || null; }
+function getMemoire(uid) {
+  return data.memories[uid] || null;
+}
 function setMemoire(uid, memo) {
   data.memories[uid] = memo;
   planifierSauvegarde();
@@ -289,11 +357,16 @@ function etatSauvegarde() {
 
 module.exports = {
   initialiser,
-  getComptes, setComptes,
-  getHistorique, setHistorique,
-  getMemoire, setMemoire,
+  getComptes,
+  setComptes,
+  getHistorique,
+  setHistorique,
+  getMemoire,
+  setMemoire,
   sauvegarderTout,
-  enregistrerFabrique, getSauvegarde, etatSauvegarde,
+  enregistrerFabrique,
+  getSauvegarde,
+  etatSauvegarde,
   declencherSauvegarde: planifierSauvegarde,
   estConfigure: () => !!JSONBIN_API_KEY
 };

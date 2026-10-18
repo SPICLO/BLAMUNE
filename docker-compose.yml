@@ -27,20 +27,20 @@ services:
     container_name: blamune-ollama
     restart: unless-stopped
     ports:
-      - "127.0.0.1:11434:11434"   # binds sur localhost : pas public
+      - '127.0.0.1:11434:11434' # binds sur localhost : pas public
     environment:
       # Modele charge dans la GPU et JAMAIS decharge : c'est le principal
       # gain de latence (un modele froid met 5 a 20 s a repondre).
-      OLLAMA_KEEP_ALIVE: "-1"
+      OLLAMA_KEEP_ALIVE: '-1'
       # Une seule requete a la fois : evite de saturer une petite GPU.
-      OLLAMA_MAX_LOADED_MODELS: "1"
-      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: '1'
+      OLLAMA_NUM_PARALLEL: '1'
     # L'image ollama ne declare aucun HEALTHCHECK. Sans celui-ci,
     # depend_on ne peut pas attendre que le serveur soit reellement pret :
     # le serveur Node demarrerait pendant que le modele se charge encore et
     # les premieres conversations partiraient en repli.
     healthcheck:
-      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      test: ['CMD-SHELL', 'ollama list >/dev/null 2>&1 || exit 1']
       interval: 10s
       timeout: 5s
       retries: 30
@@ -69,7 +69,7 @@ services:
       OLLAMA_HOST: http://ollama:11434
     volumes:
       - ollama_data:/root/.ollama
-    entrypoint: ["/bin/sh", "-c"]
+    entrypoint: ['/bin/sh', '-c']
     command:
       - |
         set -e
@@ -78,7 +78,7 @@ services:
         echo "Préchauffage..."
         ollama run ${MODEL:-qwen2.5:3b} "dis ok" >/dev/null 2>&1 || true
         echo "Modele pret."
-    restart: "no"
+    restart: 'no'
 
   # ------------------------------------------------ Bot C++ (service HTTP)
   # Le bot lit le savoir via un volume NOMME partage avec le serveur (meme
@@ -99,10 +99,10 @@ services:
       ollama-init:
         condition: service_completed_successfully
     environment:
-      BOT_MODE: "2"
-      BOT_GENRE: "feminin"
-      BOT_NOM: "Visiteur"
-      BOT_NOM_BOT: "BLAMUNE"
+      BOT_MODE: '2'
+      BOT_GENRE: 'feminin'
+      BOT_NOM: 'Visiteur'
+      BOT_NOM_BOT: 'BLAMUNE'
     volumes:
       - bot_data:/app
       # savoir.txt en LECTURE SEULE : le serveur est le seul ecrivain.
@@ -124,33 +124,33 @@ services:
       ollama:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - '8080:8080'
     environment:
-      PORT: "8080"
-      NODE_ENV: "production"
+      PORT: '8080'
+      NODE_ENV: 'production'
 
       # --- Ollama local (primaire, illimite) ---
-      API_PROVIDER: "ollama"
-      API_URL: "http://ollama:11434/v1"
-      API_MODEL: "${OLLAMA_MODEL:-qwen2.5:3b}"
-      API_MAX_TOKENS: "${API_MAX_TOKENS:-512}"
-      API_TEMPERATURE: "0.7"
+      API_PROVIDER: 'ollama'
+      API_URL: 'http://ollama:11434/v1'
+      API_MODEL: '${OLLAMA_MODEL:-qwen2.5:3b}'
+      API_MAX_TOKENS: '${API_MAX_TOKENS:-512}'
+      API_TEMPERATURE: '0.7'
 
       # --- Bot C++ local (secours regles + apprentissage) ---
-      BOT_SERVICE_URL: "http://bot:8090"
+      BOT_SERVICE_URL: 'http://bot:8090'
       # Dossier d'export du savoir partage avec le bot (volume Docker).
-      SAVOIR_EXPORT_DIR: "/savoir"
+      SAVOIR_EXPORT_DIR: '/savoir'
 
       # --- Opt-in ---
-      MEMOIRE_EXTRACTION: "${MEMOIRE_EXTRACTION:-1}"
-      RECHERCHE_WEB: "${RECHERCHE_WEB:-0}"
-      RATE_SEND_IP: "${RATE_SEND_IP:-30}"
-      RATE_SEND_UID: "${RATE_SEND_UID:-20}"
-      ADMIN_PSEUDO: "${ADMIN_PSEUDO:-admin}"
+      MEMOIRE_EXTRACTION: '${MEMOIRE_EXTRACTION:-1}'
+      RECHERCHE_WEB: '${RECHERCHE_WEB:-0}'
+      RATE_SEND_IP: '${RATE_SEND_IP:-30}'
+      RATE_SEND_UID: '${RATE_SEND_UID:-20}'
+      ADMIN_PSEUDO: '${ADMIN_PSEUDO:-admin}'
 
       # --- Persistance cloud (a definir si besoin) ---
-      JSONBIN_API_KEY: "${JSONBIN_API_KEY:-}"
-      JSONBIN_BIN_ID: "${JSONBIN_BIN_ID:-}"
+      JSONBIN_API_KEY: '${JSONBIN_API_KEY:-}'
+      JSONBIN_BIN_ID: '${JSONBIN_BIN_ID:-}'
     volumes:
       - server_data:/app
       # Export du savoir partage avec le bot (lecture seule pour le bot).

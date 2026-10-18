@@ -1,6 +1,14 @@
 // BLAMUNE Service Worker - offline cache
 const CACHE = 'blamune-v10';
-const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/ia-navigateur.js', '/manifest.json', '/logo.png'];
+const ASSETS = [
+  '/',
+  '/index.html',
+  '/style.css',
+  '/app.js',
+  '/ia-navigateur.js',
+  '/manifest.json',
+  '/logo.png'
+];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
@@ -9,9 +17,9 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    )
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
   );
   self.clients.claim();
 });
@@ -25,15 +33,24 @@ self.addEventListener('fetch', (e) => {
   // ferait ~1 Go de perdu). Le bundle ia-webllm.mjs, lui, reste chez nous.
   if (url.origin !== self.location.origin) return;
   // Ne pas cacher les requetes API ni les appels dynamiques
-  if (url.pathname.startsWith('/send') || url.pathname.startsWith('/historique') ||
-      url.pathname.startsWith('/mode') || url.pathname.startsWith('/register') ||
-      url.pathname.startsWith('/login') || url.pathname.startsWith('/invite') ||
-      url.pathname.startsWith('/logout') || url.pathname.startsWith('/profil') ||
-      url.pathname.startsWith('/stats') || url.pathname.startsWith('/admin') ||
-      url.pathname.startsWith('/ping') || url.pathname.startsWith('/health') ||
-      url.pathname.startsWith('/proactif') ||
-      url.pathname.startsWith('/connexions') || url.pathname.startsWith('/config-api') ||
-      url.pathname.startsWith('/tous-les-messages')) {
+  if (
+    url.pathname.startsWith('/send') ||
+    url.pathname.startsWith('/historique') ||
+    url.pathname.startsWith('/mode') ||
+    url.pathname.startsWith('/register') ||
+    url.pathname.startsWith('/login') ||
+    url.pathname.startsWith('/invite') ||
+    url.pathname.startsWith('/logout') ||
+    url.pathname.startsWith('/profil') ||
+    url.pathname.startsWith('/stats') ||
+    url.pathname.startsWith('/admin') ||
+    url.pathname.startsWith('/ping') ||
+    url.pathname.startsWith('/health') ||
+    url.pathname.startsWith('/proactif') ||
+    url.pathname.startsWith('/connexions') ||
+    url.pathname.startsWith('/config-api') ||
+    url.pathname.startsWith('/tous-les-messages')
+  ) {
     return;
   }
   // Page (HTML) : network d'abord pour avoir toujours la derniere version,
@@ -52,13 +69,17 @@ self.addEventListener('fetch', (e) => {
   }
   // Assets (css/js/logo) : cache d'abord -> chargement instantane a chaque
   // visite, revalidation en arriere-plan pour recuperer une nouvelle version.
-  e.respondWith((async () => {
-    const cache = await caches.open(CACHE);
-    const cached = await cache.match(e.request);
-    const reval = fetch(e.request).then((r) => {
-      if (r && r.ok) cache.put(e.request, r.clone());
-      return r;
-    }).catch(() => null);
-    return cached || (await reval) || new Response('', { status: 504 });
-  })());
+  e.respondWith(
+    (async () => {
+      const cache = await caches.open(CACHE);
+      const cached = await cache.match(e.request);
+      const reval = fetch(e.request)
+        .then((r) => {
+          if (r && r.ok) cache.put(e.request, r.clone());
+          return r;
+        })
+        .catch(() => null);
+      return cached || (await reval) || new Response('', { status: 504 });
+    })()
+  );
 });

@@ -45,7 +45,11 @@ var moteurNav = (function () {
   ].join(' ');
 
   function webgpuDisponible() {
-    try { return typeof navigator !== 'undefined' && !!navigator.gpu; } catch (e) { return false; }
+    try {
+      return typeof navigator !== 'undefined' && !!navigator.gpu;
+    } catch (e) {
+      return false;
+    }
   }
 
   function modeleChoisi() {
@@ -56,16 +60,22 @@ var moteurNav = (function () {
     return MODELE_DEFAUT;
   }
 
-  function etatCourant() { return etat; }
+  function etatCourant() {
+    return etat;
+  }
 
-  function moteurPret() { return etat === ETAT_PRET; }
+  function moteurPret() {
+    return etat === ETAT_PRET;
+  }
 
   // Import du bundle WebLLM (seule fois ou il est charge : dynamic import,
   // donc le site demarre exactement aussi vite qu'avant sans cette feature).
   function importer() {
     if (!libChargee) {
       libChargee = import('/ia-webllm.mjs');
-      libChargee.catch(function () { libChargee = null; });
+      libChargee.catch(function () {
+        libChargee = null;
+      });
     }
     return libChargee;
   }
@@ -77,14 +87,19 @@ var moteurNav = (function () {
     try {
       var w = await importer();
       return await w.hasModelInCache(modeleChoisi());
-    } catch (e) { return false; }
+    } catch (e) {
+      return false;
+    }
   }
 
   // Telecharge (1ere fois) puis charge le modele en memoire GPU.
   async function activer(surProgres) {
     if (etat === ETAT_ABSENT) throw new Error('WebGPU absent sur ce navigateur');
     if (etat === ETAT_TELE) return etat;
-    if (moteur) { etat = ETAT_PRET; return etat; }
+    if (moteur) {
+      etat = ETAT_PRET;
+      return etat;
+    }
     etat = ETAT_TELE;
     try {
       var w = await importer();
@@ -112,7 +127,9 @@ var moteurNav = (function () {
   // dans le cache : reactiver sera quasi instantane.
   async function desactiver() {
     if (moteur) {
-      try { await moteur.unload(); } catch (e) {}
+      try {
+        await moteur.unload();
+      } catch (e) {}
     }
     moteur = null;
     etat = webgpuDisponible() ? ETAT_ETEINT : ETAT_ABSENT;
@@ -159,7 +176,9 @@ var moteurNav = (function () {
     }
   }
 
-  function modeleCourant() { return modeleChoisi(); }
+  function modeleCourant() {
+    return modeleChoisi();
+  }
 
   // ---- Palier EN LIGNE direct (depuis la page, sans serveur) ------------
   // Le service est OpenAI-compatible et CORS ouvert ; sans cle. Un modele
@@ -178,7 +197,9 @@ var moteurNav = (function () {
     }
     var messages = [{ role: 'system', content: PERSONNALITE }].concat(liste);
     var ctrl = new AbortController();
-    var chrono = setTimeout(function () { ctrl.abort(); }, 45000);
+    var chrono = setTimeout(function () {
+      ctrl.abort();
+    }, 45000);
     try {
       var r = await fetch(URL_EN_LIGNE, {
         method: 'POST',
@@ -193,7 +214,9 @@ var moteurNav = (function () {
         signal: ctrl.signal
       });
       if (r.status === 402) {
-        throw new Error('limite du service atteinte (1 reponse / 30 s par IP) : reessaie dans un instant');
+        throw new Error(
+          'limite du service atteinte (1 reponse / 30 s par IP) : reessaie dans un instant'
+        );
       }
       if (!r.ok) {
         throw new Error('service en ligne refuse (HTTP ' + r.status + ')');
@@ -201,7 +224,7 @@ var moteurNav = (function () {
       // Chemin JSON unique (service qui ignore stream=true)
       if (!r.body || !r.body.getReader) {
         var j = await r.json();
-        var m = j && j.choices && j.choices[0] && j.choices[0].message || null;
+        var m = (j && j.choices && j.choices[0] && j.choices[0].message) || null;
         var t = m && typeof m.content === 'string' ? m.content : '';
         if (!t.trim()) throw new Error('reponse vide');
         if (typeof onDelta === 'function') onDelta(t);
@@ -220,9 +243,16 @@ var moteurNav = (function () {
           var brut = ligne.substring(5).trim();
           if (!brut || brut === '[DONE]') continue;
           var d;
-          try { d = JSON.parse(brut); } catch (e) { continue; }
+          try {
+            d = JSON.parse(brut);
+          } catch (e) {
+            continue;
+          }
           var choix = (d && d.choices && d.choices[0]) || null;
-          var frg = choix && choix.delta && typeof choix.delta.content === 'string' ? choix.delta.content : '';
+          var frg =
+            choix && choix.delta && typeof choix.delta.content === 'string'
+              ? choix.delta.content
+              : '';
           if (frg) {
             total += frg;
             if (typeof onDelta === 'function') onDelta(total);

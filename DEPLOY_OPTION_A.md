@@ -7,19 +7,20 @@ ton PC puisse être éteint : le chat répond 24/7 depuis le cloud.
 
 Je ne peux pas créer ces comptes à ta place. Voici ce qu'il te faut :
 
-| Service | Pourquoi | Lien |
-|---------|----------|------|
-| **GitHub** | Ton code y est déjà poussé | github.com |
-| **Render** | Héberge le serveur Node 24/7 (plan gratuit) | render.com |
-| **Gemini (Google)** | Clé IA principale, gratuite et limitée en quota | aistudio.google.com/app/apikey |
-| **Qdrant** (optionnel) | Mémoire vectorielle du savoir | cloud.qdrant.io |
-| **JSONBin** | Persistance des comptes, mémoires, historiques | jsonbin.io |
+| Service                | Pourquoi                                        | Lien                           |
+| ---------------------- | ----------------------------------------------- | ------------------------------ |
+| **GitHub**             | Ton code y est déjà poussé                      | github.com                     |
+| **Render**             | Héberge le serveur Node 24/7 (plan gratuit)     | render.com                     |
+| **Gemini (Google)**    | Clé IA principale, gratuite et limitée en quota | aistudio.google.com/app/apikey |
+| **Qdrant** (optionnel) | Mémoire vectorielle du savoir                   | cloud.qdrant.io                |
+| **JSONBin**            | Persistance des comptes, mémoires, historiques  | jsonbin.io                     |
 
 ---
 
 ## Étape 1 : Créer tes clés API
 
 ### 1.1 Gemini (principal, gratuit)
+
 1. Va sur [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
 2. Crée une clé API (commence par `AIza...`)
 3. Copie-la, tu en auras besoin dans Render.
@@ -32,6 +33,7 @@ Je ne peux pas créer ces comptes à ta place. Voici ce qu'il te faut :
 > y est tracé (ex. « API key not valid » = mauvaise clé).
 
 ### 1.2 Qdrant (optionnel, mémoire vectorielle du savoir)
+
 1. Va sur [https://cloud.qdrant.io](https://cloud.qdrant.io), crée un cluster gratuit.
 2. Copie :
    - **URL** → `QDRANT_URL`
@@ -43,6 +45,7 @@ Je ne peux pas créer ces comptes à ta place. Voici ce qu'il te faut :
 > exacts, il manque juste la tolérance aux tournures de phrases.
 
 ### 1.3 JSONBin (persistance obligatoire)
+
 1. Va sur [https://jsonbin.io](https://jsonbin.io)
 2. Crée un compte gratuit
 3. Crée un **Bin** (contenu vide `{}`)
@@ -83,13 +86,13 @@ Les variables simples (`API_PROVIDER`, `API_MODEL`, limites, Qdrant activé...)
 viennent déjà de `render.yaml` : ne les re-déclare pas. Ajoute seulement
 celles-ci (des secrets, donc jamais dans le dépôt) :
 
-| Clé | Valeur |
-|-----|--------|
-| `API_KEY` | `AIza_TA_CLE_GEMINI` |
-| `JSONBIN_API_KEY` | `ta_cle_jsonbin` |
-| `JSONBIN_BIN_ID` | `ton_id_bin_jsonbin` |
-| `QDRANT_URL` | *(ton URL cloud.qdrant.io, optionnel)* |
-| `QDRANT_API_KEY` | *(ta clé Qdrant, optionnel)* |
+| Clé               | Valeur                                 |
+| ----------------- | -------------------------------------- |
+| `API_KEY`         | `AIza_TA_CLE_GEMINI`                   |
+| `JSONBIN_API_KEY` | `ta_cle_jsonbin`                       |
+| `JSONBIN_BIN_ID`  | `ton_id_bin_jsonbin`                   |
+| `QDRANT_URL`      | _(ton URL cloud.qdrant.io, optionnel)_ |
+| `QDRANT_API_KEY`  | _(ta clé Qdrant, optionnel)_           |
 
 > Le raccourci : à la racine du projet, lance `afficher_cles_render.bat`,
 > il imprime ces lignes prêtes à copier-coller depuis ton `.env` local.
@@ -130,6 +133,7 @@ Sur le plan gratuit, Render endort l'instance après ~15 min d'inactivité.
 Ton projet contient déjà `.github/workflows/keepalive.yml` qui ping ton URL toutes les 5 minutes via GitHub Actions.
 
 ### Configurer l'URL dans GitHub
+
 1. Dans ton dépôt GitHub, va dans **Settings > Secrets and variables > Actions > Variables**.
 2. Crée une variable `BLAMUNE_URL` avec la valeur : `https://TON-NOM-APP.onrender.com`
    (Remplace par le nom exact de ton service Render.)
@@ -182,6 +186,7 @@ Résultat attendu : `PRÊT À PUBLIER`.
 ## Quand tu auras besoin de mon aide
 
 Dis-moi quand tu bloques sur l'une de ces étapes, par exemple :
+
 - Créer le bin JSONBin ou récupérer l'API key
 - Configurer les variables d'environnement sur Render
 - Le déploiement échoue (copie-colle les logs Render)

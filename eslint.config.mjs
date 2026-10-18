@@ -8,10 +8,17 @@ export default [
       ecmaVersion: 2022,
       sourceType: 'commonjs',
       globals: {
-        console: 'readonly', process: 'readonly', require: 'readonly',
-        module: 'writable', __dirname: 'readonly', Buffer: 'readonly',
-        setTimeout: 'readonly', clearTimeout: 'readonly', setInterval: 'readonly',
-        clearInterval: 'readonly', URL: 'readonly'
+        console: 'readonly',
+        process: 'readonly',
+        require: 'readonly',
+        module: 'writable',
+        __dirname: 'readonly',
+        Buffer: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        URL: 'readonly'
       }
     },
     rules: {
@@ -28,13 +35,25 @@ export default [
     languageOptions: {
       sourceType: 'script',
       globals: {
-        window: 'readonly', document: 'readonly', navigator: 'readonly',
-        localStorage: 'readonly', fetch: 'readonly', self: 'readonly',
-        caches: 'readonly', location: 'readonly', EventSource: 'readonly',
-        requestAnimationFrame: 'readonly', AbortController: 'readonly',
-        TextDecoder: 'readonly', FileReader: 'readonly', Image: 'readonly',
-        SpeechSynthesisUtterance: 'readonly', Response: 'readonly',
-        URL: 'readonly', Headers: 'readonly', FormData: 'readonly',
+        window: 'readonly',
+        document: 'readonly',
+        navigator: 'readonly',
+        localStorage: 'readonly',
+        fetch: 'readonly',
+        self: 'readonly',
+        caches: 'readonly',
+        location: 'readonly',
+        EventSource: 'readonly',
+        requestAnimationFrame: 'readonly',
+        AbortController: 'readonly',
+        TextDecoder: 'readonly',
+        FileReader: 'readonly',
+        Image: 'readonly',
+        SpeechSynthesisUtterance: 'readonly',
+        Response: 'readonly',
+        URL: 'readonly',
+        Headers: 'readonly',
+        FormData: 'readonly',
         // IA_NAV : global pose par site/ia-navigateur.js (script classique
         // charge avant app.js, voir index.html).
         IA_NAV: 'readonly'

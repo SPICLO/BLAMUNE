@@ -2,12 +2,12 @@
 
 ## Prérequis
 
-| Outil | Pourquoi |
-|---|---|
-| **Node.js 22** (voir `.nvmrc`) | `node:sqlite` est utilisé pour les connaissances ; Node 22.5 minimum |
-| **g++ avec MinGW** | compiler le bot C++ en local (`bot.exe`) |
-| **Python 3** + `pip install -r requirements.txt` | outils hors ligne (`*.py`) |
-| **WSL ou Linux** | `bot_service.py` et la CI ne tournent que sous POSIX |
+| Outil                                            | Pourquoi                                                             |
+| ------------------------------------------------ | -------------------------------------------------------------------- |
+| **Node.js 22** (voir `.nvmrc`)                   | `node:sqlite` est utilisé pour les connaissances ; Node 22.5 minimum |
+| **g++ avec MinGW**                               | compiler le bot C++ en local (`bot.exe`)                             |
+| **Python 3** + `pip install -r requirements.txt` | outils hors ligne (`*.py`)                                           |
+| **WSL ou Linux**                                 | `bot_service.py` et la CI ne tournent que sous POSIX                 |
 
 ## Démarrer
 
@@ -75,13 +75,13 @@ dans `server.js`.
 
 ## Chiffres à jour
 
-| | |
-|---|---|
-| `server.js` | 2 228 lignes |
-| Tests d'intégration | 47 |
-| Tests unitaires | 45 |
-| Contrôles de routes | 54 |
-| Tests du service bot | 24 |
+|                      |              |
+| -------------------- | ------------ |
+| `server.js`          | 2 228 lignes |
+| Tests d'intégration  | 47           |
+| Tests unitaires      | 45           |
+| Contrôles de routes  | 54           |
+| Tests du service bot | 24           |
 
 `verifier_deploiement.py` échoue si un fichier attendu disparaît du dépôt,
 si une image Docker perd son digest, ou si la CI cesse de compiler `bot.cpp`.

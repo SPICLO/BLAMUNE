@@ -22,35 +22,48 @@ var authEnCours = false;
 // Consoles (Xbox/PlayStation/Switch) : interface pilotee au pad, pas a la
 // souris. On allege les animations pour eviter les saccades GPU qui font
 // vibrer/defiler la page.
-var estConsole = /xbox|playstation|nintendo/i.test((navigator.userAgent || ''));
+var estConsole = /xbox|playstation|nintendo/i.test(navigator.userAgent || '');
 if (estConsole) document.documentElement.classList.add('console');
 
 // ---------------- OUTILS D'ANIMATION ----------------
 
 function delai(ms) {
-  return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  return new Promise(function (resolve) {
+    setTimeout(resolve, ms);
+  });
 }
 
 // Pilule glissante EGO / BLAMUNE
 function deplacerPilule(mode, instant) {
-  var btn = document.getElementById(mode === '1' ? 'mode1' : (mode === '2' ? 'mode2' : null));
+  var btn = document.getElementById(mode === '1' ? 'mode1' : mode === '2' ? 'mode2' : null);
   var pill = document.getElementById('piluleMode');
   if (!btn || !pill) return;
   var x = btn.offsetLeft;
   var w = btn.offsetWidth;
   if (!w) return; // panneau masque : on attendra le prochain passage
-  if (instant) { pill.style.transition = 'none'; }
+  if (instant) {
+    pill.style.transition = 'none';
+  }
   pill.style.left = x + 'px';
   pill.style.width = w + 'px';
-  if (instant) { void pill.offsetWidth; pill.style.transition = ''; }
+  if (instant) {
+    void pill.offsetWidth;
+    pill.style.transition = '';
+  }
 }
 
 // Remet les boutons de mode sur BLAMUNE (2) apres une deconnexion
 function reinitaliserModeUI() {
   var mode1Btn = document.getElementById('mode1');
   var mode2Btn = document.getElementById('mode2');
-  if (mode1Btn) { mode1Btn.classList.remove('actif'); mode1Btn.setAttribute('aria-pressed', 'false'); }
-  if (mode2Btn) { mode2Btn.classList.add('actif'); mode2Btn.setAttribute('aria-pressed', 'true'); }
+  if (mode1Btn) {
+    mode1Btn.classList.remove('actif');
+    mode1Btn.setAttribute('aria-pressed', 'false');
+  }
+  if (mode2Btn) {
+    mode2Btn.classList.add('actif');
+    mode2Btn.setAttribute('aria-pressed', 'true');
+  }
   sauverProfilLocal('mode', '2');
   deplacerPilule('2', true);
 }
@@ -60,7 +73,7 @@ function animerEntreeChat() {
   var msgs = document.querySelectorAll('#chat .msg:not(.attente), #chat .accueil');
   for (var i = 0; i < msgs.length; i++) {
     msgs[i].style.animation = 'cascadeIn 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both';
-    msgs[i].style.animationDelay = (80 + i * 70) + 'ms';
+    msgs[i].style.animationDelay = 80 + i * 70 + 'ms';
   }
 }
 
@@ -77,13 +90,19 @@ var AUTH_CLES = {
   jeton: 'blamune_invite_jeton'
 };
 
-function getAuthEgo() { return localStorage.getItem(AUTH_CLES.ego) || ''; }
-function getAuthPseudo() { return localStorage.getItem(AUTH_CLES.pseudo) || ''; }
+function getAuthEgo() {
+  return localStorage.getItem(AUTH_CLES.ego) || '';
+}
+function getAuthPseudo() {
+  return localStorage.getItem(AUTH_CLES.pseudo) || '';
+}
 function getAuthUserId() {
   var uid = localStorage.getItem(AUTH_CLES.userId);
   return uid || '';
 }
-function getAuthJeton() { return localStorage.getItem(AUTH_CLES.jeton) || ''; }
+function getAuthJeton() {
+  return localStorage.getItem(AUTH_CLES.jeton) || '';
+}
 function setAuthInfo(ego, pseudo, uid) {
   localStorage.setItem(AUTH_CLES.ego, ego);
   localStorage.setItem(AUTH_CLES.pseudo, pseudo);
@@ -97,7 +116,9 @@ function clearAuth() {
   localStorage.removeItem(AUTH_CLES.userId);
   localStorage.removeItem(AUTH_CLES.jeton);
 }
-function estAuth() { return !!getAuthEgo(); }
+function estAuth() {
+  return !!getAuthEgo();
+}
 
 // L'identite voyage dans les entetes (X-EGO / X-UID / X-Jeton). Le serveur
 // les lit avant le corps et le query string : un "authBody" qui recopierait
@@ -122,7 +143,9 @@ async function migrerJetonInvite() {
   if (!uid || uid.indexOf('inv_') !== 0 || getAuthJeton()) return;
   try {
     var ctrl = new AbortController();
-    var minuteur = setTimeout(function () { ctrl.abort(); }, 8000);
+    var minuteur = setTimeout(function () {
+      ctrl.abort();
+    }, 8000);
     var r = await fetch('/invite/jeton', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-UID': uid },
@@ -141,7 +164,10 @@ function afficherApp() {
   var appContenu = document.getElementById('appContenu');
   majEchec(false);
   if (ecranAuth) ecranAuth.style.display = 'none';
-  if (appContenu) { appContenu.style.display = 'flex'; appContenu.style.flexDirection = 'column'; }
+  if (appContenu) {
+    appContenu.style.display = 'flex';
+    appContenu.style.flexDirection = 'column';
+  }
   finaliserAffichageApp();
 }
 
@@ -154,7 +180,10 @@ function finaliserAffichageApp() {
     if (btnDeconnexion) btnDeconnexion.style.display = '';
   } else {
     if (noteInvite) noteInvite.style.display = '';
-    if (btnDeconnexion) { btnDeconnexion.style.display = ''; btnDeconnexion.textContent = 'Quitter'; }
+    if (btnDeconnexion) {
+      btnDeconnexion.style.display = '';
+      btnDeconnexion.textContent = 'Quitter';
+    }
   }
   charger();
   // Sonde proactif : uniquement pour un compte enregistre (les invites n'ont
@@ -165,7 +194,9 @@ function finaliserAffichageApp() {
 // ---------------- ANIMATIONS CONNEXION / DECONNEXION ----------------
 
 function forcerReflow(el) {
-  if (el) { void el.offsetWidth; }
+  if (el) {
+    void el.offsetWidth;
+  }
 }
 
 function afficherToastDeco(texte, type) {
@@ -175,7 +206,9 @@ function afficherToastDeco(texte, type) {
   d.className = 'deco-toast' + (type === 'ok' ? ' deco-toast-ok' : '');
   d.textContent = texte;
   document.body.appendChild(d);
-  setTimeout(function () { if (d && d.parentNode) d.parentNode.removeChild(d); }, 2300);
+  setTimeout(function () {
+    if (d && d.parentNode) d.parentNode.removeChild(d);
+  }, 2300);
 }
 
 // Joue le check anime + le fondu vers l'app. Utilisee apres connexion,
@@ -215,7 +248,10 @@ function jouerTransitionConnexion(message) {
     finaliserAffichageApp();
 
     setTimeout(function () {
-      if (ecranAuth) { ecranAuth.style.display = 'none'; ecranAuth.classList.remove('sortie-auth'); }
+      if (ecranAuth) {
+        ecranAuth.style.display = 'none';
+        ecranAuth.classList.remove('sortie-auth');
+      }
       if (success) success.classList.remove('actif');
       if (principal) principal.style.display = '';
     }, 560);
@@ -280,22 +316,36 @@ async function authRegister() {
   var email = emailEl.value.trim();
   var mdp = mdpEl.value;
   errEl.textContent = '';
-  if (!marquerChamp(pseudoEl, pseudo.length >= 2, true) ||
-      !marquerChamp(emailEl, email.indexOf('@') >= 0, true) ||
-      !marquerChamp(mdpEl, mdp.length >= 6, true)) {
+  if (
+    !marquerChamp(pseudoEl, pseudo.length >= 2, true) ||
+    !marquerChamp(emailEl, email.indexOf('@') >= 0, true) ||
+    !marquerChamp(mdpEl, mdp.length >= 6, true)
+  ) {
     errEl.textContent = 'Des champs sont invalides.';
     majEchec(true);
     return;
   }
   majEchec(false);
-  fermerClavier();   // le clavier se ferme avant la transition
+  fermerClavier(); // le clavier se ferme avant la transition
   authEnCours = true;
   btnRegister.disabled = true;
   btnRegister.textContent = 'Creation...';
   try {
-    var body = 'pseudo=' + encodeURIComponent(pseudo) + '&email=' + encodeURIComponent(email) + '&mdp=' + encodeURIComponent(mdp);
-    var req = fetch('/register', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    var body =
+      'pseudo=' +
+      encodeURIComponent(pseudo) +
+      '&email=' +
+      encodeURIComponent(email) +
+      '&mdp=' +
+      encodeURIComponent(mdp);
+    var req = fetch('/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
     var j = (await Promise.all([req, delai(1500)]))[0];
     if (j.ok) {
       majEchec(false);
@@ -327,21 +377,29 @@ async function authLogin() {
   var email = emailEl.value.trim();
   var mdp = mdpEl.value;
   errEl.textContent = '';
-  if (!marquerChamp(emailEl, email.indexOf('@') >= 0, true) ||
-      !marquerChamp(mdpEl, mdp.length >= 1, true)) {
+  if (
+    !marquerChamp(emailEl, email.indexOf('@') >= 0, true) ||
+    !marquerChamp(mdpEl, mdp.length >= 1, true)
+  ) {
     errEl.textContent = 'Des champs sont invalides.';
     majEchec(true);
     return;
   }
   majEchec(false);
-  fermerClavier();   // le clavier se ferme avant la transition
+  fermerClavier(); // le clavier se ferme avant la transition
   authEnCours = true;
   btnLogin.disabled = true;
   btnLogin.textContent = 'Connexion...';
   try {
     var body = 'email=' + encodeURIComponent(email) + '&mdp=' + encodeURIComponent(mdp);
-    var req = fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    var req = fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
     var j = (await Promise.all([req, delai(1400)]))[0];
     if (j.ok) {
       majEchec(false);
@@ -369,8 +427,10 @@ async function authInvite() {
   authEnCours = true;
   btnInvite.disabled = true;
   try {
-    var req = fetch('/invite', { method: 'POST' })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    var req = fetch('/invite', { method: 'POST' }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
     var j = (await Promise.all([req, delai(1200)]))[0];
     if (j.ok) {
       localStorage.removeItem(AUTH_CLES.ego);
@@ -418,10 +478,15 @@ function majEchec(on) {
   if (on) {
     e.classList.add('echec');
     if (majEchec._t) clearTimeout(majEchec._t);
-    majEchec._t = setTimeout(function () { majEchec(false); }, 6000);
+    majEchec._t = setTimeout(function () {
+      majEchec(false);
+    }, 6000);
   } else {
     e.classList.remove('echec');
-    if (majEchec._t) { clearTimeout(majEchec._t); majEchec._t = null; }
+    if (majEchec._t) {
+      clearTimeout(majEchec._t);
+      majEchec._t = null;
+    }
   }
 }
 
@@ -439,8 +504,14 @@ var swapT2 = null;
 
 // coupe un swap en cours et remet les deux formes dans leur etat normal
 function annulerSwap() {
-  if (swapT1) { clearTimeout(swapT1); swapT1 = null; }
-  if (swapT2) { clearTimeout(swapT2); swapT2 = null; }
+  if (swapT1) {
+    clearTimeout(swapT1);
+    swapT1 = null;
+  }
+  if (swapT2) {
+    clearTimeout(swapT2);
+    swapT2 = null;
+  }
   swapEnCours = false;
   var login = document.getElementById('authFormLogin');
   var reg = document.getElementById('authFormRegister');
@@ -456,8 +527,8 @@ function basculerForm(vers) {
   var reg = document.getElementById('authFormRegister');
   var boite = document.querySelector('.auth-box');
   if (!login || !reg) return;
-  var depuis = (vers === 'register') ? login : reg;
-  var cible = (vers === 'register') ? reg : login;
+  var depuis = vers === 'register' ? login : reg;
+  var cible = vers === 'register' ? reg : login;
   if (depuis.style.display === 'none') return;
   swapEnCours = true;
   majEchec(false);
@@ -505,11 +576,36 @@ function initAuth() {
   // Validation en direct : tremblement rouge si invalide (plus de ✓ vert).
   // Taper = l'utilisateur corrige, donc le fond rouge disparait.
   var CHAMPS = [
-    { id: 'authPseudoReg', valide: function (v) { return v.trim().length >= 2; } },
-    { id: 'authEmailReg', valide: function (v) { return v.indexOf('@') >= 0; } },
-    { id: 'authMdpReg', valide: function (v) { return v.length >= 6; } },
-    { id: 'authEmail', valide: function (v) { return v.indexOf('@') >= 0; } },
-    { id: 'authMdp', valide: function (v) { return v.length >= 1; } }
+    {
+      id: 'authPseudoReg',
+      valide: function (v) {
+        return v.trim().length >= 2;
+      }
+    },
+    {
+      id: 'authEmailReg',
+      valide: function (v) {
+        return v.indexOf('@') >= 0;
+      }
+    },
+    {
+      id: 'authMdpReg',
+      valide: function (v) {
+        return v.length >= 6;
+      }
+    },
+    {
+      id: 'authEmail',
+      valide: function (v) {
+        return v.indexOf('@') >= 0;
+      }
+    },
+    {
+      id: 'authMdp',
+      valide: function (v) {
+        return v.length >= 1;
+      }
+    }
   ];
   CHAMPS.forEach(function (def) {
     var el = document.getElementById(def.id);
@@ -525,19 +621,25 @@ function initAuth() {
   });
 
   if (authShowRegister) {
-    authShowRegister.onclick = function (e) { e.preventDefault(); basculerForm('register'); };
+    authShowRegister.onclick = function (e) {
+      e.preventDefault();
+      basculerForm('register');
+    };
   }
   if (authShowLogin) {
-    authShowLogin.onclick = function (e) { e.preventDefault(); basculerForm('login'); };
+    authShowLogin.onclick = function (e) {
+      e.preventDefault();
+      basculerForm('login');
+    };
   }
 
   if (authMdp) {
-    authMdp.addEventListener('keydown', function(e) {
+    authMdp.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') authLogin();
     });
   }
   if (authMdpReg) {
-    authMdpReg.addEventListener('keydown', function(e) {
+    authMdpReg.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') authRegister();
     });
   }
@@ -546,12 +648,12 @@ function initAuth() {
   var authEmail = document.getElementById('authEmail');
   var authEmailReg = document.getElementById('authEmailReg');
   if (authEmail) {
-    authEmail.addEventListener('keydown', function(e) {
+    authEmail.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') authLogin();
     });
   }
   if (authEmailReg) {
-    authEmailReg.addEventListener('keydown', function(e) {
+    authEmailReg.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') authRegister();
     });
   }
@@ -559,8 +661,8 @@ function initAuth() {
   // Bouton deconnexion
   var btnDeconnexion = document.getElementById('btnDeconnexion');
   if (btnDeconnexion) {
-    btnDeconnexion.onclick = function() {
-      fetch('/logout', { method: 'POST', headers: authHeaders() }).catch(function(){});
+    btnDeconnexion.onclick = function () {
+      fetch('/logout', { method: 'POST', headers: authHeaders() }).catch(function () {});
       clearAuth();
       arreterProactif();
       retirerPhotoChoisie();
@@ -572,15 +674,24 @@ function initAuth() {
 
   // Boutons mode et envoi
   if (envoyerBtn) envoyerBtn.onclick = envoyer;
-  if (mode1Btn) mode1Btn.onclick = function () { changerMode(1); };
-  if (mode2Btn) mode2Btn.onclick = function () { changerMode(2); };
+  if (mode1Btn)
+    mode1Btn.onclick = function () {
+      changerMode(1);
+    };
+  if (mode2Btn)
+    mode2Btn.onclick = function () {
+      changerMode(2);
+    };
 
   // Bouton photo : choix d'un fichier, apercu dans la barre, envoi avec le
   // prochain message (ou seul, le serveur accepte un message vide + image).
   var btnImage = document.getElementById('btnImage');
   var fichierImage = document.getElementById('fichierImage');
   if (btnImage && fichierImage) {
-    btnImage.onclick = function () { if (actionEnCours) return; fichierImage.click(); };
+    btnImage.onclick = function () {
+      if (actionEnCours) return;
+      fichierImage.click();
+    };
     fichierImage.onchange = function () {
       choisirImage(fichierImage.files && fichierImage.files[0]);
     };
@@ -590,7 +701,10 @@ function initAuth() {
 
   if (zoneEl) {
     zoneEl.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); envoyer(); }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        envoyer();
+      }
     });
   }
 
@@ -602,16 +716,27 @@ function initAuth() {
   // Quand l'onglet redevient visible, on verifie l'etat du serveur
   // ET les messages que BLAMUNE aurait pu ecrire pendant notre absence.
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) { charger(); verifierProactif(); }
+    if (!document.hidden) {
+      charger();
+      verifierProactif();
+    }
   });
 
   if (estAuth()) {
-    fetch('/historique', { headers: authHeaders() }).then(function(r) { return r.json(); }).then(function(j) {
-      if (j.ok !== false) afficherApp();
-      else { clearAuth(); afficherAuth(); }
-    }).catch(function() {
-      afficherAuth();
-    });
+    fetch('/historique', { headers: authHeaders() })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (j) {
+        if (j.ok !== false) afficherApp();
+        else {
+          clearAuth();
+          afficherAuth();
+        }
+      })
+      .catch(function () {
+        afficherAuth();
+      });
   } else {
     afficherAuth();
   }
@@ -621,12 +746,16 @@ function initAuth() {
     if (estAuth()) {
       var headers = authHeaders();
       headers['Content-Type'] = 'application/x-www-form-urlencoded';
-      fetch('/logout', { method: 'POST', headers: headers, body: '', keepalive: true }).catch(function(){});
+      fetch('/logout', { method: 'POST', headers: headers, body: '', keepalive: true }).catch(
+        function () {}
+      );
     }
   });
 }
 
-function getUserId() { return getAuthUserId(); }
+function getUserId() {
+  return getAuthUserId();
+}
 
 // ---------------- LOCALSTORAGE : PROFIL UTILISATEUR ----------------
 
@@ -658,7 +787,11 @@ function conteneur() {
   var chat = document.getElementById('chat');
   if (!chat) return null;
   var c = chat.querySelector('.conteneur');
-  if (!c) { c = document.createElement('div'); c.className = 'conteneur'; chat.appendChild(c); }
+  if (!c) {
+    c = document.createElement('div');
+    c.className = 'conteneur';
+    chat.appendChild(c);
+  }
   return c;
 }
 
@@ -688,8 +821,24 @@ function ajouterMessage(qui, texte, confiance, epoch) {
 
   var avatar = document.createElement('div');
   avatar.className = 'avatar ' + (qui === 'bot' ? 'avatar-bot' : 'avatar-moi');
-  if (qui === 'bot') { var logo = document.createElement('img'); logo.src = 'logo.png'; logo.alt = ''; avatar.appendChild(logo); }
-  else { var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('fill', 'currentColor'); svg.setAttribute('aria-hidden', 'true'); var path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'); svg.appendChild(path); avatar.appendChild(svg); }
+  if (qui === 'bot') {
+    var logo = document.createElement('img');
+    logo.src = 'logo.png';
+    logo.alt = '';
+    avatar.appendChild(logo);
+  } else {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'currentColor');
+    svg.setAttribute('aria-hidden', 'true');
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute(
+      'd',
+      'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'
+    );
+    svg.appendChild(path);
+    avatar.appendChild(svg);
+  }
 
   var corps = document.createElement('div');
   corps.className = 'corps';
@@ -713,8 +862,13 @@ function ajouterMessage(qui, texte, confiance, epoch) {
   heure.textContent = heureDepuis(epoch);
   corps.appendChild(heure);
 
-  if (qui === 'moi') { d.appendChild(corps); d.appendChild(avatar); }
-  else { d.appendChild(avatar); d.appendChild(corps); }
+  if (qui === 'moi') {
+    d.appendChild(corps);
+    d.appendChild(avatar);
+  } else {
+    d.appendChild(avatar);
+    d.appendChild(corps);
+  }
 
   var c = conteneur();
   if (!c) return null;
@@ -768,14 +922,19 @@ function attente(on) {
     bulle.className = 'bulle';
     var pts = document.createElement('span');
     pts.className = 'points';
-    var p1 = document.createElement('i'); var p2 = document.createElement('i'); var p3 = document.createElement('i');
-    pts.appendChild(p1); pts.appendChild(p2); pts.appendChild(p3);
+    var p1 = document.createElement('i');
+    var p2 = document.createElement('i');
+    var p3 = document.createElement('i');
+    pts.appendChild(p1);
+    pts.appendChild(p2);
+    pts.appendChild(p3);
     bulle.appendChild(pts);
     corps.appendChild(bulle);
     d.appendChild(av);
     d.appendChild(corps);
     c.appendChild(d);
-    requestAnimationFrame(function () { // FIX #3: scroll after DOM update
+    requestAnimationFrame(function () {
+      // FIX #3: scroll after DOM update
       var chat = document.getElementById('chat');
       if (chat) chat.scrollTop = chat.scrollHeight;
     });
@@ -840,9 +999,10 @@ function signalerArret() {
   b.textContent = 'Le bot est arrete. ';
   var btn = document.createElement('button');
   btn.textContent = 'Relancer';
-  btn.style.cssText = 'display:inline;color:var(--accent);font-weight:600;text-decoration:underline;background:none;border:none;cursor:pointer;font-size:inherit;margin-left:4px;';
+  btn.style.cssText =
+    'display:inline;color:var(--accent);font-weight:600;text-decoration:underline;background:none;border:none;cursor:pointer;font-size:inherit;margin-left:4px;';
   btn.onclick = function () {
-    var m = (chargerProfilLocal().mode === '1') ? 1 : 2;
+    var m = chargerProfilLocal().mode === '1' ? 1 : 2;
     changerMode(m);
   };
   b.appendChild(btn);
@@ -897,7 +1057,8 @@ function afficherAccueil() {
   var titre = document.createElement('h2');
   titre.textContent = 'Bienvenue !';
   var sous = document.createElement('p');
-  sous.textContent = 'Je suis BLAMUNE. Discute avec moi, pose-moi des questions, ou apprends-moi des choses que je retiendrai.';
+  sous.textContent =
+    'Je suis BLAMUNE. Discute avec moi, pose-moi des questions, ou apprends-moi des choses que je retiendrai.';
   var s = document.createElement('div');
   s.className = 'suggestions';
   var chips = [
@@ -910,7 +1071,10 @@ function afficherAccueil() {
     b.textContent = txt;
     b.onclick = function () {
       var z = document.getElementById('zone');
-      if (z) { z.value = txt; z.focus(); }
+      if (z) {
+        z.value = txt;
+        z.focus();
+      }
     };
     s.appendChild(b);
   });
@@ -933,13 +1097,21 @@ async function charger() {
   chargerEnCours = true;
   try {
     var abortCtrl = new AbortController();
-    var abortTimer = setTimeout(function () { abortCtrl.abort(); }, 120000);
+    var abortTimer = setTimeout(function () {
+      abortCtrl.abort();
+    }, 120000);
     var r = await fetch('/historique', { headers: authHeaders(), signal: abortCtrl.signal });
     clearTimeout(abortTimer);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var j = await r.json();
-    if (j.ok === false) { chargerEnCours = false; return; }
-    if (_chargerInterval) { clearTimeout(_chargerInterval); _chargerInterval = null; }
+    if (j.ok === false) {
+      chargerEnCours = false;
+      return;
+    }
+    if (_chargerInterval) {
+      clearTimeout(_chargerInterval);
+      _chargerInterval = null;
+    }
     nbErreursConnexion = 0;
     majMode(j.mode || '2');
     majStatut(j.etat);
@@ -947,8 +1119,11 @@ async function charger() {
     if (j.etat === 'pret' || j.etat === 'arrete' || j.etat === 'erreur') nbPollsDemarrage = 0;
     var hist = j.historique || [];
     var c = conteneur();
-    if (!c) { chargerEnCours = false; return; }
-    var modeChange = (dernierModeCharge !== null && dernierModeCharge !== j.mode);
+    if (!c) {
+      chargerEnCours = false;
+      return;
+    }
+    var modeChange = dernierModeCharge !== null && dernierModeCharge !== j.mode;
     dernierModeCharge = j.mode;
     var existants = c.querySelectorAll('.msg:not(.attente)');
     var nbExistants = existants.length;
@@ -964,16 +1139,19 @@ async function charger() {
             // Photo envoyee : seul le marqueur revient du serveur (pas de
             // base64 dans l'historique), donc un simple emoji dans la bulle.
             var texteAffiche = h.image
-              ? ((h.texte || '') + ((h.texte || '') ? ' ' : '') + '\ud83d\udcf7')
+              ? (h.texte || '') + (h.texte || '' ? ' ' : '') + '\ud83d\udcf7'
               : h.texte;
             ajouterMessage(h.qui, texteAffiche, undefined, h.t);
-          }
-          else ajouterInfo(h.texte);
+          } else ajouterInfo(h.texte);
         });
       } else if (j.etat === 'pret' || j.etat === 'demarrage') {
         afficherAccueil();
       }
-    } else if (nbHistorique === 0 && !c.querySelector('.accueil') && (j.etat === 'pret' || j.etat === 'demarrage')) {
+    } else if (
+      nbHistorique === 0 &&
+      !c.querySelector('.accueil') &&
+      (j.etat === 'pret' || j.etat === 'demarrage')
+    ) {
       afficherAccueil();
     }
     if (_animEntree) {
@@ -987,13 +1165,20 @@ async function charger() {
       else majStatut('erreur', 'Demarrage trop long');
     }
     chargerEnCours = false;
-    if (_chargerPending) { _chargerPending = false; setTimeout(charger, 100); }
+    if (_chargerPending) {
+      _chargerPending = false;
+      setTimeout(charger, 100);
+    }
   } catch (e) {
     chargerEnCours = false;
-    if (_chargerPending) { _chargerPending = false; setTimeout(charger, 100); }
+    if (_chargerPending) {
+      _chargerPending = false;
+      setTimeout(charger, 100);
+    }
     nbErreursConnexion++;
     majStatut('horsligne', 'Serveur injoignable');
-    if (nbErreursConnexion < 30) setTimeout(charger, Math.min(4000 + nbErreursConnexion * 1000, 30000));
+    if (nbErreursConnexion < 30)
+      setTimeout(charger, Math.min(4000 + nbErreursConnexion * 1000, 30000));
   }
 }
 
@@ -1092,9 +1277,16 @@ function lireFlux(reponse, surDelta, surFin) {
       var brut = ligne.substring(5).trim();
       if (!brut) continue;
       var d;
-      try { d = JSON.parse(brut); } catch (e) { continue; }
-      if (d.fin) { surFin(d); }
-      else if (typeof d.t === 'string') { surDelta(d.t); }
+      try {
+        d = JSON.parse(brut);
+      } catch (e) {
+        continue;
+      }
+      if (d.fin) {
+        surFin(d);
+      } else if (typeof d.t === 'string') {
+        surDelta(d.t);
+      }
     }
   }
 
@@ -1129,25 +1321,41 @@ function retirerPhotoChoisie() {
 
 function choisirImage(fichier) {
   if (!fichier) return;
-  if (!/^image\//.test(fichier.type)) { ajouterInfo("Ce fichier n'est pas une image."); return; }
+  if (!/^image\//.test(fichier.type)) {
+    ajouterInfo("Ce fichier n'est pas une image.");
+    return;
+  }
   var lecteur = new FileReader();
   lecteur.onload = function (ev) {
     var img = new Image();
     img.onload = function () {
       var max = 1280;
-      var l = img.width, h = img.height;
+      var l = img.width,
+        h = img.height;
       if (l > max || h > max) {
-        if (l >= h) { h = Math.round(h * max / l); l = max; }
-        else { l = Math.round(l * max / h); h = max; }
+        if (l >= h) {
+          h = Math.round((h * max) / l);
+          l = max;
+        } else {
+          l = Math.round((l * max) / h);
+          h = max;
+        }
       }
       var c = document.createElement('canvas');
-      c.width = l; c.height = h;
+      c.width = l;
+      c.height = h;
       var ctx = c.getContext('2d');
       ctx.drawImage(img, 0, 0, l, h);
       var dataUrl;
-      try { dataUrl = c.toDataURL('image/jpeg', 0.82); }
-      catch (e) { dataUrl = ev.target.result; }
-      if (dataUrl.length > 9000000) { ajouterInfo('Photo trop lourde (7 Mo max).'); return; }
+      try {
+        dataUrl = c.toDataURL('image/jpeg', 0.82);
+      } catch (e) {
+        dataUrl = ev.target.result;
+      }
+      if (dataUrl.length > 9000000) {
+        ajouterInfo('Photo trop lourde (7 Mo max).');
+        return;
+      }
       imageChoisie = dataUrl;
       var ap = document.getElementById('apercuPhoto');
       var apImg = document.getElementById('apercuPhotoImg');
@@ -1158,7 +1366,9 @@ function choisirImage(fichier) {
       var z = document.getElementById('zone');
       if (z) z.focus();
     };
-    img.onerror = function () { ajouterInfo('Image illisible.'); };
+    img.onerror = function () {
+      ajouterInfo('Image illisible.');
+    };
     img.src = ev.target.result;
   };
   lecteur.readAsDataURL(fichier);
@@ -1185,7 +1395,9 @@ async function traiterCommande(m) {
   var mot = m.split(/\s+/)[0].toLowerCase();
   if (mot === '/aide' || mot === '/help') {
     if (z) z.value = '';
-    ajouterSysteme('Commandes : /stats (ta vie avec BLAMUNE), /oublie (effacer la conversation, profil conserve), /aide (cette liste). Le bouton photo envoie une image.');
+    ajouterSysteme(
+      'Commandes : /stats (ta vie avec BLAMUNE), /oublie (effacer la conversation, profil conserve), /aide (cette liste). Le bouton photo envoie une image.'
+    );
     return;
   }
   if (mot === '/stats') {
@@ -1195,26 +1407,44 @@ async function traiterCommande(m) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       var j = await r.json();
       if (!j.ok) throw new Error('refus');
-      var lignes = 'Messages echanges : ' + j.messages + ' (conversation n\u00b0' + j.sessions + ')';
+      var lignes =
+        'Messages echanges : ' + j.messages + ' (conversation n\u00b0' + j.sessions + ')';
       if (j.jours <= 0) lignes += "\nVous vous connaissez depuis aujourd'hui.";
-      else lignes += '\nVous vous connaissez depuis ' + j.jours + ' jour' + (j.jours > 1 ? 's' : '') + '.';
+      else
+        lignes +=
+          '\nVous vous connaissez depuis ' + j.jours + ' jour' + (j.jours > 1 ? 's' : '') + '.';
       if (j.dernierContact) {
         var ecart = Math.floor((Date.now() - j.dernierContact) / 86400000);
-        lignes += ecart <= 0 ? "\nDernier contact : aujourd'hui." :
-          "\nDernier contact : il y a " + ecart + ' jour' + (ecart > 1 ? 's' : '') + '.';
+        lignes +=
+          ecart <= 0
+            ? "\nDernier contact : aujourd'hui."
+            : '\nDernier contact : il y a ' + ecart + ' jour' + (ecart > 1 ? 's' : '') + '.';
       }
       if (j.anniversaire) {
-        lignes += '\nAnniversaire : ' + j.anniversaire +
-          (j.joursAnniversaire === 0 ? " (aujourd'hui !)" :
-            (j.joursAnniversaire > 0 ? ' (dans ' + j.joursAnniversaire + ' jour' + (j.joursAnniversaire > 1 ? 's' : '') + ')' : ''));
+        lignes +=
+          '\nAnniversaire : ' +
+          j.anniversaire +
+          (j.joursAnniversaire === 0
+            ? " (aujourd'hui !)"
+            : j.joursAnniversaire > 0
+              ? ' (dans ' +
+                j.joursAnniversaire +
+                ' jour' +
+                (j.joursAnniversaire > 1 ? 's' : '') +
+                ')'
+              : '');
       }
       ajouterSysteme(lignes);
-    } catch (e) { ajouterInfo('Stats indisponibles pour le moment.'); }
+    } catch (e) {
+      ajouterInfo('Stats indisponibles pour le moment.');
+    }
     return;
   }
   if (mot === '/oublie') {
     if (z) z.value = '';
-    var ok = window.confirm('Effacer toute la conversation ? Ton profil (nom, souvenirs) est conserve.');
+    var ok = window.confirm(
+      'Effacer toute la conversation ? Ton profil (nom, souvenirs) est conserve.'
+    );
     if (!ok) return;
     try {
       var r2 = await fetch('/historique', { method: 'DELETE', headers: authHeaders() });
@@ -1222,7 +1452,9 @@ async function traiterCommande(m) {
       viderChat();
       afficherAccueil();
       afficherToastDeco('Conversation effac\u00e9e.', 'ok');
-    } catch (e2) { ajouterInfo('Effacement impossible pour le moment.'); }
+    } catch (e2) {
+      ajouterInfo('Effacement impossible pour le moment.');
+    }
     return;
   }
   if (z) z.value = '';
@@ -1243,7 +1475,10 @@ function demarrerProactif() {
 }
 
 function arreterProactif() {
-  if (minuterieProactif) { clearInterval(minuterieProactif); minuterieProactif = null; }
+  if (minuterieProactif) {
+    clearInterval(minuterieProactif);
+    minuterieProactif = null;
+  }
 }
 
 async function verifierProactif() {
@@ -1251,7 +1486,9 @@ async function verifierProactif() {
   proactifEnCours = true;
   try {
     var ctrl = new AbortController();
-    var t = setTimeout(function () { ctrl.abort(); }, 10000);
+    var t = setTimeout(function () {
+      ctrl.abort();
+    }, 10000);
     var r = await fetch('/proactif', { headers: authHeaders(), signal: ctrl.signal });
     clearTimeout(t);
     if (!r.ok) return;
@@ -1270,7 +1507,10 @@ async function envoyer() {
   var z = document.getElementById('zone');
   if (!z) return;
   var m = z.value.trim();
-  if (m.charAt(0) === '/') { traiterCommande(m); return; }
+  if (m.charAt(0) === '/') {
+    traiterCommande(m);
+    return;
+  }
   if ((!m && !imageChoisie) || actionEnCours) return;
   actionEnCours = true;
   desactiver(true);
@@ -1281,7 +1521,7 @@ async function envoyer() {
 
   // Bulle du bot : creee des le premier fragment recu.
   var bulleBot = null;
-  var termine = false;   // une fois la reponse finalisee, plus aucun fragment
+  var termine = false; // une fois la reponse finalisee, plus aucun fragment
 
   function direct(texte) {
     if (termine || !texte) return;
@@ -1308,11 +1548,13 @@ async function envoyer() {
     if (reps.length > 0) {
       if (bulleBot) {
         var b = bulleBot.querySelector('.bulle');
-        if (b) b.textContent = reps[0];   // version nettoyee par le serveur
+        if (b) b.textContent = reps[0]; // version nettoyee par le serveur
         for (var i = 1; i < reps.length; i++) ajouterMessage('bot', reps[i], j.confiance);
         bulleBot = null;
       } else {
-        reps.forEach(function (rep) { ajouterMessage('bot', rep, j.confiance); });
+        reps.forEach(function (rep) {
+          ajouterMessage('bot', rep, j.confiance);
+        });
       }
       if (j.etat === 'arrete' || j.etat === 'erreur') signalerArret();
       lireVoix(reps[0]);
@@ -1326,24 +1568,35 @@ async function envoyer() {
   // s'arretait des les en-tetes et un flux qui s'arrete gelait l'application
   // (bouton d'envoi bloque, plus aucun rafraichissement).
   var abortCtrl = new AbortController();
-  var abortTimer = setTimeout(function () { abortCtrl.abort(); }, 120000);
+  var abortTimer = setTimeout(function () {
+    abortCtrl.abort();
+  }, 120000);
 
   try {
     var profil = chargerProfilLocal();
     var modeServ = dernierModeCharge || profil.mode || '2';
-    var body = 'msg=' + encodeURIComponent(m) + '&mode=' + encodeURIComponent(modeServ) + '&stream=1';
+    var body =
+      'msg=' + encodeURIComponent(m) + '&mode=' + encodeURIComponent(modeServ) + '&stream=1';
     if (imageChoisie) body += '&image=' + encodeURIComponent(imageChoisie);
     var headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
     var ah = authHeaders();
     for (var k in ah) headers[k] = ah[k];
-    var r = await fetch('/send', { method: 'POST', headers: headers, body: body, signal: abortCtrl.signal });
+    var r = await fetch('/send', {
+      method: 'POST',
+      headers: headers,
+      body: body,
+      signal: abortCtrl.signal
+    });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     z.value = '';
     retirerPhotoChoisie();
     var ct = r.headers.get('content-type') || '';
     if (ct.indexOf('text/event-stream') >= 0 && r.body && r.body.getReader) {
       var recuFin = false;
-      await lireFlux(r, direct, function (d) { recuFin = true; finaliser(d); });
+      await lireFlux(r, direct, function (d) {
+        recuFin = true;
+        finaliser(d);
+      });
       if (!recuFin) throw new Error('Flux interrompu');
     } else if (ct.indexOf('text/event-stream') >= 0) {
       // Flux annonce mais non lisible : on ne peut pas faire mieux que d'echouer.
@@ -1367,14 +1620,20 @@ async function envoyer() {
       if (local.fait) {
         var texteLocal = bulleBot ? (bulleBot.querySelector('.bulle') || {}).textContent || '' : '';
         bulleBot = null;
-        ajouterInfo('Reponse generee DIRECTEMENT par ton navigateur (IA libre en ligne, sans serveur BLAMUNE).');
+        ajouterInfo(
+          'Reponse generee DIRECTEMENT par ton navigateur (IA libre en ligne, sans serveur BLAMUNE).'
+        );
         lireVoix(texteLocal);
       } else {
         var second = await tenterIAHorsLigne(direct);
         if (second.fait) {
-          var texteWebgpu = bulleBot ? (bulleBot.querySelector('.bulle') || {}).textContent || '' : '';
+          var texteWebgpu = bulleBot
+            ? (bulleBot.querySelector('.bulle') || {}).textContent || ''
+            : '';
           bulleBot = null;
-          ajouterInfo('Reponse generee LOCALEMENT par ton navigateur (modele embarque, sans internet).');
+          ajouterInfo(
+            'Reponse generee LOCALEMENT par ton navigateur (modele embarque, sans internet).'
+          );
           lireVoix(texteWebgpu);
         } else {
           if (msgNode) msgNode.remove();
@@ -1385,9 +1644,15 @@ async function envoyer() {
             ajouterInfo(local.erreur.message + '.');
           }
           if (second.erreur) {
-            ajouterInfo('IA locale pour l instant indisponible : ' + (second.erreur.message || 'erreur inconnue') + '.');
+            ajouterInfo(
+              'IA locale pour l instant indisponible : ' +
+                (second.erreur.message || 'erreur inconnue') +
+                '.'
+            );
           } else if (window.IA_NAV && IA_NAV.webgpuDisponible() && !IA_NAV.moteurPret()) {
-            ajouterInfo('Astuce : le bouton "IA hors-ligne" charge un mini modele dans ton navigateur pour discuter meme sans internet.');
+            ajouterInfo(
+              'Astuce : le bouton "IA hors-ligne" charge un mini modele dans ton navigateur pour discuter meme sans internet.'
+            );
           }
         }
       }
@@ -1395,10 +1660,15 @@ async function envoyer() {
   } finally {
     clearTimeout(abortTimer);
     actionEnCours = false;
-    if (_chargerInterval) { clearTimeout(_chargerInterval); _chargerInterval = null; }
+    if (_chargerInterval) {
+      clearTimeout(_chargerInterval);
+      _chargerInterval = null;
+    }
     desactiver(false);
     z.focus();
-    setTimeout(function () { charger(); }, 500);
+    setTimeout(function () {
+      charger();
+    }, 500);
   }
 }
 
@@ -1406,7 +1676,10 @@ async function changerMode(m) {
   if (m !== 1 && m !== 2 && m !== 3) return;
   if (modeEnCours) return;
   modeEnCours = true;
-  if (actionEnCours) { modeEnCours = false; return; }
+  if (actionEnCours) {
+    modeEnCours = false;
+    return;
+  }
   actionEnCours = true;
   desactiver(true);
   arretSignale = false;
@@ -1422,9 +1695,20 @@ async function changerMode(m) {
   }
   try {
     var abortCtrl = new AbortController();
-    var abortTimer = setTimeout(function () { abortCtrl.abort(); }, 120000);
-    var req = fetch('/mode', { method: 'POST', headers: Object.assign({}, authHeaders(), { 'Content-Type': 'application/x-www-form-urlencoded' }), body: 'm=' + m, signal: abortCtrl.signal })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    var abortTimer = setTimeout(function () {
+      abortCtrl.abort();
+    }, 120000);
+    var req = fetch('/mode', {
+      method: 'POST',
+      headers: Object.assign({}, authHeaders(), {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }),
+      body: 'm=' + m,
+      signal: abortCtrl.signal
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
     var j = (await Promise.all([req, delai(1100)]))[0];
     clearTimeout(abortTimer);
     majMode(String(j.mode || '2'), true);
@@ -1435,12 +1719,19 @@ async function changerMode(m) {
   }
   attente(false);
   actionEnCours = false;
-  if (_chargerInterval) { clearTimeout(_chargerInterval); _chargerInterval = null; }
+  if (_chargerInterval) {
+    clearTimeout(_chargerInterval);
+    _chargerInterval = null;
+  }
   if (appContenu) {
-    setTimeout(function () { appContenu.classList.remove('mode-bascule'); }, 700);
+    setTimeout(function () {
+      appContenu.classList.remove('mode-bascule');
+    }, 700);
   }
   modeEnCours = false;
-  try { await charger(); } catch (_) {}
+  try {
+    await charger();
+  } catch (_) {}
   desactiver(false);
   var z = document.getElementById('zone');
   if (z) z.focus();
@@ -1459,10 +1750,17 @@ var langueVoix = navigator.language || 'fr-FR';
 function eteindreVoix() {
   voixOn = false;
   var b = document.getElementById('btnVoix');
-  if (b) { b.classList.remove('actif'); b.setAttribute('aria-pressed', 'false'); }
-  try { if (reco) reco.stop(); } catch (e) {}
+  if (b) {
+    b.classList.remove('actif');
+    b.setAttribute('aria-pressed', 'false');
+  }
+  try {
+    if (reco) reco.stop();
+  } catch (e) {}
   recoEnCours = false;
-  try { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); } catch (e) {}
+  try {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  } catch (e) {}
 }
 
 function ecouterVoix() {
@@ -1475,7 +1773,7 @@ function ecouterVoix() {
     reco.interimResults = true;
     reco.continuous = false;
     reco.maxAlternatives = 1;
-    var entendu = '';          // ce qui a deja ete tranche par le navigateur
+    var entendu = ''; // ce qui a deja ete tranche par le navigateur
     reco.onresult = function (ev) {
       var interim = '';
       for (var i = ev.resultIndex; i < ev.results.length; i++) {
@@ -1501,7 +1799,10 @@ function ecouterVoix() {
       if (texte) {
         var attendreEnvoi = function () {
           if (!voixOn) return;
-          if (!actionEnCours) { envoyer(); return; }
+          if (!actionEnCours) {
+            envoyer();
+            return;
+          }
           setTimeout(attendreEnvoi, 600);
         };
         attendreEnvoi();
@@ -1514,7 +1815,9 @@ function ecouterVoix() {
   try {
     recoEnCours = true;
     reco.start();
-  } catch (e) { recoEnCours = false; }
+  } catch (e) {
+    recoEnCours = false;
+  }
 }
 
 function lireVoix(texte) {
@@ -1524,8 +1827,12 @@ function lireVoix(texte) {
     var u = new SpeechSynthesisUtterance(texte);
     u.lang = langueVoix;
     u.rate = 1;
-    u.onend = function () { if (voixOn) setTimeout(ecouterVoix, 500); };
-    u.onerror = function () { if (voixOn) setTimeout(ecouterVoix, 500); };
+    u.onend = function () {
+      if (voixOn) setTimeout(ecouterVoix, 500);
+    };
+    u.onerror = function () {
+      if (voixOn) setTimeout(ecouterVoix, 500);
+    };
     window.speechSynthesis.speak(u);
   } catch (e) {}
 }
@@ -1534,10 +1841,20 @@ function lireVoix(texte) {
   var b = document.getElementById('btnVoix');
   if (!b) return;
   var sr = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!sr && !('speechSynthesis' in window)) { b.style.display = 'none'; return; }
+  if (!sr && !('speechSynthesis' in window)) {
+    b.style.display = 'none';
+    return;
+  }
   b.addEventListener('click', function () {
-    if (voixOn) { eteindreVoix(); afficherToastDeco('Mode vocal eteint.'); return; }
-    if (!sr) { afficherToastDeco('Ce navigateur ne gere pas la dictee vocale.'); return; }
+    if (voixOn) {
+      eteindreVoix();
+      afficherToastDeco('Mode vocal eteint.');
+      return;
+    }
+    if (!sr) {
+      afficherToastDeco('Ce navigateur ne gere pas la dictee vocale.');
+      return;
+    }
     voixOn = true;
     b.classList.add('actif');
     b.setAttribute('aria-pressed', 'true');
@@ -1552,14 +1869,19 @@ function lireVoix(texte) {
 (function initBoutonIANav() {
   var b = document.getElementById('btnIANav');
   if (!b) return;
-  if (!window.IA_NAV || !IA_NAV.webgpuDisponible()) { b.style.display = 'none'; return; }
+  if (!window.IA_NAV || !IA_NAV.webgpuDisponible()) {
+    b.style.display = 'none';
+    return;
+  }
   b.style.display = ''; // visible des maintenant : WebGPU present
 
   var texte = document.getElementById('btnIANavTexte');
   function surProgres(r) {
     if (!texte) return;
     var pct = 0;
-    try { pct = Math.round((r.progress || 0) * 100); } catch (e) {}
+    try {
+      pct = Math.round((r.progress || 0) * 100);
+    } catch (e) {}
     texte.textContent = pct > 0 ? 'IA ' + pct + '%' : 'IA...';
   }
 
@@ -1567,7 +1889,10 @@ function lireVoix(texte) {
     var st = IA_NAV.etatCourant();
     if (st === 'telechargement' || st === 'en_cours') return; // deja parti
     if (st === 'pret') {
-      afficherToastDeco('IA hors-ligne prete : elle prendra le relais si le serveur est injoignable.', 'ok');
+      afficherToastDeco(
+        'IA hors-ligne prete : elle prendra le relais si le serveur est injoignable.',
+        'ok'
+      );
       return;
     }
     b.disabled = true;
@@ -1588,7 +1913,9 @@ function lireVoix(texte) {
       if (info) info.remove();
       if (texte) texte.textContent = 'IA hors-ligne';
       IA_NAV.desactiver().catch(function () {});
-      ajouterInfo('IA hors-ligne indisponible : ' + (e && e.message ? e.message : 'erreur inconnue') + '.');
+      ajouterInfo(
+        'IA hors-ligne indisponible : ' + (e && e.message ? e.message : 'erreur inconnue') + '.'
+      );
     } finally {
       b.disabled = false;
     }
@@ -1603,9 +1930,11 @@ window.addEventListener('load', async function () {
   }
   // Avant la premiere requete : l'invite legacy echange son uid contre un
   // jeton, pour ne pas se faire refuser des la seconde appelee.
-  try { await migrerJetonInvite(); } catch (e) {}
+  try {
+    await migrerJetonInvite();
+  } catch (e) {}
   initAuth();
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(function() {});
+    navigator.serviceWorker.register('/sw.js').catch(function () {});
   }
 });

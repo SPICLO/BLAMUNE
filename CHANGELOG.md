@@ -7,6 +7,7 @@ versions antérieures sont visibles dans `git log`.
 ## [Non publié] - 2026-10-04
 
 ### Ajouté
+
 - `README.md` : point d'entrée du projet (installation, variables, tests, déploiement).
 - `build_bot.ps1` / `build_bot.bat` : scripts reproductibles pour recompiler `bot.exe`.
 - `requirements.txt` : dépendances Python des scripts locaux.
@@ -35,12 +36,14 @@ versions antérieures sont visibles dans `git log`.
   `BOT_SERVICE_TIMEOUT_MS`.
 
 ### Modifié
+
 - `config.json.example` : modèle aligné sur le défaut du serveur (`gemini-3.5-flash`).
 - `render.yaml` : variables optionnelles documentées (limites, quota, admin).
 - `site/manifest.json` : ajout de `id`, `scope`, `lang`, `categories` et de l'icône 192.
 - `site/index.html` : liens d'icônes (favicon + apple-touch-icon) et apple-mobile-web-app.
 
 ### Corrigé
+
 - **Portage Linux de `bot.cpp`** : les helpers de session (`.blamune_session`)
   étaient Defined dans un bloc `#ifdef _WIN32` alors que
   `cheminFichierUtilisateur()` les utilise — la compilation Linux échouait.
@@ -81,9 +84,9 @@ versions antérieures sont visibles dans `git log`.
   - **ordre** : la colonne `rang` préserve l'ordre du fichier, donc chaque
     export est stable et le diff git ne montre que de vraies modifications ;
   - transactions atomiques en mode `WAL` (lecteurs et écrivain coexistent).
-  `migrer_savoir_sqlite.js` migre les 1 266 entrées existantes (`--rapport`
-  pour un diagnostic sans écriture). `server.js` migre automatiquement au
-  premier démarrage si la base est vide.
+    `migrer_savoir_sqlite.js` migre les 1 266 entrées existantes (`--rapport`
+    pour un diagnostic sans écriture). `server.js` migre automatiquement au
+    premier démarrage si la base est vide.
 - **Banque de repli hors ligne** (`replis.txt` + `replis.js`). Quand l'IA est
   injoignable (quota, coupure, clé absente), le serveur ne renvoie plus
   « Désolé, j'ai eu un problème technique » mais une réponse de BLAMUNE tirée
@@ -108,8 +111,8 @@ versions antérieures sont visibles dans `git log`.
   (`salut`, `connais`, `suite`) retirées du dépôt continuaient de répondre
   « Je ne sais pas encore... » en ligne. Vérifié sur le déploiement réel.
   `savoirDb.synchroniserFichier()` rejoue le dépôt à **chaque démarrage** :
-  le fichier fait autorité sur les connaissances *éditées* (une ligne retirée
-  disparaît), tandis que les connaissances *apprises* en cours d'usage
+  le fichier fait autorité sur les connaissances _éditées_ (une ligne retirée
+  disparaît), tandis que les connaissances _apprises_ en cours d'usage
   (`source` ≠ `migration`) sont conservées.
 - **Fournisseur `edenai` ajouté** : Eden AI est une passerelle
   OpenAI-compatible (`https://api.edenai.run/v3`) donnant accès à 1 100+

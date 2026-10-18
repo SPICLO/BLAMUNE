@@ -8,28 +8,28 @@ perdre les données, et quelle IA utiliser.
 **Tout est déjà prêt.** Le serveur est sur Render (`render.yaml`), il n'a besoin
 que de ce qui suit :
 
-| Fichier | Poids | Rôle |
-|---|---|---|
-| `server.js` | 139 Ko | le serveur Express (toutes les routes) |
-| `storage.js` | 11 Ko | sauvegarde cloud JSONBin |
-| `savoir.txt` | 94 Ko | les connaissances du bot |
-| `personnalite.txt` | 115 Ko | sa personnalité |
-| `vocabulaire.txt` | 12 Ko | son vocabulaire |
-| `site/` | 400 Ko | le site public |
-| `admin/` | 37 Ko | le panneau d'administration |
+| Fichier            | Poids  | Rôle                                   |
+| ------------------ | ------ | -------------------------------------- |
+| `server.js`        | 139 Ko | le serveur Express (toutes les routes) |
+| `storage.js`       | 11 Ko  | sauvegarde cloud JSONBin               |
+| `savoir.txt`       | 94 Ko  | les connaissances du bot               |
+| `personnalite.txt` | 115 Ko | sa personnalité                        |
+| `vocabulaire.txt`  | 12 Ko  | son vocabulaire                        |
+| `site/`            | 400 Ko | le site public                         |
+| `admin/`           | 37 Ko  | le panneau d'administration            |
 
 **Total publié : 1,5 Mo.** La limite de Render est de 100 Mo. Tu as de la marge
 pour les années.
 
 ### Ce qui ne part PAS sur le serveur (et pourquoi)
 
-| Élément | Poids | Pourquoi pas |
-|---|---|---|
-| `bot.exe` | 3,1 Mo | le bot **local** ; le serveur ne le lit pas (seulement mentionné dans des commentaires) |
-| `bot.cpp` | 492 Ko | le code source C++, utile seulement pour recompiler en local |
-| `node_modules` | 3,7 Mo | recréé par `npm install` au build |
-| `cloudflared.exe` | ~~53 Mo~~ | **supprimé** — résidu du tunnel, plus utilisé |
-| `users/`, `backups/`, `*.log` | — | données de comptes, ignorées par git |
+| Élément                       | Poids     | Pourquoi pas                                                                            |
+| ----------------------------- | --------- | --------------------------------------------------------------------------------------- |
+| `bot.exe`                     | 3,1 Mo    | le bot **local** ; le serveur ne le lit pas (seulement mentionné dans des commentaires) |
+| `bot.cpp`                     | 492 Ko    | le code source C++, utile seulement pour recompiler en local                            |
+| `node_modules`                | 3,7 Mo    | recréé par `npm install` au build                                                       |
+| `cloudflared.exe`             | ~~53 Mo~~ | **supprimé** — résidu du tunnel, plus utilisé                                           |
+| `users/`, `backups/`, `*.log` | —         | données de comptes, ignorées par git                                                    |
 
 > Le dossier fait 69 Mo sur ton disque, mais **1,5 Mo seulement sont publiés**.
 > Les 53 Mo de `cloudflared.exe` et les 3,7 Mo de `node_modules` ne quittent
@@ -82,10 +82,10 @@ qui reconnaît des intentions par motifs et compose ses réponses à partir de
 
 Le plan gratuit Render donne **512 Mo de RAM**.
 
-| Modèle | Poids (Q4) | Verdict en 512 Mo |
-|---|---|---|
-| `Qwen2.5-0.5B` | ~400 Mo | à peine — Node + OS mangent déjà 250 Mo |
-| `Qwen2.5-1.5B` | ~1 Go | **ne tient pas** |
+| Modèle         | Poids (Q4) | Verdict en 512 Mo                       |
+| -------------- | ---------- | --------------------------------------- |
+| `Qwen2.5-0.5B` | ~400 Mo    | à peine — Node + OS mangent déjà 250 Mo |
+| `Qwen2.5-1.5B` | ~1 Go      | **ne tient pas**                        |
 
 Le moteur de règles actuel pèse **0 Mo de RAM**. Tu gains 40× avec lui.
 
@@ -98,13 +98,13 @@ tiers.
 
 ### Recommendation finale
 
-| | Moteur de règles | API en ligne | Modèle local |
-|---|---|---|---|
-| Coût | 0 € | ~2–10 €/mois | 0 € mais 7 $/mois d'hébergement |
-| Mémoire | 0 Mo | 0 Mo | 400 Mo+ (impossible en gratuit) |
-| Hors ligne | ✅ | ❌ | ✅ |
-| Qualité sur sujet connu | très bonne | bonne | bonne |
-| Prévisibilité | totale | variable | variable |
+|                         | Moteur de règles | API en ligne | Modèle local                    |
+| ----------------------- | ---------------- | ------------ | ------------------------------- |
+| Coût                    | 0 €              | ~2–10 €/mois | 0 € mais 7 $/mois d'hébergement |
+| Mémoire                 | 0 Mo             | 0 Mo         | 400 Mo+ (impossible en gratuit) |
+| Hors ligne              | ✅               | ❌           | ✅                              |
+| Qualité sur sujet connu | très bonne       | bonne        | bonne                           |
+| Prévisibilité           | totale           | variable     | variable                        |
 
 **Garde le moteur de règles.** Si un jour tu veux plus d'intelligence, le
 prochain palier raisonnable est un **bot OpenAI/Render payant** (2 Go de RAM) —

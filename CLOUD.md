@@ -32,11 +32,11 @@ chemin nominal.
 
 ## 2. Ce qu'il faut pour le serveur
 
-| Modèle 3b | RAM мини | GPU | Sans GPU (CPU) |
-|---|---|---|---|
-| `qwen2.5:3b` (recommandé) | 8 Go | 4 Go VRAM | possible, 2 à 6 s/réponse |
-| `llama3.2:3b` | 8 Go | 4 Go VRAM | possible, 2 à 6 s/réponse |
-| `qwen2.5:7b` | 16 Go | 8 Go VRAM | 10 à 25 s/réponse |
+| Modèle 3b                 | RAM мини | GPU       | Sans GPU (CPU)            |
+| ------------------------- | -------- | --------- | ------------------------- |
+| `qwen2.5:3b` (recommandé) | 8 Go     | 4 Go VRAM | possible, 2 à 6 s/réponse |
+| `llama3.2:3b`             | 8 Go     | 4 Go VRAM | possible, 2 à 6 s/réponse |
+| `qwen2.5:7b`              | 16 Go    | 8 Go VRAM | 10 à 25 s/réponse         |
 
 Sans GPU, un modèle 3b reste utilisable mais la latence augmente fortement.
 
@@ -67,17 +67,17 @@ Le site répond sur le port `8080`.
 
 ## 4. Optimisations de latence déjà appliquées
 
-| Optimisation | Effet |
-|---|---|
-| `OLLAMA_KEEP_ALIVE=-1` | le modèle ne se décharge jamais (sinon 5 à 20 s au premier message) |
-| `ollama-init` | modèle téléchargé et chauffé avant le premier usage |
-| réseau Docker interne | pas d'aller-retour public entre composants |
-| `API_MAX_TOKENS=512` | réponses courtes = moins de tokens à générer |
-| `OLLAMA_NUM_PARALLEL=1` | évite de saturer une petite GPU |
-| cache LRU 5 min | les messages récurrents (« salut », « merci ») ne relancent pas l'IA |
-| bot local en secours | si l'IA tombe, la réponse vient du C++ en quelques ms |
-| streaming SSE | le visiteur voit le début de la réponse sans attendre la fin |
-| `RECHERCHE_WEB=0` par défaut | évite un appel outil inutile sur chaque message |
+| Optimisation                 | Effet                                                                |
+| ---------------------------- | -------------------------------------------------------------------- |
+| `OLLAMA_KEEP_ALIVE=-1`       | le modèle ne se décharge jamais (sinon 5 à 20 s au premier message)  |
+| `ollama-init`                | modèle téléchargé et chauffé avant le premier usage                  |
+| réseau Docker interne        | pas d'aller-retour public entre composants                           |
+| `API_MAX_TOKENS=512`         | réponses courtes = moins de tokens à générer                         |
+| `OLLAMA_NUM_PARALLEL=1`      | évite de saturer une petite GPU                                      |
+| cache LRU 5 min              | les messages récurrents (« salut », « merci ») ne relancent pas l'IA |
+| bot local en secours         | si l'IA tombe, la réponse vient du C++ en quelques ms                |
+| streaming SSE                | le visiteur voit le début de la réponse sans attendre la fin         |
+| `RECHERCHE_WEB=0` par défaut | évite un appel outil inutile sur chaque message                      |
 
 ---
 
@@ -124,13 +124,13 @@ La source de vérité est **SQLite** (`savoir.db`, module `savoir_db.js`).
 `savoir.txt` n'est plus qu'un **export** : il reste versionné dans git, lu par
 le bot Windows local, et inclus dans la sauvegarde.
 
-| Risque | Ce qui le règle |
-|---|---|
-| Deux visiteurs apprennent en même temps | transactions + `busy_timeout`, mode `WAL` |
-| Un arrêt tronque le fichier | transactions atomiques (SQLite) |
-| Clé en double | `cle_norm` en `PRIMARY KEY` |
-| Un export qui réordonne tout le fichier | colonne `rang` (ordre préservé) |
-| Sauvegarde applicative (texte) d'une base binaire | la base est sauvegardée en **dump SQL** |
+| Risque                                            | Ce qui le règle                           |
+| ------------------------------------------------- | ----------------------------------------- |
+| Deux visiteurs apprennent en même temps           | transactions + `busy_timeout`, mode `WAL` |
+| Un arrêt tronque le fichier                       | transactions atomiques (SQLite)           |
+| Clé en double                                     | `cle_norm` en `PRIMARY KEY`               |
+| Un export qui réordonne tout le fichier           | colonne `rang` (ordre préservé)           |
+| Sauvegarde applicative (texte) d'une base binaire | la base est sauvegardée en **dump SQL**   |
 
 Commandes utiles :
 

@@ -6,11 +6,11 @@ var refreshInterval = null;
 var dashboardInit = false;
 
 // ---- LOGIN ----
-(function() {
+(function () {
   var stored = localStorage.getItem('dashmin_token');
   var storedPseudo = localStorage.getItem('dashmin_pseudo');
   var storedTime = localStorage.getItem('dashmin_time');
-  if (stored && storedTime && (Date.now() - parseInt(storedTime)) > 86400000) {
+  if (stored && storedTime && Date.now() - parseInt(storedTime) > 86400000) {
     localStorage.removeItem('dashmin_token');
     localStorage.removeItem('dashmin_pseudo');
     localStorage.removeItem('dashmin_time');
@@ -28,7 +28,7 @@ var dashboardInit = false;
   }
 })();
 
-document.getElementById('loginAdminForm').onsubmit = async function(e) {
+document.getElementById('loginAdminForm').onsubmit = async function (e) {
   e.preventDefault();
   var pseudo = document.getElementById('loginPseudo').value.trim();
   var mdp = document.getElementById('loginMdp').value;
@@ -40,7 +40,10 @@ document.getElementById('loginAdminForm').onsubmit = async function(e) {
     errEl.classList.remove('masquee');
     return;
   }
-  if (btn) { btn.disabled = true; btn.textContent = 'Connexion...'; }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Connexion...';
+  }
   try {
     var r = await fetch(API + '/login', {
       method: 'POST',
@@ -50,9 +53,12 @@ document.getElementById('loginAdminForm').onsubmit = async function(e) {
     var j = await r.json();
     if (j.ok) {
       if (j.pseudo !== 'admin') {
-        errEl.textContent = 'Ce compte n\'est pas admin.';
+        errEl.textContent = "Ce compte n'est pas admin.";
         errEl.classList.remove('masquee');
-        if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Se connecter';
+        }
         return;
       }
       adminToken = j.ego;
@@ -66,20 +72,28 @@ document.getElementById('loginAdminForm').onsubmit = async function(e) {
     } else {
       errEl.textContent = j.message || 'Identifiants incorrects.';
       errEl.classList.remove('masquee');
-      if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Se connecter';
+      }
     }
-  } catch(ex) {
+  } catch (ex) {
     errEl.textContent = 'Erreur de connexion au serveur.';
     errEl.classList.remove('masquee');
-    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Se connecter';
+    }
   }
 };
 
 function initDashboard() {
   if (!dashboardInit) {
     document.getElementById('btnRefresh').onclick = chargerDonnees;
-    document.getElementById('btnReload').onclick = function() { window.location.reload(); };
-    document.getElementById('btnLogout').onclick = function() {
+    document.getElementById('btnReload').onclick = function () {
+      window.location.reload();
+    };
+    document.getElementById('btnLogout').onclick = function () {
       localStorage.removeItem('dashmin_token');
       localStorage.removeItem('dashmin_pseudo');
       localStorage.removeItem('dashmin_time');
@@ -87,7 +101,7 @@ function initDashboard() {
       dashboardInit = false;
       window.location.reload();
     };
-    document.getElementById('btnChangeMdp').onclick = async function() {
+    document.getElementById('btnChangeMdp').onclick = async function () {
       var input = document.getElementById('nouveauMdp');
       var msgEl = document.getElementById('mdpMessage');
       var btn = this;
@@ -115,13 +129,13 @@ function initDashboard() {
           msgEl.textContent = j.message || 'Erreur.';
           msgEl.style.color = 'var(--danger)';
         }
-      } catch(e) {
+      } catch (e) {
         msgEl.textContent = 'Erreur reseau.';
         msgEl.style.color = 'var(--danger)';
       }
       btn.disabled = false;
     };
-    document.getElementById('btnBackup').onclick = async function() {
+    document.getElementById('btnBackup').onclick = async function () {
       var msg = document.getElementById('backupMessage');
       var btn = this;
       btn.disabled = true;
@@ -131,9 +145,11 @@ function initDashboard() {
         var r = await fetch(API + '/admin/backup', { headers: { 'X-EGO': adminToken } });
         if (!r.ok) {
           var j = null;
-          try { j = await r.json(); } catch(e) {}
+          try {
+            j = await r.json();
+          } catch (e) {}
           msg.style.color = 'var(--danger)';
-          msg.textContent = (j && j.message) || ('Erreur ' + r.status);
+          msg.textContent = (j && j.message) || 'Erreur ' + r.status;
           return;
         }
         var blob = await r.blob();
@@ -143,24 +159,31 @@ function initDashboard() {
         document.body.appendChild(a);
         a.click();
         a.remove();
-        setTimeout(function() { URL.revokeObjectURL(a.href); }, 5000);
+        setTimeout(function () {
+          URL.revokeObjectURL(a.href);
+        }, 5000);
         msg.style.color = 'var(--ok)';
         msg.textContent = 'Sauvegarde telechargee.';
-      } catch(e) {
+      } catch (e) {
         msg.style.color = 'var(--danger)';
         msg.textContent = 'Erreur reseau.';
       }
       btn.disabled = false;
     };
-    document.getElementById('btnRestore').onclick = function() {
+    document.getElementById('btnRestore').onclick = function () {
       document.getElementById('fichierRestore').click();
     };
-    document.getElementById('fichierRestore').onchange = async function() {
+    document.getElementById('fichierRestore').onchange = async function () {
       var fichier = this.files && this.files[0];
       this.value = '';
       if (!fichier) return;
       var msg = document.getElementById('backupMessage');
-      if (!window.confirm('Restaurer cette sauvegarde ? Les fichiers actuels seront remplaces par ceux du fichier.')) return;
+      if (
+        !window.confirm(
+          'Restaurer cette sauvegarde ? Les fichiers actuels seront remplaces par ceux du fichier.'
+        )
+      )
+        return;
       msg.style.color = 'var(--texte-doux)';
       msg.textContent = 'Restauration...';
       try {
@@ -172,16 +195,18 @@ function initDashboard() {
           body: JSON.stringify(donnees)
         });
         var out = null;
-        try { out = await r.json(); } catch(e) {}
+        try {
+          out = await r.json();
+        } catch (e) {}
         if (r.ok && out && out.ok) {
           msg.style.color = 'var(--ok)';
           msg.textContent = 'Restauration reussie : ' + out.fichiers + ' fichier(s).';
           chargerDonnees();
         } else {
           msg.style.color = 'var(--danger)';
-          msg.textContent = (out && out.message) || ('Erreur ' + r.status);
+          msg.textContent = (out && out.message) || 'Erreur ' + r.status;
         }
-      } catch(e) {
+      } catch (e) {
         msg.style.color = 'var(--danger)';
         msg.textContent = 'Fichier invalide.';
       }
@@ -195,7 +220,13 @@ function initDashboard() {
 
 function setSectionErreur(id, msg) {
   var el = document.getElementById(id);
-  if (el) { el.replaceChildren(); var p = document.createElement('p'); p.className = 'vide'; p.textContent = msg; el.appendChild(p); }
+  if (el) {
+    el.replaceChildren();
+    var p = document.createElement('p');
+    p.className = 'vide';
+    p.textContent = msg;
+    el.appendChild(p);
+  }
 }
 
 function afficherErreur(msg) {
@@ -208,7 +239,10 @@ function afficherErreur(msg) {
   setSectionErreur('vocabContenu', msg);
   setSectionErreur('configContenu', msg);
   var bann = document.getElementById('alerteBanniere');
-  if (bann) { bann.style.display = 'none'; bann.textContent = ''; }
+  if (bann) {
+    bann.style.display = 'none';
+    bann.textContent = '';
+  }
 }
 
 // Duree lisible depuis une date ISO ("12 s", "4 min", "2 h").
@@ -229,14 +263,23 @@ function afficherAlertes(j) {
   var al = j.alertes || {};
   var texte = '';
   if (al.quota) {
-    texte = 'ALERTE QUOTA : tous les modeles satur\u00e9s depuis ' + depuis(al.quota.debut) +
-      ' (' + (al.quota.compteur || 1) + ' fois)';
+    texte =
+      'ALERTE QUOTA : tous les modeles satur\u00e9s depuis ' +
+      depuis(al.quota.debut) +
+      ' (' +
+      (al.quota.compteur || 1) +
+      ' fois)';
   } else if (al.technique) {
     texte = 'ALERTE MODELE : plus aucune reponse depuis ' + depuis(al.technique.debut);
-  } else if (al.derniereResolution &&
-             Date.now() - Date.parse(al.derniereResolution.fin) < 86400000) {
-    texte = 'Incident ' + (al.derniereResolution.type === 'quota' ? 'quota' : 'modele') +
-      ' resolu a ' + new Date(al.derniereResolution.fin).toLocaleTimeString('fr-FR');
+  } else if (
+    al.derniereResolution &&
+    Date.now() - Date.parse(al.derniereResolution.fin) < 86400000
+  ) {
+    texte =
+      'Incident ' +
+      (al.derniereResolution.type === 'quota' ? 'quota' : 'modele') +
+      ' resolu a ' +
+      new Date(al.derniereResolution.fin).toLocaleTimeString('fr-FR');
   }
   var alerteActive = !!(al.quota || al.technique);
   bann.className = 'banniere-alerte' + (alerteActive ? '' : ' banniere-ok');
@@ -249,7 +292,9 @@ async function chargerDonnees() {
   if (btn) btn.disabled = true;
   try {
     var headers = {};
-    if (adminToken) { headers['X-EGO'] = adminToken; }
+    if (adminToken) {
+      headers['X-EGO'] = adminToken;
+    }
     var r = await fetch(API + '/admin/data', { headers: headers });
     if (!r.ok) {
       if (r.status === 403 || r.status === 401) {
@@ -265,8 +310,16 @@ async function chargerDonnees() {
       return;
     }
     var j;
-    try { j = await r.json(); } catch(e) { afficherErreur('Reponse invalide du serveur'); return; }
-    if (!j.ok) { afficherErreur('Erreur serveur'); return; }
+    try {
+      j = await r.json();
+    } catch (e) {
+      afficherErreur('Reponse invalide du serveur');
+      return;
+    }
+    if (!j.ok) {
+      afficherErreur('Erreur serveur');
+      return;
+    }
 
     // Stats
     var s = j.stats || {};
@@ -307,16 +360,17 @@ async function chargerDonnees() {
       tableU.style.borderCollapse = 'collapse';
       var theadU = document.createElement('thead');
       var trHU = document.createElement('tr');
-      ['Pseudo','Email','Date','Msg'].forEach(function(txt) {
+      ['Pseudo', 'Email', 'Date', 'Msg'].forEach(function (txt) {
         var th = document.createElement('th');
-        th.style.cssText = 'text-align:left;padding:8px;border-bottom:1px solid var(--bordure);color:var(--texte-doux);font-size:12px;';
+        th.style.cssText =
+          'text-align:left;padding:8px;border-bottom:1px solid var(--bordure);color:var(--texte-doux);font-size:12px;';
         th.textContent = txt;
         trHU.appendChild(th);
       });
       theadU.appendChild(trHU);
       tableU.appendChild(theadU);
       var tbodyU = document.createElement('tbody');
-      users.forEach(function(u) {
+      users.forEach(function (u) {
         var tr = document.createElement('tr');
         tr.style.borderBottom = '1px solid var(--bordure)';
         var tdPseudo = document.createElement('td');
@@ -329,7 +383,8 @@ async function chargerDonnees() {
         tdCree.style.cssText = 'padding:8px;color:var(--texte-doux);font-size:12px;';
         tdCree.textContent = u.cree || '-';
         var tdMsg = document.createElement('td');
-        tdMsg.style.cssText = 'padding:8px;color:var(--texte-doux);font-size:12px;text-align:right;';
+        tdMsg.style.cssText =
+          'padding:8px;color:var(--texte-doux);font-size:12px;text-align:right;';
         tdMsg.textContent = u.messages || 0;
         tr.appendChild(tdPseudo);
         tr.appendChild(tdEmail);
@@ -356,16 +411,17 @@ async function chargerDonnees() {
       tableC.style.borderCollapse = 'collapse';
       var theadC = document.createElement('thead');
       var trHC = document.createElement('tr');
-      ['Pseudo','UID','Debut'].forEach(function(txt) {
+      ['Pseudo', 'UID', 'Debut'].forEach(function (txt) {
         var th = document.createElement('th');
-        th.style.cssText = 'text-align:left;padding:8px;border-bottom:1px solid var(--bordure);color:var(--texte-doux);font-size:12px;';
+        th.style.cssText =
+          'text-align:left;padding:8px;border-bottom:1px solid var(--bordure);color:var(--texte-doux);font-size:12px;';
         th.textContent = txt;
         trHC.appendChild(th);
       });
       theadC.appendChild(trHC);
       tableC.appendChild(theadC);
       var tbodyC = document.createElement('tbody');
-      connexions.forEach(function(c) {
+      connexions.forEach(function (c) {
         var tr = document.createElement('tr');
         tr.style.borderBottom = '1px solid var(--bordure)';
         var tdP = document.createElement('td');
@@ -404,29 +460,34 @@ async function chargerDonnees() {
       tableM.style.borderCollapse = 'collapse';
       var theadM = document.createElement('thead');
       var trHM = document.createElement('tr');
-      ['Heure','Qui','Message','Reponse'].forEach(function(txt) {
+      ['Heure', 'Qui', 'Message', 'Reponse'].forEach(function (txt) {
         var th = document.createElement('th');
-        th.style.cssText = 'text-align:left;padding:8px;border-bottom:1px solid var(--bordure);color:var(--texte-doux);font-size:12px;';
+        th.style.cssText =
+          'text-align:left;padding:8px;border-bottom:1px solid var(--bordure);color:var(--texte-doux);font-size:12px;';
         th.textContent = txt;
         trHM.appendChild(th);
       });
       theadM.appendChild(trHM);
       tableM.appendChild(theadM);
       var tbodyM = document.createElement('tbody');
-      afficher.forEach(function(m) {
+      afficher.forEach(function (m) {
         var tr = document.createElement('tr');
         tr.style.borderBottom = '1px solid var(--bordure)';
         var tdH = document.createElement('td');
-        tdH.style.cssText = 'padding:8px;color:var(--texte-doux);font-size:11px;white-space:nowrap;';
+        tdH.style.cssText =
+          'padding:8px;color:var(--texte-doux);font-size:11px;white-space:nowrap;';
         tdH.textContent = m.heure || '-';
         var tdP = document.createElement('td');
-        tdP.style.cssText = 'padding:8px;color:var(--texte);font-weight:600;font-size:12px;white-space:nowrap;';
+        tdP.style.cssText =
+          'padding:8px;color:var(--texte);font-weight:600;font-size:12px;white-space:nowrap;';
         tdP.textContent = m.pseudo || m.uid || '?';
         var tdMsg = document.createElement('td');
-        tdMsg.style.cssText = 'padding:8px;color:var(--texte);font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        tdMsg.style.cssText =
+          'padding:8px;color:var(--texte);font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
         tdMsg.textContent = m.message || '';
         var tdR = document.createElement('td');
-        tdR.style.cssText = 'padding:8px;color:var(--accent);font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        tdR.style.cssText =
+          'padding:8px;color:var(--accent);font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
         tdR.textContent = m.reponse || '';
         tr.appendChild(tdH);
         tr.appendChild(tdP);
@@ -465,9 +526,9 @@ async function chargerDonnees() {
       ['Aime pas', profil.aimePas || '-'],
       ['Mots favoris', (profil.motsFavoris || []).join(', ') || '-'],
       ['Humeur de BLAMUNE', profil.humeur || 'neutre'],
-      ['Humeur de l\'utilisateur', profil.humeurUser || 'inconnue']
+      ["Humeur de l'utilisateur", profil.humeurUser || 'inconnue']
     ];
-    profilChamps.forEach(function(c) {
+    profilChamps.forEach(function (c) {
       var d = document.createElement('div');
       d.className = 'profil-item';
       var k = document.createElement('span');
@@ -493,7 +554,7 @@ async function chargerDonnees() {
       savoirEl.appendChild(pVide3);
     } else {
       var afficherSavoir = savoir.slice(0, 100);
-      afficherSavoir.forEach(function(s) {
+      afficherSavoir.forEach(function (s) {
         var d = document.createElement('div');
         d.style.cssText = 'padding:8px;border-bottom:1px solid var(--bordure);font-size:13px;';
         var topic = document.createElement('strong');
@@ -508,7 +569,8 @@ async function chargerDonnees() {
       if (savoir.length > 100) {
         var pLimite2 = document.createElement('p');
         pLimite2.className = 'vide';
-        pLimite2.textContent = 'Affichage des 100 premiers sur ' + savoir.length + ' connaissances.';
+        pLimite2.textContent =
+          'Affichage des 100 premiers sur ' + savoir.length + ' connaissances.';
         pLimite2.style.marginTop = '8px';
         savoirEl.appendChild(pLimite2);
       }
@@ -528,7 +590,7 @@ async function chargerDonnees() {
       var tags = document.createElement('div');
       tags.className = 'vocab-tags';
       var afficherVocab = vocab.slice(0, 100);
-      afficherVocab.forEach(function(v) {
+      afficherVocab.forEach(function (v) {
         var tag = document.createElement('span');
         tag.className = 'vocab-tag';
         tag.textContent = v;
@@ -553,7 +615,7 @@ async function chargerDonnees() {
       ['Provider', cfg.api_provider || '?', cfg.api_configured ? 'ok' : 'err'],
       ['Mode actif', modeStr, '']
     ];
-    rows.forEach(function(r) {
+    rows.forEach(function (r) {
       var d = document.createElement('div');
       d.className = 'config-row';
       var k = document.createElement('span');
@@ -566,8 +628,7 @@ async function chargerDonnees() {
       d.appendChild(v);
       configEl.appendChild(d);
     });
-
-  } catch(e) {
+  } catch (e) {
     afficherErreur('Serveur eteint');
   } finally {
     if (btn) btn.disabled = false;

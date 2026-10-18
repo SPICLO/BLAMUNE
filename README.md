@@ -141,22 +141,22 @@ référence injectée à l'initialisation devient périmée après une restaurat
 de sauvegarde — c'est le piège que `comptes` et `stats` posent, et la
 raison pour laquelle `getComptes()` / `getStats()` existent.
 
-| Module | Rôle | Lignes |
-|---|---|---|
-| `lib/config_ia.js` | Fournisseur, modèles de secours, rotation du dernier modèle répondu | 136 |
-| `lib/rate_limit.js` | Fenêtre glissante par IP et par utilisateur, purge périodique | 45 |
-| `lib/memoire.js` | `users/<uid>/`, `memoire.txt` (format plat partagé avec le bot C++) | 80 |
-| `lib/historique.js` | `historique_mode<1\|2>.json`, push cloud | 34 |
-| `lib/resume.js` | Repliage des anciens échanges en tâche de fond | 90 |
-| `lib/ia/gemini.js` | Transport Gemini, historique envoyé au modèle, reprise sur 429, état de quota | 269 |
+| Module              | Rôle                                                                          | Lignes |
+| ------------------- | ----------------------------------------------------------------------------- | ------ |
+| `lib/config_ia.js`  | Fournisseur, modèles de secours, rotation du dernier modèle répondu           | 136    |
+| `lib/rate_limit.js` | Fenêtre glissante par IP et par utilisateur, purge périodique                 | 45     |
+| `lib/memoire.js`    | `users/<uid>/`, `memoire.txt` (format plat partagé avec le bot C++)           | 80     |
+| `lib/historique.js` | `historique_mode<1\|2>.json`, push cloud                                      | 34     |
+| `lib/resume.js`     | Repliage des anciens échanges en tâche de fond                                | 90     |
+| `lib/ia/gemini.js`  | Transport Gemini, historique envoyé au modèle, reprise sur 429, état de quota | 269    |
 
-| Module de routes | Couvre | Lignes |
-|---|---|---|
-| `lib/routes/send.js` | `/send` — message → réponse, streaming SSE, apprentissage avant prompt | 251 |
-| `lib/routes/admin.js` | `/ping`, `/health`, `/connexions`, tout `/admin/*`, `/stats`, `/config-api` | 328 |
-| `lib/routes/compte.js` | `/register`, `/login`, `/logout`, `/invite`, `/savoir` | 166 |
-| `lib/routes/consultation.js` | `/historique`, `/proactif`, `/stats-perso`, `/mode`, `/profil` | 121 |
-| `lib/routes/statique.js` | Site PWA et panneau admin, avec garde-fous de traversée de chemin | 76 |
+| Module de routes             | Couvre                                                                      | Lignes |
+| ---------------------------- | --------------------------------------------------------------------------- | ------ |
+| `lib/routes/send.js`         | `/send` — message → réponse, streaming SSE, apprentissage avant prompt      | 251    |
+| `lib/routes/admin.js`        | `/ping`, `/health`, `/connexions`, tout `/admin/*`, `/stats`, `/config-api` | 328    |
+| `lib/routes/compte.js`       | `/register`, `/login`, `/logout`, `/invite`, `/savoir`                      | 166    |
+| `lib/routes/consultation.js` | `/historique`, `/proactif`, `/stats-perso`, `/mode`, `/profil`              | 121    |
+| `lib/routes/statique.js`     | Site PWA et panneau admin, avec garde-fous de traversée de chemin           | 76     |
 
 La couche HTTP reste partiellement dans `server.js` : le fournisseur
 compatible OpenAI, le service du bot C++ et le secours « savoir ».
@@ -165,7 +165,8 @@ compatible OpenAI, le service du bot C++ et le secours « savoir ».
 reste de la couche doit lire et écrire. Les trois blocs restants sont plus
 facilement extractibles dans cet ordre : le fournisseur OpenAI d'abord, puis
 le service du bot, puis le secours savoir.
-```
+
+````
 
 ## Prerequis
 
@@ -182,7 +183,7 @@ pip install -r requirements.txt
 python extraire_savoir.py --ecrire --dossier "D:\donne pour fair apprendre a un ia"
 python fusionner_vocabulaire.py --ecrire
 Get-Content vocabulaire_ajouts.txt | Where-Object { $_ -and -not $_.StartsWith('#') } | Add-Content vocabulaire.txt
-```
+````
 
 ## Installation
 
@@ -232,14 +233,14 @@ detection plus tard, au pire moment.
 
 Le bot fonctionne **sans cle**. Pour activer la conversation intelligente :
 
-| Fournisseur | `API_PROVIDER` | `API_URL` | `API_MODEL` (exemple) |
-|---|---|---|---|
-| Google Gemini | `gemini` | `https://generativelanguage.googleapis.com/v1beta` | `gemini-3.5-flash` |
-| Groq | `groq` | `https://api.groq.com/openai/v1` | `llama-3.1-8b-instant` |
-| OpenRouter | `openrouter` | `https://openrouter.ai/api/v1` | `meta-llama/llama-3.1-8b-instruct:free` |
-| Ollama (local, illimite) | `ollama` | `http://127.0.0.1:11434/v1` | `llama3.1` |
-| NVIDIA NIM (credits gratuits) | `nvidia` | `https://integrate.api.nvidia.com/v1` | `meta/llama-3.1-8b-instruct` |
-| Eden AI (passerelle, ~1 100 modeles) | `edenai` | `https://api.edenai.run/v3` | `openai/gpt-4o-mini` |
+| Fournisseur                          | `API_PROVIDER` | `API_URL`                                          | `API_MODEL` (exemple)                   |
+| ------------------------------------ | -------------- | -------------------------------------------------- | --------------------------------------- |
+| Google Gemini                        | `gemini`       | `https://generativelanguage.googleapis.com/v1beta` | `gemini-3.5-flash`                      |
+| Groq                                 | `groq`         | `https://api.groq.com/openai/v1`                   | `llama-3.1-8b-instant`                  |
+| OpenRouter                           | `openrouter`   | `https://openrouter.ai/api/v1`                     | `meta-llama/llama-3.1-8b-instruct:free` |
+| Ollama (local, illimite)             | `ollama`       | `http://127.0.0.1:11434/v1`                        | `llama3.1`                              |
+| NVIDIA NIM (credits gratuits)        | `nvidia`       | `https://integrate.api.nvidia.com/v1`              | `meta/llama-3.1-8b-instruct`            |
+| Eden AI (passerelle, ~1 100 modeles) | `edenai`       | `https://api.edenai.run/v3`                        | `openai/gpt-4o-mini`                    |
 
 Tous les fournisseurs `groq`, `openrouter`, `ollama`, `lmstudio`, `vllm`,
 `mistral`, `deepseek`, `openai`, `nvidia`, `edenai` utilisent le format
@@ -287,10 +288,10 @@ python tests\bot_service.test.py  # service HTTP du bot (poignee de main, /healt
 Le bot C++ est compile par la CI, pas par les tests ci-dessus. Le job
 `bot-cpp` verifie **les deux branches plateforme** de `bot.cpp` :
 
-| Branche | Commande | Ce qu'elle couvre |
-|---|---|---|
+| Branche  | Commande                                                        | Ce qu'elle couvre                                                        |
+| -------- | --------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | `_WIN32` | `x86_64-w64-mingw32-g++-posix -std=c++14 -fsyntax-only bot.cpp` | toute l'implementation reelle : WinINet, appel en ligne, `pousserSavoir` |
-| POSIX | `g++ -std=c++14 -fsyntax-only bot.cpp` | ce que compile `Dockerfile.bot` |
+| POSIX    | `g++ -std=c++14 -fsyntax-only bot.cpp`                          | ce que compile `Dockerfile.bot`                                          |
 
 La branche POSIX ne contient que des stubs (`pousserSavoir` et
 `appelerEnLigne` y sont vides) : verifier uniquement celle-ci laisserait
@@ -310,12 +311,12 @@ python verifier_deploiement.py
 
 ## Outillage
 
-| Outil | Role | Etat |
-|---|---|---|
-| `npm run lint` | ESLint, 9 fichiers | **0 erreur, 0 warning** |
-| `.github/dependabot.yml` | npm, pip, images Docker, actions GitHub | hebdomadaire |
-| `prettier` | `.prettierrc.json` + `.prettierignore` | **installe, mais le code n'est pas encore formate** |
-| `verifier_deploiement.py` | garde-fous de depot | tourne dans la CI |
+| Outil                     | Role                                    | Etat                                                |
+| ------------------------- | --------------------------------------- | --------------------------------------------------- |
+| `npm run lint`            | ESLint, 9 fichiers                      | **0 erreur, 0 warning**                             |
+| `.github/dependabot.yml`  | npm, pip, images Docker, actions GitHub | hebdomadaire                                        |
+| `prettier`                | `.prettierrc.json` + `.prettierignore`  | **installe, mais le code n'est pas encore formate** |
+| `verifier_deploiement.py` | garde-fous de depot                     | tourne dans la CI                                   |
 
 ### Le cas prettier, en clair
 

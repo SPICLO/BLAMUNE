@@ -25,15 +25,16 @@ if (!fs.existsSync(FICHIER_SAVOIR)) {
   process.exit(1);
 }
 
-const lignes = fs.readFileSync(FICHIER_SAVOIR, 'utf8')
+const lignes = fs
+  .readFileSync(FICHIER_SAVOIR, 'utf8')
   .split('\n')
-  .map(l => l.replace(/\r$/, ''))
-  .filter(l => l.trim());
+  .map((l) => l.replace(/\r$/, ''))
+  .filter((l) => l.trim());
 
 // Diagnostic du fichier avant migration : met en evidence les entrees
 // suspectes (reponse vide = mot-cle, ou ligne sans separateur).
-const sansSeparateur = lignes.filter(l => l.indexOf('|') <= 0);
-const motsClesVides = lignes.filter(l => {
+const sansSeparateur = lignes.filter((l) => l.indexOf('|') <= 0);
+const motsClesVides = lignes.filter((l) => {
   const pos = l.indexOf('|');
   if (pos <= 0) return false;
   let rep = l.substring(pos + 1);

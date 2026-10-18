@@ -10,10 +10,10 @@ repondre : le visiteur croit que le site est casse.
 
 Deux rappel automatiques. Aucun compte a creer.
 
-| Mecanisme | Ou | Garantit |
-|---|---|---|
+| Mecanisme      | Ou                                         | Garantit                                                       |
+| -------------- | ------------------------------------------ | -------------------------------------------------------------- |
 | Rappel interne | `lib/keepalive.js`, cable dans `server.js` | Maintient l'instance eveillee **tant que le processus tourne** |
-| Rappel externe | `.github/workflows/keepalive.yml` | Maintient **et reveille** l'instance |
+| Rappel externe | `.github/workflows/keepalive.yml`          | Maintient **et reveille** l'instance                           |
 
 ### Rappel interne
 
