@@ -25,7 +25,7 @@ const { creerRoutesAdmin } = require('./lib/routes/admin');
 const { creerRoutesConsultation } = require('./lib/routes/consultation');
 const { creerRoutesStatique } = require('./lib/routes/statique');
 const { creerRouteSend } = require('./lib/routes/send');
-const { creerGemini } = require('./lib/ia/gemini');
+const { creerGemini, estQuota } = require('./lib/ia/gemini');
 const { creerPoolIA } = require('./lib/pool_ia');
 const { creerQdrantFaits, fnv1a } = require('./lib/qdrant_faits');
 const { demarrerKeepalive } = require('./lib/keepalive');
@@ -141,17 +141,27 @@ const {
   loggerErreur
 });
 
-// ==================== POOL MULTI-FOURNISSEUR ====================
-// Anti-saturation : le fournisseur principal est tente en premier, puis les
-// membres d'API_POOL ("nom|url|cle|modele;..."). Un membre qui renvoie
-// 429/401/403/5xx repart en cooldown et un autre prend le relais ; celui qui
-// repond devient prioritaire (sticky). membrePrincipal est une FONCTION :
-// appelee a chaque ordre(), elle relit config vivante (URL/cle changes par
-// /config-api pris en compte sans redemarrage).
+// =====================================================================
+//  Pool multi-fournisseur : voir lib/pool_ia.js.
+//
+//  Anti-saturation : le fournisseur principal est tente en premier, puis
+//  les membres d'API_POOL ("nom|url|cle|modele;..."). Un membre qui renvoie
+//  429/401/403/5xx repart en cooldown et un autre prend le relais ; celui
+//  qui repond devient prioritaire (sticky). membrePrincipal est une
+//  FONCTION : appelee a chaque ordre(), elle relit la config vivante (URL/
+//  cle changes par /config-api, pris en compte sans redemarrage).
+//
+//  iaOpenai (fournisseurs compatibles OpenAI, lib/ia/openai.js) est cree
+//  plus bas, apres le transport gemini dont il reutilise des helpers.
+//  membrePrincipal ne le lit qu'au moment de la demande (ordres faits
+//  pendant les requetes), jamais a l'initialisation : l'ordre de
+//  declaration inverse est donc sans risque.
+// =====================================================================
+let iaOpenai = null;
 function membrePrincipal() {
   return {
     nom: 'principal',
-    url: baseOpenAI(),
+    url: iaOpenai.baseOpenAI(),
     cle: config.api_key,
     modele: modeleActif()
   };
@@ -997,6 +1007,30 @@ const {
   getConfig: () => config,
   providerOpenAI
 });
+
+// =====================================================================
+//  Fournisseurs compatibles OpenAI (Groq, OpenRouter, Ollama...) :
+//  implementation dans lib/ia/openai.js. Angles morts occupes ici :
+//  le transport gemini (requeter, delaiIndique, marquerQuota, limiter/
+//  HISTO_API_MAX), les alertes et le pool. iaOpenai est deja referencé
+//  par membrePrincipal() plus haut : l'affectation doit rester avant le
+//  demarrage du serveur, ce qui est le cas (toute creation sous forme de
+//  top-level se fait dans l'ordre du fichier).
+// =====================================================================
+iaOpenai = require('./lib/ia/openai').creerOpenai({
+  getConfig: () => config,
+  getPool: () => pool,
+  requeter,
+  limiterHisto,
+  HISTO_API_MAX,
+  marquerQuota,
+  resoudreAlertes,
+  memoriserModeleOk,
+  ordreModeles,
+  delaiIndique,
+  alerter,
+  loggerErreur
+});
 // ============ SERVICE BOT C++ (LOCAL / CLOUD) ============
 // Sur le serveur cloud, le bot C++ tourne dans un conteneur voisin expose
 // sur BOT_SERVICE_URL. Il repond avec son moteur de regles local quand
@@ -1107,11 +1141,7 @@ const QUOTA_ATTENTE_MAX = parseInt(process.env.QUOTA_ATTENTE_MAX_MS || '', 10) |
 // gardent la longue attente de QUOTA_ATTENTE_MAX).
 const QUOTA_ATTENTE_MSG_MAX = parseInt(process.env.QUOTA_ATTENTE_MSG_MS || '', 10) || 10000;
 
-function estQuota(e) {
-  if (!e) return false;
-  if (e.statusCode === 429) return true;
-  return /quota|exhausted|high demand|rate.?limit|resource has been/i.test(e.message || '');
-}
+// estQuota vit dans lib/ia/gemini.js (partagee avec lib/ia/openai.js).
 
 // Attente avant la seconde passe : le "retry in 45s" de Google ou le temps
 // restant de la fenetre d'une minute, on prend le plus long des deux (borne).
@@ -1842,7 +1872,7 @@ function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion, avecOutilsDe
 async function appelerGemini(message, histo, onDelta, imageParts) {
   // Fournisseur compatible OpenAI : on delegue (le reste du fichier reste
   // centre sur le format Gemini historique).
-  if (providerOpenAI()) return appelerOpenAI(message, histo, onDelta, imageParts);
+  if (providerOpenAI()) return iaOpenai.appelerOpenAI(message, histo, onDelta, imageParts);
   // Memoire du flux : si UN SEUL fragment a deja atteint la bulle du
   // visiteur, plus aucun repli ne doit relancer une reponse (doublon).
   let fluxDejaLivree = false;
@@ -1971,7 +2001,12 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
   const echec = derniereErreur ? derniereErreur.message : 'Tous les modeles Gemini ont echoue';
   if (pool.actif() && !fluxDejaLivree) {
     try {
-      const texte = await appelerOpenAI(message, histo, needsFlux ? onDelta : null, imageParts);
+      const texte = await iaOpenai.appelerOpenAI(
+        message,
+        histo,
+        needsFlux ? onDelta : null,
+        imageParts
+      );
       if (texte) {
         loggerErreur('ia', 'pilier de secours : reponse OK apres ' + echec);
         resoudreAlertes();
@@ -1990,235 +2025,9 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
 }
 
 // ==================== FOURNISSEURS COMPATIBLES OPENAI ====================
-// Format "chat/completions" ({ base }/chat/completions) : meme corps et meme
-// reponse que l'API OpenAI. Couvre Groq, OpenRouter, Ollama, LM Studio, etc.
-function baseOpenAI() {
-  let u = String(config.api_url || '')
-    .trim()
-    .replace(/\/+$/, '');
-  if (!u) return 'https://api.openai.com/v1';
-  return u.replace(/\/chat\/completions$/i, '');
-}
-
-// Les en-tetes (Bearer facultatif pour Ollama, timeout) sont concus PAR
-// MEMBRE dans openAIRequete() depuis le pool multi-fournisseur : l'URL et
-// la cle d'un membre du pool n'ont rien a voir avec celle du principal.
-
-function construireMessages(histo, imageParts) {
-  const messages = [];
-  for (const h of histo) {
-    if (!h || !h.content) continue; // system vide du mode normal BLAMUNE
-    const role = h.role === 'assistant' ? 'assistant' : h.role === 'system' ? 'system' : 'user';
-    messages.push({ role, content: h.content });
-  }
-  if (imageParts) {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'user') {
-        messages[i] = {
-          role: 'user',
-          content: [
-            { type: 'text', text: messages[i].content || '(photo)' },
-            {
-              type: 'image_url',
-              image_url: { url: 'data:' + imageParts.mime_type + ';base64,' + imageParts.data }
-            }
-          ]
-        };
-        break;
-      }
-    }
-  }
-  return messages;
-}
-
-// Un appel unique. onDelta optionnel : fourni = reponse en flux (SSE).
-// membreOuModele accepte deux formes :
-//   - un STRING (nom de modele) : l'URL et la cle viennent de config
-//     (chemin historique : cascade de modeles d'UN fournisseur) ;
-//   - un MEMBRE de pool { nom, url, cle, modele } : tout vient du membre
-//     (cascade MULTI-fournisseur).
-// En cas d'echec, err.fluxEntame indique si le client a deja recu du texte :
-// pas de rotation possible alors, le client afficherait deux reponses.
-function openAIRequete(membreOuModele, messages, onDelta) {
-  const membre =
-    typeof membreOuModele === 'string'
-      ? { nom: 'principal', url: baseOpenAI(), cle: config.api_key, modele: membreOuModele }
-      : membreOuModele;
-  const url = String(membre.url || '').replace(/\/+$/, '') + '/chat/completions';
-  const enFlux = typeof onDelta === 'function';
-  const corps = JSON.stringify({
-    model: membre.modele,
-    messages,
-    max_tokens: config.api_max_tokens,
-    temperature: config.api_temperature,
-    stream: enFlux
-  });
-  const headers = { 'Content-Type': 'application/json' };
-  if (membre.cle) headers['Authorization'] = 'Bearer ' + membre.cle;
-  const options = { method: 'POST', headers, timeout: 20000 };
-  let fluxFait = false;
-  const promesse = new Promise((resolve, reject) => {
-    const req = requeter(url, options, (res) => {
-      if (res.statusCode !== 200) {
-        let data = '';
-        res.on('data', (c) => (data += c));
-        res.on('end', () => {
-          const err = new Error('HTTP ' + res.statusCode + ' ' + data.substring(0, 200));
-          err.statusCode = res.statusCode;
-          reject(err);
-        });
-        res.resume();
-        return;
-      }
-      if (!enFlux) {
-        let data = '';
-        res.on('data', (c) => (data += c));
-        res.on('end', () => {
-          try {
-            const json = JSON.parse(data);
-            if (json.error) throw new Error(json.error.message || 'erreur API');
-            const choix = (json.choices && json.choices[0]) || {};
-            resolve((choix.message && choix.message.content) || choix.text || '');
-          } catch (e) {
-            reject(e);
-          }
-        });
-        return;
-      }
-      let tampon = '';
-      let texte = '';
-      let fini = false;
-      res.setEncoding('utf8');
-      res.on('data', (morceau) => {
-        if (fini) return;
-        tampon += morceau;
-        const lignes = tampon.split('\n');
-        tampon = lignes.pop();
-        for (const ligne of lignes) {
-          if (ligne.substring(0, 5) !== 'data:') continue;
-          const brut = ligne.substring(5).trim();
-          if (!brut || brut === '[DONE]') continue;
-          let json;
-          try {
-            json = JSON.parse(brut);
-          } catch (e) {
-            continue;
-          }
-          if (json.error) {
-            fini = true;
-            reject(new Error(json.error.message || 'erreur API'));
-            return;
-          }
-          const delta = (json.choices && json.choices[0] && json.choices[0].delta) || {};
-          if (delta.content) {
-            fluxFait = true;
-            texte += delta.content;
-            try {
-              onDelta(texte);
-            } catch (e) {}
-          }
-        }
-      });
-      res.on('end', () => {
-        if (!fini) {
-          fini = true;
-          resolve(texte);
-        }
-      });
-      res.on('error', (e) => {
-        if (!fini) {
-          fini = true;
-          reject(e);
-        }
-      });
-    });
-    req.on('error', reject);
-    req.on('timeout', () => {
-      req.destroy();
-      reject(new Error('Timeout'));
-    });
-    req.write(corps);
-    req.end();
-  });
-  return promesse.catch((e) => {
-    try {
-      e.fluxEntame = fluxFait;
-    } catch (x) {}
-    throw e;
-  });
-}
-
-// Cascade pour le mode compatible OpenAI.
-// Pool actif (API_POOL) : cascade MULTI-fournisseur — principal, puis les
-// membres disponibles, cooldown auto sur 429/401/403/5xx, sticky sur celui
-// qui repond. Si le client a deja recu du texte (fluxEntame), plus aucune
-// rotation : on rethrowe sans polluer un autre fournisseur.
-// Pool inactif : comportement historique (cascade de modeles d'UN
-// fournisseur, ordreModeles()).
-async function appelerOpenAI(message, histo, onDelta, imageParts) {
-  const messages = construireMessages(limiterHisto(histo, HISTO_API_MAX), imageParts);
-
-  let derniereErreur = null;
-
-  if (pool.actif()) {
-    // marquerQuota : le drapeau quota global sert aux taches de fond
-    // (reporterTache), on le tient a jour au passage du 429.
-    for (const membre of pool.ordre()) {
-      try {
-        const texte = await openAIRequete(membre, messages, onDelta);
-        if (texte) {
-          pool.noteOk(membre.nom);
-          resoudreAlertes();
-          return texte;
-        }
-        derniereErreur = new Error('Reponse vide');
-      } catch (e) {
-        derniereErreur = e;
-        if (e && e.statusCode === 429) marquerQuota();
-        loggerErreur(
-          'ia',
-          'pool: ' +
-            membre.nom +
-            ' (' +
-            membre.modele +
-            ') KO: ' +
-            e.message +
-            (e.fluxEntame ? ' [flux entame, pas de rotation]' : ' [cooldown/DAB]')
-        );
-        if (e && e.fluxEntame) break;
-        pool.noteEchec(membre.nom, e);
-      }
-    }
-    // Tous les membres en cooldown : message clair et immediat, sans
-    // perdre 30 s x N membres a tours de bras.
-    if (!derniereErreur) {
-      derniereErreur = new Error('Pool IA : tous les fournisseurs en cooldown');
-    }
-  } else {
-    // Comportement historique : cascade de modeles d'UN fournisseur.
-    const modeles = ordreModeles();
-    for (const modele of modeles) {
-      try {
-        const texte = await openAIRequete(modele, messages, onDelta);
-        if (texte) {
-          memoriserModeleOk(modele);
-          resoudreAlertes();
-          return texte;
-        }
-        derniereErreur = new Error('Reponse vide');
-      } catch (e) {
-        derniereErreur = e;
-        const delai = delaiIndique(e);
-        if (delai || (e && e.statusCode === 429)) marquerQuota();
-        loggerErreur('ia', modele + ' KO: ' + e.message);
-      }
-    }
-  }
-
-  const echec = derniereErreur ? derniereErreur.message : 'Tous les fournisseurs ont echoue';
-  alerter(estQuota(derniereErreur) ? 'quota' : 'technique', echec);
-  throw new Error(echec);
-}
+// Implementation dans lib/ia/openai.js (cree plus haut, apres le transport
+// gemini). La cascade reste ici pour questionModele(), qui arbitre entre
+// le chemin OpenAI compat. et le chemin Gemini selon le fournisseur actif.
 
 // Question ponctuelle (resume, extraction) : un seul message, sans flux.
 // Pool actif : UNE tentative chez le premier membre disponible (pas de
@@ -2231,7 +2040,11 @@ async function questionModele(consigne) {
       if (membres.length === 0) throw new Error('Pool IA : tous les fournisseurs en cooldown');
       const membre = membres[0];
       try {
-        const texte = await openAIRequete(membre, [{ role: 'user', content: consigne }], null);
+        const texte = await iaOpenai.openAIRequete(
+          membre,
+          [{ role: 'user', content: consigne }],
+          null
+        );
         pool.noteOk(membre.nom);
         return texte;
       } catch (e) {
@@ -2239,7 +2052,7 @@ async function questionModele(consigne) {
         throw e;
       }
     }
-    return openAIRequete(modeleActif(), [{ role: 'user', content: consigne }], null);
+    return iaOpenai.openAIRequete(modeleActif(), [{ role: 'user', content: consigne }], null);
   }
   return modeleClassique(
     modeleActif(),

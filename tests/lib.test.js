@@ -548,3 +548,263 @@ test('keepalive : le minuteur ne bloque pas la sortie du processus', async (t) =
     'le minuteur doit etre unref pour ne pas empecher Node de s arreter'
   );
 });
+
+// ======================= FOURNISSEURS COMPATIBLES OPENAI =======================
+
+const { creerOpenai } = require('../lib/ia/openai');
+
+// Transport faux : imite le peu que openAIRequete() attend de http.request.
+// plan : fonction(url, options, corps) -> { statut, corps } (corps = texte ou
+// tableau de fragments SSE ; le plan sert aussi de capteur pour les assertions).
+function transportFaux(plan) {
+  function requeterFaux(url, options, cb) {
+    let corpsRecu = '';
+    let lance = false;
+    function lancer() {
+      if (lance) return;
+      lance = true;
+      const p = plan(url, options, corpsRecu);
+      const res = {
+        statusCode: p.statut,
+        _ev: {},
+        on(nom, fn) {
+          (this._ev[nom] = this._ev[nom] || []).push(fn);
+          return this;
+        },
+        emit(nom, ...a) {
+          for (const fn of this._ev[nom] || []) fn(...a);
+        },
+        setEncoding() {},
+        resume() {}
+      };
+      cb(res);
+      setTimeout(() => {
+        const morceaux = Array.isArray(p.corps) ? p.corps : [p.corps];
+        for (const m of morceaux) res.emit('data', m);
+        res.emit('end');
+      }, 0);
+    }
+    return {
+      on(nom, fn) {
+        this._ev = this._ev || {};
+        (this._ev[nom] = this._ev[nom] || []).push(fn);
+        return this;
+      },
+      write(c) {
+        corpsRecu += String(c);
+      },
+      end() {
+        lancer();
+      }
+    };
+  }
+  return requeterFaux;
+}
+
+function openaiDeTest({ modeles = null, pool = null, plan = null } = {}) {
+  const traces = {
+    modeleOk: [],
+    quota: [],
+    alertes: [],
+    resolution: 0,
+    noteEchecs: [],
+    noteOks: [],
+    ordres: 0,
+    url: null,
+    headers: null,
+    corps: null
+  };
+  const config = {
+    api_url: 'https://api-exemple/v1',
+    api_key: 'KLE',
+    api_max_tokens: 100,
+    api_temperature: 1
+  };
+  const m = creerOpenai({
+    getConfig: () => config,
+    getPool:
+      pool ||
+      (() => ({
+        actif: () => false,
+        ordre: () => []
+      })),
+    requeter: transportFaux(
+      plan || (() => ({ statut: 200, corps: '{"choices":[{"message":{"content":"ok"}}]}' }))
+    ),
+    limiterHisto: (h) => h,
+    HISTO_API_MAX: 16,
+    marquerQuota: (e) => traces.quota.push(e),
+    resoudreAlertes: () => traces.resolution++,
+    memoriserModeleOk: (x) => traces.modeleOk.push(x),
+    ordreModeles: () => modeles || ['a', 'b'],
+    delaiIndique: () => 0,
+    alerter: (type, message) => traces.alertes.push({ type, message }),
+    loggerErreur: () => {}
+  });
+  m._traces = traces;
+  return m;
+}
+
+test('openAIRequete : appel du membre du pool, Bearer pose, texte rendu', async () => {
+  const m = openaiDeTest({
+    plan: (url, options) => {
+      m._traces.url = url;
+      m._traces.headers = options.headers;
+      return {
+        statut: 200,
+        corps: JSON.stringify({ choices: [{ message: { content: 'salut' } }] })
+      };
+    }
+  });
+  const rep = await m.openAIRequete(
+    { nom: 'groq', url: 'https://g/', cle: 'C', modele: 'm' },
+    [{ role: 'user', content: 'coucou' }],
+    null
+  );
+  assert.strictEqual(rep, 'salut');
+  assert.strictEqual(m._traces.url, 'https://g/chat/completions');
+  assert.strictEqual(m._traces.headers['Authorization'], 'Bearer C');
+});
+
+test('openAIRequete : un STRING de modele prend l URL et la cle de config, et le corps de config', async () => {
+  const m = openaiDeTest({
+    plan: (url, options, corps) => {
+      m._traces.url = url;
+      m._traces.headers = options.headers;
+      m._traces.corps = corps;
+      return { statut: 200, corps: JSON.stringify({ choices: [{ message: { content: 'ok' } }] }) };
+    }
+  });
+  await m.openAIRequete('mod-1', [{ role: 'user', content: 'u' }], null);
+  assert.strictEqual(m._traces.url, 'https://api-exemple/v1/chat/completions');
+  assert.strictEqual(m._traces.headers['Authorization'], 'Bearer KLE');
+  const envoye = JSON.parse(m._traces.corps);
+  assert.strictEqual(envoye.model, 'mod-1');
+  assert.strictEqual(envoye.max_tokens, 100);
+  assert.strictEqual(envoye.temperature, 1);
+  assert.strictEqual(envoye.stream, false);
+});
+
+test('openAIRequete : en flux, les deltas cumulent dans onDelta, texte complet rendu', async (t) => {
+  const recues = [];
+  const sse = [
+    'data: ' + JSON.stringify({ choices: [{ delta: { content: 'Bo' } }] }) + '\n\n',
+    'data: ' + JSON.stringify({ choices: [{ delta: { content: 'njour' } }] }) + '\n\n',
+    'data: [DONE]\n\n'
+  ];
+  const m = openaiDeTest({
+    plan: (url, options, corps) => {
+      m._traces.corps = corps;
+      return { statut: 200, corps: sse };
+    }
+  });
+  const rep = await new Promise((resolve, reject) => {
+    m.openAIRequete('m1', [{ role: 'user', content: 'u' }], (texte) => recues.push(texte)).then(
+      resolve,
+      reject
+    );
+  });
+  assert.strictEqual(rep, 'Bonjour');
+  assert.deepStrictEqual(recues, ['Bo', 'Bonjour']);
+  assert.strictEqual(JSON.parse(m._traces.corps).stream, true, 'le flux doit etre demande');
+});
+
+test('openAIRequete : echec HTTP porte le statusCode', async () => {
+  const m = openaiDeTest({ plan: () => ({ statut: 500, corps: 'boom' }) });
+  await assert.rejects(
+    () => m.openAIRequete('m1', [{ role: 'user', content: 'u' }], null),
+    (e) => {
+      assert.strictEqual(e.statusCode, 500);
+      return true;
+    }
+  );
+});
+
+test('openAIRequete : erreur API apres des deltas -> fluxEntame=true, jamais de rotation', async () => {
+  const sse = [
+    'data: ' + JSON.stringify({ choices: [{ delta: { content: 'deja affiche' } }] }) + '\n\n',
+    'data: ' + JSON.stringify({ error: { message: 'quota depasse' } }) + '\n\n'
+  ];
+  const m = openaiDeTest({ plan: () => ({ statut: 200, corps: sse }) });
+  await assert.rejects(
+    () => m.openAIRequete('m1', [{ role: 'user', content: 'u' }], () => {}),
+    (e) => {
+      assert.strictEqual(e.fluxEntame, true);
+      assert.strictEqual(e.message, 'quota depasse');
+      return true;
+    }
+  );
+});
+
+test('appelerOpenAI sans pool : cascade de modeles, la reussite memorise le modele', async () => {
+  let essai = 0;
+  const m = openaiDeTest({
+    modeles: ['a', 'b'],
+    plan: (url, options) => {
+      essai++;
+      const corps =
+        essai >= 2 ? JSON.stringify({ choices: [{ message: { content: 'ca marche' } }] }) : '';
+      return {
+        statut: essai >= 2 ? 200 : 429,
+        corps
+      };
+    }
+  });
+  const rep = await m.appelerOpenAI('salut', [{ role: 'user', content: 'salut' }], null);
+  assert.strictEqual(rep, 'ca marche');
+  assert.deepStrictEqual(m._traces.quota.length, 1, 'un 429 doit marquer le quota');
+  assert.deepStrictEqual(m._traces.modeleOk, ['b'], 'le modele reussi doit etre memorise');
+  assert.deepStrictEqual(
+    m._traces.alertes,
+    [],
+    'une reussite resolve les alertes, rien a signaler'
+  );
+});
+
+test('appelerOpenAI sans pool : tout echoue -> alerte technique et rethrow', async () => {
+  const m = openaiDeTest({ modeles: ['a'], plan: () => ({ statut: 500, corps: 'x' }) });
+  await assert.rejects(
+    () => m.appelerOpenAI('hi', [{ role: 'user', content: 'hi' }], null),
+    /HTTP 500/
+  );
+  assert.strictEqual(m._traces.alertes[0].type, 'technique');
+});
+
+test('appelerOpenAI sans pool : quotas partout -> alerte quota', async () => {
+  const m = openaiDeTest({
+    modeles: ['a', 'b'],
+    plan: () => ({ statut: 429, corps: '{"error":"q"}' })
+  });
+  await assert.rejects(() => m.appelerOpenAI('hi', [{ role: 'user', content: 'hi' }], null), /429/);
+  assert.strictEqual(m._traces.alertes[0].type, 'quota');
+});
+
+test('appelerOpenAI avec pool : le premier membre mort laisse la place, sticky note le second', async () => {
+  let membresVus = [];
+  const m = openaiDeTest({
+    pool: () => ({
+      actif: () => true,
+      ordre: () =>
+        [
+          { nom: 'p1', url: 'https://p1/', cle: '', modele: 'm1' },
+          { nom: 'p2', url: 'https://p2/', cle: '', modele: 'm2' }
+        ].map((x) => {
+          membresVus.push(x.nom);
+          return x;
+        }),
+      noteOk: (nom) => m._traces.noteOks.push(nom),
+      noteEchec: (nom, e) => m._traces.noteEchecs.push(nom)
+    }),
+    plan: (url) => ({
+      statut: url.indexOf('p1') >= 0 ? 503 : 200,
+      corps:
+        url.indexOf('p1') >= 0
+          ? ''
+          : JSON.stringify({ choices: [{ message: { content: 'p2 repond' } }] })
+    })
+  });
+  const rep = await m.appelerOpenAI('hi', [{ role: 'user', content: 'hi' }], null);
+  assert.strictEqual(rep, 'p2 repond');
+  assert.deepStrictEqual(m._traces.noteEchecs, ['p1']);
+  assert.deepStrictEqual(m._traces.noteOks, ['p2']);
+});
