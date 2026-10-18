@@ -4,6 +4,21 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Ce journal démarre avec la mise à niveau « hygiène du dépôt » ci-dessous ; les
 versions antérieures sont visibles dans `git log`.
 
+## [Non publié] - 2026-10-05
+
+### Modifié
+
+- **Secours : plus de fait hors sujet comme « réponse du chat »** : la
+  couche sémantique de `reponseSecours()` suit désormais la même règle que
+  le savoir exact — elle ne partage sa trouvaille que sur une vraie
+  demande d'information (« c'est quoi… », « qu'est-ce que… »). En
+  contexte, un message de conversation (« tu es qui ? », « ok ») tombait
+  sur le voisin vectoriel le plus proche (seuil 0.30) et recevait une
+  définition sans rapport (« Parcourir pour découvrir. », « Médecin qui
+  opère. ») — exactement l'incohérence constatée sur l'instance en ligne
+  pendant la panne Gemini : la banque de replis (situations, ton de
+  BLAMUNE) prend la suite à la place.
+
 ## [Non publié] - 2026-10-04
 
 ### Ajouté
