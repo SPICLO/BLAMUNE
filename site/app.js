@@ -1863,6 +1863,94 @@ function lireVoix(texte) {
   });
 })();
 
+// ---------------- THEME : clair / sombre ----------------
+// Le choix vive dans le navigateur (blamune_theme) : aucun aller-retour
+// serveur, il s'applique des le premier rendu, ecran de connexion compris.
+// Le <meta name="theme-color"> suit : c'est lui qui colore la barre du
+// navigateur mobile (PWA).
+function appliquerTheme(nom) {
+  var clair = nom === 'clair';
+  document.documentElement.setAttribute('data-theme', clair ? 'clair' : 'sombre');
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', clair ? '#eef2f9' : '#0b1020');
+  var b = document.getElementById('btnTheme');
+  if (b) {
+    // Le libelle annonce le mode d'arrivee, pas celui d'aujourd'hui.
+    b.textContent = clair ? 'Sombre' : 'Clair';
+    b.title = clair ? 'Passer en mode sombre' : 'Passer en mode clair';
+  }
+}
+
+(function initBoutonTheme() {
+  var b = document.getElementById('btnTheme');
+  if (!b) return;
+  appliquerTheme(localStorage.getItem('blamune_theme') || 'sombre');
+  b.addEventListener('click', function () {
+    var suivant = localStorage.getItem('blamune_theme') === 'clair' ? 'sombre' : 'clair';
+    localStorage.setItem('blamune_theme', suivant);
+    sauverProfilLocal('theme', suivant);
+    appliquerTheme(suivant);
+  });
+})();
+
+// ---------------- EXPORT DE L'HISTORIQUE ----------------
+// Ce que tu as dit t'appartient. Un clic, et l'historique du mode courant
+// (les 100 dernieres bulles que le serveur garde en affichage) part dans
+// un fichier .txt lisible, telecharge LOCALEMENT : rien n'est renvoye
+// nulle part, aucun compte, aucun service tiers.
+function exporterHistorique() {
+  fetch('/historique', { headers: authHeaders() })
+    .then(function (r) {
+      return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status));
+    })
+    .then(function (j) {
+      var liste = (j && j.historique) || [];
+      if (!liste.length) {
+        afficherToastDeco('Rien a exporter : historique vide.');
+        return;
+      }
+      var lignes = [
+        'Historique BLAMUNE - exporte le ' + new Date().toLocaleString('fr-FR'),
+        'Mode : ' +
+          ((j.mode || '2') === '1' ? 'EGO' : 'BLAMUNE') +
+          ' (les bulles affichees sont gardees cote serveur, 100 derniers echanges)',
+        ''
+      ];
+      // Format fichier de l'historique : { qui: 'moi'|'bot', texte, t }
+      // (t en secondes), identique pour les deux modes.
+      for (var i = 0; i < liste.length; i++) {
+        var m = liste[i] || {};
+        var role = m.qui === 'moi' ? 'Toi' : (j.mode || '2') === '1' ? 'EGO' : 'BLAMUNE';
+        var quand = m.t ? new Date(m.t * 1000).toLocaleString('fr-FR') : '';
+        lignes.push('[' + quand + '] ' + role);
+        lignes.push(String(m.texte || '').trim());
+        lignes.push('');
+      }
+      var blob = new Blob([lignes.join('\n')], { type: 'text/plain;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'BLAMUNE-conversation-' + new Date().toISOString().substring(0, 10) + '.txt';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () {
+        try {
+          URL.revokeObjectURL(a.href);
+        } catch (e) {}
+      }, 1000);
+      afficherToastDeco('Historique exporte : ' + liste.length + ' bulles.', 'ok');
+    })
+    .catch(function () {
+      afficherToastDeco('Export impossible pour le moment.');
+    });
+}
+
+(function initBoutonExport() {
+  var b = document.getElementById('btnExport');
+  if (!b) return;
+  b.addEventListener('click', exporterHistorique);
+})();
+
 // ---------------- IA HORS-LIGNE (bouton eclair) ----------------
 // Un seulrole d'action ici : telecharger/charger le modele. L'usage
 // automatique (serveur down) est dans envoyer() > catch > tenterIAHorsLigne.
@@ -1928,6 +2016,9 @@ window.addEventListener('load', async function () {
   if (profil.mode === '3') {
     sauverProfilLocal('mode', '2');
   }
+  // Theme DES LA PREMIERE SECONDE : l'ecran de connexion aussi est colore,
+  // et on ne re-render pas au brusque passage sombre->clair au login.
+  appliquerTheme(localStorage.getItem('blamune_theme') || 'sombre');
   // Avant la premiere requete : l'invite legacy echange son uid contre un
   // jeton, pour ne pas se faire refuser des la seconde appelee.
   try {

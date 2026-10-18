@@ -54,6 +54,7 @@ export default [
         URL: 'readonly',
         Headers: 'readonly',
         FormData: 'readonly',
+        Blob: 'readonly',
         // IA_NAV : global pose par site/ia-navigateur.js (script classique
         // charge avant app.js, voir index.html).
         IA_NAV: 'readonly'

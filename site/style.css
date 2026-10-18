@@ -7,22 +7,62 @@
 :root {
   --fond: #0b1020;
   --fond-2: #111a33;
-  --surface: rgba(255, 255, 255, 0.05);
-  --surface-2: rgba(255, 255, 255, 0.09);
-  --bordure: rgba(255, 255, 255, 0.09);
+  --surface: rgb(var(--blanc) / 0.05);
+  --surface-2: rgb(var(--blanc) / 0.09);
+  --bordure: rgb(var(--blanc) / 0.09);
   --texte: #e8eef7;
   --texte-doux: #9fb3c8;
   --texte-faible: #6b7f97;
   --accent: #38bdf8;
   --accent-2: #22d3ee;
   --bot-bulle: #1c2a45;
-  --bot-bordure: rgba(255, 255, 255, 0.06);
+  --bot-bordure: rgb(var(--blanc) / 0.06);
   --moi-debut: #0ea5a6;
   --moi-fin: #10b981;
   --danger: #f87171;
   --attente: #fbbf24;
   --ok: #34d399;
   --rayon-bulle: 18px;
+  /* Voile blanc : le gris translucide qui fonde surfaces, bordures et
+     surlignages du mode sombre. En mode clair, seule cette base change :
+     le voile devient encre sombre, et TOUTES les surfaces s'inversent
+     d'un coup (toutes les occurrences du CSS pointent cette variable). */
+  --vitro: rgb(8 12 26 / 0.7);
+  --sur-accent: #052033;
+  --blanc: 255 255 255;
+}
+
+/* ======================= MODE CLAIR ======================= */
+/* L'utilisateur choisit (btnTheme, memorise dans blamune_theme). Ce
+   n'est pas une inversion : chaque couleur est re-choisie pour rester
+   lisible sur fond clair. --blanc devient de l'encre : surfaces et
+   bordures s'adaptent automatiquement, sans surcharge ligne par ligne. */
+[data-theme='clair'] {
+  --fond: #eef2f9;
+  --fond-2: #ffffff;
+  --surface: rgb(var(--blanc) / 0.05);
+  --surface-2: rgb(var(--blanc) / 0.08);
+  --bordure: rgb(var(--blanc) / 0.1);
+  --texte: #17263b;
+  --texte-doux: #42618a;
+  --texte-faible: #74879e;
+  --accent: #0284c7;
+  --accent-2: #0891b2;
+  --bot-bulle: #ffffff;
+  --bot-bordure: rgb(var(--blanc) / 0.12);
+  --danger: #dc2626;
+  --attente: #b45309;
+  --ok: #0f9d58;
+  --vitro: rgb(255 255 255 / 0.78);
+  --sur-accent: #f8fbff;
+  --blanc: 15 23 42;
+}
+[data-theme='clair'] body {
+  background:
+    radial-gradient(900px 500px at 85% -10%, rgb(2 132 199 / 0.1), transparent 60%),
+    radial-gradient(800px 500px at -10% 110%, rgb(124 58 237 / 0.08), transparent 60%),
+    radial-gradient(600px 400px at 50% 50%, rgb(16 185 129 / 0.06), transparent 70%),
+    linear-gradient(165deg, var(--fond-2), var(--fond) 45%, #dfe7f2);
 }
 
 #appContenu {
@@ -100,10 +140,10 @@ input:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  background: rgba(8, 12, 26, 0.7);
+  background: var(--vitro);
   backdrop-filter: blur(16px) saturate(1.2);
   -webkit-backdrop-filter: blur(16px) saturate(1.2);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgb(var(--blanc) / 0.06);
   z-index: 2;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
@@ -299,7 +339,7 @@ input:focus-visible {
 
 .segmente button.actif {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #052033;
+  color: var(--sur-accent);
   box-shadow: 0 2px 12px rgba(56, 189, 248, 0.5);
   transform: scale(1.02);
 }
@@ -326,7 +366,7 @@ input:focus-visible {
 /* Barre de defilement fine */
 #chat {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  scrollbar-color: rgb(var(--blanc) / 0.12) transparent;
 }
 #chat::-webkit-scrollbar {
   width: 6px;
@@ -335,11 +375,11 @@ input:focus-visible {
   background: transparent;
 }
 #chat::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgb(var(--blanc) / 0.1);
   border-radius: 8px;
 }
 #chat::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgb(var(--blanc) / 0.2);
 }
 
 .msg {
@@ -413,14 +453,14 @@ input:focus-visible {
   border-bottom-left-radius: 6px;
   box-shadow:
     0 2px 12px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    inset 0 1px 0 rgb(var(--blanc) / 0.03);
   backdrop-filter: blur(8px);
 }
 
 .msg.bot .bulle:hover {
   box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    inset 0 1px 0 rgb(var(--blanc) / 0.05);
 }
 
 .msg.moi .bulle {
@@ -429,13 +469,13 @@ input:focus-visible {
   border-bottom-right-radius: 6px;
   box-shadow:
     0 2px 12px rgba(16, 185, 129, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    inset 0 1px 0 rgb(var(--blanc) / 0.1);
 }
 
 .msg.moi .bulle:hover {
   box-shadow:
     0 4px 18px rgba(16, 185, 129, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    inset 0 1px 0 rgb(var(--blanc) / 0.15);
 }
 
 /* Indicateur de confiance */
@@ -638,10 +678,10 @@ input:focus-visible {
   align-items: center;
   gap: 8px;
   padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
-  background: rgba(8, 12, 26, 0.7);
+  background: var(--vitro);
   backdrop-filter: blur(16px) saturate(1.2);
   -webkit-backdrop-filter: blur(16px) saturate(1.2);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgb(var(--blanc) / 0.06);
   z-index: 2;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
 }
@@ -671,12 +711,12 @@ input:focus-visible {
 
 #zone:hover {
   background: var(--surface-2);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgb(var(--blanc) / 0.12);
 }
 
 #zone:focus {
   border-color: rgba(56, 189, 248, 0.6);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(var(--blanc) / 0.08);
   box-shadow:
     0 0 0 3px rgba(56, 189, 248, 0.15),
     0 0 20px rgba(56, 189, 248, 0.1);
@@ -691,7 +731,7 @@ input:focus-visible {
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #052033;
+  color: var(--sur-accent);
   box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -734,7 +774,7 @@ input:focus-visible {
 }
 #btnVoix:hover {
   color: var(--texte);
-  border-color: rgba(255, 255, 255, 0.16);
+  border-color: rgb(var(--blanc) / 0.16);
   transform: scale(1.06);
 }
 #btnVoix:active {
@@ -743,7 +783,7 @@ input:focus-visible {
 #btnVoix.actif {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   border-color: transparent;
-  color: #052033;
+  color: var(--sur-accent);
   animation: poulsVoix 1.6s ease-out infinite;
 }
 @keyframes poulsVoix {
@@ -863,7 +903,7 @@ button:disabled {
 
 .auth-box {
   background: rgba(17, 26, 51, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgb(var(--blanc) / 0.08);
   border-radius: 20px;
   padding: 36px 30px;
   width: 90%;
@@ -873,7 +913,7 @@ button:disabled {
   -webkit-backdrop-filter: blur(20px) saturate(1.3);
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    inset 0 1px 0 rgb(var(--blanc) / 0.05);
   animation: authSlide 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
   position: relative;
   z-index: 1;
@@ -1023,8 +1063,8 @@ button:disabled {
 }
 
 .auth-form input {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgb(var(--blanc) / 0.04);
+  border: 1px solid rgb(var(--blanc) / 0.08);
   border-radius: 12px;
   padding: 13px 16px;
   color: var(--texte);
@@ -1042,7 +1082,7 @@ button:disabled {
 .auth-form input:focus,
 .auth-form .champ input:focus {
   border-color: rgba(56, 189, 248, 0.6);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgb(var(--blanc) / 0.06);
   box-shadow:
     0 0 0 3px rgba(56, 189, 248, 0.12),
     0 0 16px rgba(56, 189, 248, 0.08);
@@ -1055,8 +1095,8 @@ button:disabled {
 }
 .auth-form input:hover,
 .auth-form .champ input:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgb(var(--blanc) / 0.06);
+  border-color: rgb(var(--blanc) / 0.12);
 }
 .auth-form input::placeholder,
 .auth-form .champ input::placeholder {
@@ -1089,15 +1129,15 @@ button:disabled {
 }
 
 .auth-invite {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgb(var(--blanc) / 0.05);
   color: var(--texte-doux);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgb(var(--blanc) / 0.08);
   box-shadow: none;
 }
 .auth-invite:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(var(--blanc) / 0.08);
   color: var(--texte);
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: rgb(var(--blanc) / 0.15);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
@@ -1134,7 +1174,7 @@ button:disabled {
 .auth-sep::after {
   content: '';
   flex: 1;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgb(var(--blanc) / 0.06);
 }
 .auth-note {
   color: var(--texte-faible);
@@ -1316,7 +1356,7 @@ button:disabled {
   top: 24px;
   transform: translate(-50%, -12px);
   background: rgba(17, 26, 51, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgb(var(--blanc) / 0.1);
   color: var(--texte);
   padding: 10px 18px;
   border-radius: 999px;
@@ -1429,7 +1469,7 @@ html.console .auth-box::before {
 .segmente button.actif {
   background: transparent;
   box-shadow: none;
-  color: #052033;
+  color: var(--sur-accent);
 }
 
 /* --- Cascade des messages a l'entree --- */
@@ -1580,10 +1620,10 @@ html.console .auth-box::before {
 }
 #btnIANav:hover {
   color: var(--texte);
-  border-color: rgba(255, 255, 255, 0.16);
+  border-color: rgb(var(--blanc) / 0.16);
 }
 #btnIANav.actif {
-  color: #052033;
+  color: var(--sur-accent);
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   border-color: transparent;
 }
