@@ -1313,6 +1313,79 @@ async function main() {
     );
     ok.push('commandes serveur: /stats-perso et /oublie (effacement)');
 
+    // 21bis. RAG : le savoir n'est plus SEULEMENT un secours. Le fait
+    //        pertinent accompagne la question DANS le prompt systeme (mode 2
+    //        comme mode 1), et "retiens que X est Y" enrichit la base de
+    //        connaissances sans deploy. Place AVANT les tests de secours
+    //        (22) : ceux-ci ferment le quota pour de bon, plus aucun envoi
+    //        nominal ne doit venir apres.
+    const savRag = await requete(
+      PORT_APP,
+      '/savoir',
+      'POST',
+      'cle=' +
+        encodeURIComponent('girafe de test') +
+        '&reponse=' +
+        encodeURIComponent('un animal a long cou qui mange des feuilles'),
+      h
+    );
+    assert.strictEqual(savRag.status, 200, 'poussee savoir RAG: HTTP ' + savRag.status);
+    // 21bis.a. La connaissance poussee remonte dans le prompt du message
+    //        suivant, du cote de BLAMUNE (mode 2).
+    dernierChat = null;
+    const rag1 = await envoyer("c'est quoi une girafe de test au fait ?");
+    assert.strictEqual(rag1.status, 200, 'RAG mode 2: HTTP ' + rag1.status);
+    assert(
+      promptTexte().indexOf('CONNAISSANCE PERTINENTE') >= 0,
+      'savoir injecte dans le prompt (mode 2): ' + promptTexte().substring(0, 500)
+    );
+    assert(
+      /long cou/i.test(promptTexte()),
+      'le savoir remonte avec sa reponse (mode 2): ' + promptTexte().substring(0, 500)
+    );
+    // 21bis.b. Un message de chat ordinaire n'ouvre pas la chasse : pas de
+    //          section savoir, pas de latence, prompt identique a avant.
+    dernierChat = null;
+    const ragSalut = await envoyer('salut la team, on est calmes ici');
+    assert.strictEqual(ragSalut.status, 200);
+    assert(
+      promptTexte().indexOf('CONNAISSANCE PERTINENTE') < 0,
+      'pas de savoir injecte sur du chat ordinaire: ' + promptTexte().substring(0, 500)
+    );
+    // 21bis.c. Mode 1 (EGO) : meme enrichissement du system prompt.
+    dernierEgo = null;
+    const ragEgo = await requete(
+      PORT_APP,
+      '/send',
+      'POST',
+      'msg=' + encodeURIComponent("c'est quoi une girafe de test ?") + '&mode=1',
+      h
+    );
+    assert.strictEqual(ragEgo.status, 200, 'RAG mode 1: HTTP ' + ragEgo.status);
+    assert(
+      promptEgo().indexOf('CONNAISSANCE PERTINENTE') >= 0,
+      'savoir injecte dans le prompt EGO: ' + promptEgo().substring(0, 500)
+    );
+    assert(
+      /long cou/i.test(promptEgo()),
+      'le savoir remonte avec sa reponse (mode 1): ' + promptEgo().substring(0, 500)
+    );
+    // 21bis.d. Enseignement explicite : "retiens que X est Y" ecrit le fait
+    //          en base (source auto, jamais de deploy), et la question
+    //          suivante l'exploite TOU DE SUITE dans le meme prompt.
+    const ragApprend = await envoyer('retiens que le dorado de test est un poisson de la ville');
+    assert.strictEqual(ragApprend.status, 200, 'enseignement: HTTP ' + ragApprend.status);
+    dernierChat = null;
+    const ragRecall = await envoyer("c'est quoi le dorado de test ?");
+    assert.strictEqual(ragRecall.status, 200);
+    assert(
+      /dorado de test est un poisson/i.test(promptTexte()) &&
+        promptTexte().indexOf('CONNAISSANCE PERTINENTE') >= 0,
+      'fait appris injecte dans le prompt: ' + promptTexte().substring(0, 500)
+    );
+    ok.push('RAG: savoir injecte dans le prompt (mode 2, mode 1 EGO, rien sur le chat ordinaire)');
+    ok.push('retiens que X est Y : fait appris en base, exploite dans la minute');
+
     // 22. savoir.txt en secours quand tout le quota est sature : plutot que
     //     "Beaucoup de monde", la question connue du fichier est repondue.
     //     On termine par la : l'etat de quota reste ferme ensuite (plus

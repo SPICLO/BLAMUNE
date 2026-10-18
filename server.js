@@ -854,6 +854,35 @@ function autoApprentissage(uid, msg) {
     }
   }
 
+  // Enseignement explicite du savoir : "retiens que tokyo est la capitale
+  // du japon", "apprends que ...", "sache que ...". La cle est le sujet
+  // (sans l'article), la reponse la phrase entiere : elle repond
+  // naturellement a "c'est quoi tokyo ?" le jour suivant. Reste strict :
+  // le sujet se coupe sur "est / c'est / veut dire / se dit", jamais un
+  // pronom, jamais un message a la premiere personne (nom, age et co. ont
+  // leurs propres regles ci-dessus). Un fait mal compose est pire qu'un
+  // fait manque.
+  m = clair.match(/\b(?:retiens|apprends|sache)\s+que\s+(.{5,140})/);
+  if (m && m[1] && !/^\s*(je\b|j['\u2019]|on\b)/.test(m[1])) {
+    const colle = m[1]
+      .replace(/\s+/g, ' ')
+      .replace(/[.!?;,]+\s*$/, '')
+      .trim();
+    const couper = colle.match(
+      /^(.{2,60}?)\s+(?:est|sont|veut dire|se dit|c['\u2019]est)\s+(.{3,120})$/
+    );
+    if (couper) {
+      const cleFait = couper[1]
+        .trim()
+        .replace(/^(le|la|les|l['\u2019]|un|une|des|mon|ma|mes|ton|ta|tes)\s+/, '')
+        .trim();
+      const PRONOMS = ['je', 'tu', 'il', 'elle', 'on', 'nous', 'vous', 'ils', 'elles'];
+      if (cleFait.length >= 2 && PRONOMS.indexOf(cleFait) < 0) {
+        if (savoirEnregistrer(cleFait, colle, null, 'auto')) changed = true;
+      }
+    }
+  }
+
   // Ce qu'il aime: "ce que j'aime c'est X", "j'aime X" (exclure "j'aime pas")
   m = lower.match(/ce que j'aime c'est\s+(.{2,40})/);
   if (!m) m = lower.match(/j'aime\s+(?!pas\s|point\s)(.{2,40})/);
@@ -1751,6 +1780,16 @@ function blocSysteme(o) {
     t += '\n\nCE QUE VOUS AVIEZ DIT AVANT (resume de vos echanges plus anciens) :\n' + o.resume;
   }
 
+  // RAG : savoir pertinent pour la question du jour (base de connaissances
+  // + index semantique). Vide dans 95 % des cas (chat du quotidien) : le
+  // prompt reste alors identique a celui d'avant, zero surcharge.
+  if (o.savoir) {
+    t +=
+      '\n\nCONNAISSANCE PERTINENTE (de ta base de connaissances) : ' +
+      o.savoir +
+      "\nSi ca repond a sa question, dis-le A TA MANIERE, pas mot pour mot. Si ca n'a rien a voir, ignore-la : il vaut mieux dire je ne sais pas que de reciter hors sujet.";
+  }
+
   // Souvenirs : TOUJOURS injectes (avant, ils n'apparaissaient qu'apres 1h d'absence).
   if (etat.souvenirs && etat.souvenirs.length) {
     const recents = etat.souvenirs.slice(-3).reverse();
@@ -2438,6 +2477,7 @@ creerRouteSend(app, {
   appelerGemini,
   nettoyerReponse,
   reponseSecours,
+  contexteSavoir: savoir.contexteQuestion,
   dernierModeleOkConnu,
   loggerErreur,
   rateSendIp: RATE_SEND_IP,
