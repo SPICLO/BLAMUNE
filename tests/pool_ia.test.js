@@ -141,3 +141,11 @@ test('membreFond ne depend pas du sticky du chat', () => {
   // le fond suit l'ordre DU FICHIER DECLARE, pas le sticky du chat
   assert.strictEqual(r.membreFond(T0).nom, 'pollinations');
 });
+
+test('aSecours : des qu un membre additionnel existe, meme seul', () => {
+  // Pas d'API_POOL : aucun membre de secours, meme principal present
+  assert.strictEqual(fabrique({}).aSecours(), false);
+  // Un membre seul suffit pour armer le pilier
+  assert.strictEqual(fabrique({ env: 'groq|http://g/v1|k|llama' }).aSecours(), true);
+  assert.strictEqual(fabrique({ principal: false, env: 'groq|http://g/v1|k|llama' }).aSecours(), true);
+});

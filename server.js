@@ -1311,6 +1311,66 @@ function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion, avecOutilsDe
   });
 }
 
+// ==================== ECLIPSE GEMINI APRES SATURATION ====================
+// Le probleme observe en prod : a chaque expiration de la fenetre de quota
+// (60 s), le premier message reprenait toute la cascade (4 modeles, parfois
+// 30 s de suspension chacun) et payait 30-60 s d'attente pour tomber sur
+// le pilier. Desormais, une cascade epuisee COUCHE Gemini pendant
+// GEMINI_REPOS_MS (2 min par defaut ; 0 desactive l'eclipse) : pendant ce
+// repos les messages
+// partent directement au pilier (groq et ses copains, ~1-2 s) — plus un
+// seul message lent. Une SONDE MINIATURE (pas d'historique, timeout court,
+// aucun contenu sireton) est lancee a la fin du repos : si Gemini respire
+// de nouveau, le repos se leve et la cascade reprend la tete toute seule.
+// Le quatrieme appel consomme un essai, pas un quota (un 429 ne facture
+// pas), et jamais le client : la sonde vit en fond de service.
+// 0 desactive l'eclipse ; sinon delai positif, defaut 120000 (2 min).
+const GEMINI_REPOS_MS = parseInt(process.env.GEMINI_REPOS_MS || '', 10);
+const DELAI_REPOS_GEMINI =
+  GEMINI_REPOS_MS === 0 ? 0 : GEMINI_REPOS_MS > 0 ? GEMINI_REPOS_MS : 120000;
+let geminiReposJusqua = 0;
+let sondeEnCours = false;
+
+function planifierSondeGemini() {
+  if (!geminiReposJusqua) return;
+  const reste = geminiReposJusqua - Date.now();
+  if (reste <= 0) return;
+  setTimeout(sonderGemini, reste);
+}
+
+async function sonderGemini() {
+  if (!geminiReposJusqua || Date.now() < geminiReposJusqua) return;
+  if (sondeEnCours) return;
+  sondeEnCours = true;
+  try {
+    const sondage = await modeleClassique(
+      modeleActif(),
+      [{ role: 'user', parts: [{ text: 'Reponds juste OK.' }] }],
+      { n: 1 },
+      false,
+      false
+    );
+    if (sondage && String(sondage).trim()) {
+      // Gemini respire de nouveau : sortie du repos, pas de nouvelle sonde.
+      geminiReposJusqua = 0;
+      resoudreAlertes();
+      loggerErreur('gemini', 'sonde OK : fin du repos, la cascade Gemini reprend la tete');
+      sondeEnCours = false;
+      return;
+    }
+    // Reponse vide : le repos se poursuit, nouvelle sonde plus tard.
+    loggerErreur('gemini', 'sonde : reponse vide, le repos se poursuit');
+    geminiReposJusqua = Date.now() + DELAI_REPOS_GEMINI;
+  } catch (e) {
+    // Toujours sature : le repos continue, nouvelle sonde plus tard.
+    loggerErreur('gemini', 'sonde : ' + (e && e.message));
+    geminiReposJusqua = Date.now() + DELAI_REPOS_GEMINI;
+  } finally {
+    sondeEnCours = false;
+  }
+  planifierSondeGemini();
+}
+
 // onDelta est optionnel : sans lui on garde l'ancien comportement.
 // Deux passes possibles : si TOUTES les tentatives de la premiere etaient des
 // quotas, on attend le rechargement de la fenetre gratuite puis on reessaie
@@ -1334,106 +1394,115 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
   const modeles = ordreModeles();
   let derniereErreur = null;
 
-  // Fenetre de quota deja crevee sur tout le parcours (alerte encore possee) :
-  // chaque tentative va 429, inutile de gaspiller ~8 requetes par message. On
-  // repond tout de suite "quota sature" ; au bout d'une minute dernierQuota
-  // devient ancien, la porte se rouvre et la cascade retente toute seule.
+  // ECLIPSE GEMINI : cascade deja epuisee (repos) OU fenetre de quota en
+  // cours -> AUCUNE nouvelle tentative Gemini (chaque reprise paie 30-60 s
+  // avant de craquer). On file direct au pilier ; la sonde de fond releve
+  // l'eclipse quand Gemini respire de nouveau.
+  const enRepos = Date.now() < geminiReposJusqua;
   const dernier429 = instantDernierQuota();
-  if (alertes.quota && dernier429 && resteFenetreQuota() > 0) {
+  const fenetreQuota = alertes.quota && dernier429 && resteFenetreQuota() > 0;
+  if (enRepos || fenetreQuota) {
     loggerErreur(
       'gemini',
-      'quota actif depuis ' +
-        Math.round((Date.now() - dernier429) / 1000) +
-        ' s -> reponse immediate sans cascade'
+      (enRepos ? 'eclipse Gemini (repos post-saturation)' : 'fenetre de quota en cours') +
+        ' -> pilier direct'
     );
-    alerter('quota', 'reponse immediate sans cascade (fenetre en cours)');
-    throw new Error('quota satur\u00e9 : fenetre de quota en cours');
-  }
+    derniereErreur = new Error(
+      enRepos ? 'Gemini au repos apres saturation' : 'quota sature : fenetre de quota en cours'
+    );
+  } else {
+    for (let passe = 0; passe < 2; passe++) {
+      let fluxActif = needsFlux;
+      let quotaPartout = true;
+      // Une seule reprise sur erreur transitoire pour TOUTE la passe,
+      // quel que soit le nombre de modeles essayes en cascade.
+      const budget = { n: 1 };
 
-  for (let passe = 0; passe < 2; passe++) {
-    let fluxActif = needsFlux;
-    let quotaPartout = true;
-    // Une seule reprise sur erreur transitoire pour TOUTE la passe,
-    // quel que soit le nombre de modeles essayes en cascade.
-    const budget = { n: 1 };
-
-    for (const modele of modeles) {
-      if (fluxActif) {
+      for (const modele of modeles) {
+        if (fluxActif) {
+          try {
+            const texte = await modeleEnFlux(modele, contents, surDeltaCompte, budget, true);
+            if (texte) {
+              memoriserModeleOk(modele);
+              resoudreAlertes();
+              return texte;
+            }
+            derniereErreur = new Error('Reponse vide');
+            quotaPartout = false;
+          } catch (e) {
+            // Le flux a echoue : on retente la meme modele en classique, et on
+            // n'insiste plus sur le flux pour le reste de la requete.
+            derniereErreur = e;
+            if (!estQuota(e)) quotaPartout = false;
+            fluxActif = false;
+            loggerErreur('gemini', modele + ' flux KO: ' + e.message);
+          }
+        }
         try {
-          const texte = await modeleEnFlux(modele, contents, surDeltaCompte, budget, true);
+          const texte = await modeleClassique(modele, contents, budget, undefined, true);
           if (texte) {
             memoriserModeleOk(modele);
             resoudreAlertes();
+            if (needsFlux) {
+              try {
+                surDeltaCompte(texte);
+              } catch (e) {}
+            }
             return texte;
           }
           derniereErreur = new Error('Reponse vide');
           quotaPartout = false;
         } catch (e) {
-          // Le flux a echoue : on retente la meme modele en classique, et on
-          // n'insiste plus sur le flux pour le reste de la requete.
           derniereErreur = e;
           if (!estQuota(e)) quotaPartout = false;
-          fluxActif = false;
-          loggerErreur('gemini', modele + ' flux KO: ' + e.message);
+          loggerErreur('gemini', modele + ' KO: ' + e.message);
         }
       }
-      try {
-        const texte = await modeleClassique(modele, contents, budget, undefined, true);
-        if (texte) {
-          memoriserModeleOk(modele);
-          resoudreAlertes();
-          if (needsFlux) {
-            try {
-              surDeltaCompte(texte);
-            } catch (e) {}
-          }
-          return texte;
-        }
-        derniereErreur = new Error('Reponse vide');
-        quotaPartout = false;
-      } catch (e) {
-        derniereErreur = e;
-        if (!estQuota(e)) quotaPartout = false;
-        loggerErreur('gemini', modele + ' KO: ' + e.message);
-      }
-    }
 
-    // Tout le parcours etait du quota : on attend puis on repasse une fois.
-    if (passe === 0 && quotaPartout && estQuota(derniereErreur)) {
-      const attenteMs = delaiAvantNouvellePasse(derniereErreur);
-      // PILIER DISPONIBLE : aucune attente d'aucune sorte. Attendre une
-      // fenetre de quota Gemini (souvent 15-45 s) figerait la conversation
-      // pendant que Groq/Pollinations repondent en 1-2 s. On rend la main
-      // a la suite du code : le pilier prend le relais immediatement,
-      // et Gemini redeviendra prioritaire des qu'il respire.
-      if (pool.actif()) {
-        loggerErreur(
-          'gemini',
-          'quota: ' +
-            Math.round(attenteMs / 1000) +
-            ' s annoncee -> pilier de secours immediat (zero attente)'
-        );
-        break;
+      // Tout le parcours etait du quota : on attend puis on repasse une fois.
+      if (passe === 0 && quotaPartout && estQuota(derniereErreur)) {
+        const attenteMs = delaiAvantNouvellePasse(derniereErreur);
+        // PILIER DISPONIBLE : aucune attente d'aucune sorte. Attendre une
+        // fenetre de quota Gemini (souvent 15-45 s) figerait la conversation
+        // pendant que Groq/Pollinations repondent en 1-2 s. On rend la main
+        // a la suite du code : le pilier prend le relais immediatement,
+        // et Gemini redeviendra prioritaire des qu'il respire.
+        if (pool.aSecours()) {
+          loggerErreur(
+            'gemini',
+            'quota: ' +
+              Math.round(attenteMs / 1000) +
+              ' s annoncee -> pilier de secours immediat (zero attente)'
+          );
+          break;
+        }
+        if (attenteMs > QUOTA_ATTENTE_MSG_MAX) {
+          // Google demande trop d'attente : ca figerait la conversation, on
+          // rend la main (le repli repond tout de suite).
+          loggerErreur(
+            'gemini',
+            'quota: attente de ' +
+              Math.round(attenteMs / 1000) +
+              ' s trop longue pour un message, on rend la main'
+          );
+          break;
+        }
+        const info =
+          'tous les modeles en quota -> nouvelle passe dans ' + Math.round(attenteMs / 1000) + ' s';
+        loggerErreur('gemini', info);
+        alerter('quota', info);
+        await attendre(attenteMs);
+        continue;
       }
-      if (attenteMs > QUOTA_ATTENTE_MSG_MAX) {
-        // Google demande trop d'attente : ca figerait la conversation, on
-        // rend la main (le repli repond tout de suite).
-        loggerErreur(
-          'gemini',
-          'quota: attente de ' +
-            Math.round(attenteMs / 1000) +
-            ' s trop longue pour un message, on rend la main'
-        );
-        break;
-      }
-      const info =
-        'tous les modeles en quota -> nouvelle passe dans ' + Math.round(attenteMs / 1000) + ' s';
-      loggerErreur('gemini', info);
-      alerter('quota', info);
-      await attendre(attenteMs);
-      continue;
+      break;
     }
-    break;
+  }
+
+  // Saturation confirmee par une cascade que l'on vient de courir :
+  // eclipse de Gemini pendant DELAI_REPOS_GEMINI puis sonde en fond.
+  if (!enRepos && !fenetreQuota && DELAI_REPOS_GEMINI > 0 && estQuota(derniereErreur)) {
+    geminiReposJusqua = Date.now() + DELAI_REPOS_GEMINI;
+    planifierSondeGemini();
   }
 
   // ---- PILIER DE SECOURS (invisible pour le visiteur) -------------------
@@ -1445,7 +1514,7 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
   //  - si le pool echoue aussi, on remonte l'erreur d'ORIGINE Gemini
   //    (les alertes quota/technique gardent leur sens).
   const echec = derniereErreur ? derniereErreur.message : 'Tous les modeles Gemini ont echoue';
-  if (pool.actif() && !fluxDejaLivree) {
+  if (pool.aSecours() && !fluxDejaLivree) {
     try {
       const texte = await iaOpenai.appelerOpenAI(
         message,
@@ -1494,7 +1563,7 @@ async function questionModele(consigne) {
       throw e;
     }
   }
-  if (pool.actif()) {
+  if (pool.aSecours()) {
     throw new Error('Pool IA : aucun fournisseur de fond disponible');
   }
   if (providerOpenAI()) {

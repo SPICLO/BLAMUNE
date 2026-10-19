@@ -8,6 +8,19 @@ versions antérieures sont visibles dans `git log`.
 
 ### Ajouté
 
+- **Eclipse Gemini apres saturation** : quand une cascade Gemini complete finit
+  en saturation (429 sur tous les modeles), les cles Gemini sont couchees
+  pendant `GEMINI_REPOS_MS` (2 min par defaut, 0 pour desactiver). Pendant ce
+  repos, les messages partent directement au pilier (API_POOL, ~1-2 s) au lieu
+  de re-payer 30-60 s de cascade a chaque expiration de la fenetre de quota ;
+  une sonde miniature (1 appel sans historique) verifie en fond a la fin du
+  delai que Gemini respire : si OK, l'eclipse se leve et la cascade reprend la
+  tete toute seule. Meme sujet : un pilier de secours s'arme des qu'UN membre
+  existe dans API_POOL (`aSecours()`), plus besoin d'un principal compatible
+  OpenAI au-dessus — un pool d'un seul membre ne tombait plus jamais sur
+  groq depuis le retrait du faux membre « principal » ; et la garde de
+  fenetre de quota (60 s) file elle aussi au pilier au lieu de rendre un
+  repli local.
 - **Fond du pool pour les taches de fond** : `questionModele()` (resume,
   extraction) travaille desormais au fond d'API_POOL via `membreFond()` —
   dernier membre declare d'abord (lent mais large), cooldowns respectes,

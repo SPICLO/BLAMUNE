@@ -626,6 +626,7 @@ function openaiDeTest({ modeles = null, pool = null, plan = null } = {}) {
       pool ||
       (() => ({
         actif: () => false,
+        aSecours: () => false,
         ordre: () => []
       })),
     requeter: transportFaux(
@@ -784,6 +785,7 @@ test('appelerOpenAI avec pool : le premier membre mort laisse la place, sticky n
   const m = openaiDeTest({
     pool: () => ({
       actif: () => true,
+      aSecours: () => true,
       ordre: () =>
         [
           { nom: 'p1', url: 'https://p1/', cle: '', modele: 'm1' },
@@ -807,4 +809,26 @@ test('appelerOpenAI avec pool : le premier membre mort laisse la place, sticky n
   assert.strictEqual(rep, 'p2 repond');
   assert.deepStrictEqual(m._traces.noteEchecs, ['p1']);
   assert.deepStrictEqual(m._traces.noteOks, ['p2']);
+});
+
+test('appelerOpenAI : un membre SEUL arme la pile meme sans principal (aSecours)', async () => {
+  // Fournisseur non OpenAI (principal absent) + un seul membre d'API_POOL :
+  // le membre est tente quand meme, pas de repli historique sur les modeles.
+  const m = openaiDeTest({
+    pool: () => ({
+      actif: () => false,
+      aSecours: () => true,
+      ordre: () => [{ nom: 'groq', url: 'https://g/', cle: 'C', modele: 'llama' }],
+      noteOk: () => {},
+      noteEchec: () => {}
+    }),
+    plan: () => ({
+      statut: 200,
+      corps: JSON.stringify({ choices: [{ message: { content: 'le membre seul repond' } }] })
+    })
+  });
+  const rep = await m.appelerOpenAI('hi', [{ role: 'user', content: 'hi' }], null);
+  assert.strictEqual(rep, 'le membre seul repond');
+  // La cascade historique (ordreModeles -> modeles 'a','b') ne doit pas tourner
+  assert.deepStrictEqual(m._traces.alertes, []);
 });
