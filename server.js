@@ -159,6 +159,12 @@ const {
 // =====================================================================
 let iaOpenai = null;
 function membrePrincipal() {
+  // Le membre "principal" represente le fournisseur ACTIF au format
+  // compatible OpenAI. Si le fournisseur est Gemini pur, rien n'est valide
+  // en POST sur {base}/chat/completions : renvoyer null evite au pilier et
+  // a l'ordre du pool d'essayer une adresse morte dans chaque requete
+  // (un aller-retour 404 perdu avant d'atteindre le premier membre reel).
+  if (!providerOpenAI()) return null;
   return {
     nom: 'principal',
     url: iaOpenai.baseOpenAI(),
@@ -1470,28 +1476,28 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
 // le chemin OpenAI compat. et le chemin Gemini selon le fournisseur actif.
 
 // Question ponctuelle (resume, extraction) : un seul message, sans flux.
-// Pool actif : UNE tentative chez le premier membre disponible (pas de
-// cascade pour une tache de fond : elle ne doit jamais voler les tentatives
-// de la reponse en cours, meme philosophie que reporterTache).
+// Pool actif : la tache travaille au FOND du pool — membreFond() part du
+// dernier membre declare (large mais lent) et remonte, en sautant les
+// cooldowns. Le premier membre (bouee du chat) et les cles Gemini du
+// principal ne sont jamais sollicites ; sans reponse, la tache passe a
+// l'eau (best effort : resume.js et l'extraction retenteront naturellement
+// au tour suivant). Pas de pool : comportement historique intact.
 async function questionModele(consigne) {
-  if (providerOpenAI()) {
-    if (pool.actif()) {
-      const membres = pool.ordre();
-      if (membres.length === 0) throw new Error('Pool IA : tous les fournisseurs en cooldown');
-      const membre = membres[0];
-      try {
-        const texte = await iaOpenai.openAIRequete(
-          membre,
-          [{ role: 'user', content: consigne }],
-          null
-        );
-        pool.noteOk(membre.nom);
-        return texte;
-      } catch (e) {
-        pool.noteEchec(membre.nom, e);
-        throw e;
-      }
+  const fond = pool.membreFond();
+  if (fond) {
+    try {
+      return await iaOpenai.openAIRequete(fond, [{ role: 'user', content: consigne }], null);
+      // PAS de noteOk : la reponse du fond ne doit pas rendre ce membre
+      // sticky (prioritaire) pour le CHAT.
+    } catch (e) {
+      pool.noteEchec(fond.nom, e);
+      throw e;
     }
+  }
+  if (pool.actif()) {
+    throw new Error('Pool IA : aucun fournisseur de fond disponible');
+  }
+  if (providerOpenAI()) {
     return iaOpenai.openAIRequete(modeleActif(), [{ role: 'user', content: consigne }], null);
   }
   return modeleClassique(

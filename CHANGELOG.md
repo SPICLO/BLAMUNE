@@ -6,6 +6,18 @@ versions antérieures sont visibles dans `git log`.
 
 ## [Non publié] - 2026-10-05
 
+### Ajouté
+
+- **Fond du pool pour les taches de fond** : `questionModele()` (resume,
+  extraction) travaille desormais au fond d'API_POOL via `membreFond()` —
+  dernier membre declare d'abord (lent mais large), cooldowns respectes,
+  jamais le premier membre ni les cles Gemini du chat. La tache rate sans
+  bruler le quota du chat quand rien n'est disponible ; `noteOk` n'est pas
+  appele, une reponse de fond ne peut pas rendre son membre sticky pour le
+  chat. En profite pour retirer le faux membre « principal » du pool quand
+  le fournisseur est Gemini pur (l'URL postee en `/chat/completions`
+  donnait un 404 perdu a chaque pilier, avant d'atteindre groq).
+
 ### Modifié
 
 - **Secours : plus de fait hors sujet comme « réponse du chat »** : la

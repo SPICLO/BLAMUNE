@@ -113,3 +113,31 @@ test('serveur mort (ECONNREFUSED/Timeout) : cooldown standard', () => {
   r.noteEchec('a', new Error('Timeout'), T0 + 70000);
   assert.ok(!r.ordre(T0 + 70000).some((m) => m.nom === 'a'));
 });
+
+test('membreFond : le 1er membre reste au chat, fond du dernier vers le premier', () => {
+  const r = fabrique({
+    env: 'groq|http://g/v1|k|llama; pollinations|http://p/v1||fast; mistral|http://m/v1|k2|small'
+  });
+  // fond = le dernier membre declare (le « boursier » lent du bout de liste)
+  assert.strictEqual(r.membreFond(T0).nom, 'mistral');
+  r.noteEchec('mistral', { statusCode: 429 }, T0);
+  // mistral en cooldown : la tache remonte vers pollinations, jamais groq
+  assert.strictEqual(r.membreFond(T0).nom, 'pollinations');
+  r.noteEchec('pollinations', { statusCode: 429 }, T0);
+  // tout fond en cooldown : null — la bouee du chat n'est jamais donnee
+  assert.strictEqual(r.membreFond(T0), null);
+  // cooldowns expires : le fond redevient disponible
+  assert.strictEqual(r.membreFond(T0 + 61000).nom, 'mistral');
+  // un membne seul dans le pool : tout pour le chat, aucune tache de fond
+  const r1 = fabrique({ env: 'groq|http://g/v1|k|llama' });
+  assert.strictEqual(r1.membreFond(T0), null);
+});
+
+test('membreFond ne depend pas du sticky du chat', () => {
+  const r = fabrique({ env: 'groq|http://g/v1|k|llama; pollinations|http://p/v1||fast' });
+  // noteOk du chat : groq redevient sticky en tete d'ordre()
+  r.noteOk('groq', T0);
+  assert.strictEqual(r.ordre(T0)[0].nom, 'groq');
+  // le fond suit l'ordre DU FICHIER DECLARE, pas le sticky du chat
+  assert.strictEqual(r.membreFond(T0).nom, 'pollinations');
+});
