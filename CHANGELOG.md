@@ -14,7 +14,10 @@ versions antérieures sont visibles dans `git log`.
   mot de passe genere n'est affiche qu'une fois dans les journaux et
   un premier boot rate le rendait impossible a retrouver. Pour changer
   le mot de passe depuis /admin/change-mdp ensuite, retirer ADMIN_MDP
-  de Render et redeployer (sinon la variable reprend la main).
+  de Render et redeployer (sinon la variable reprend la main). Le
+  verrou d'echecs (5 tentatives, 15 min) ne survit plus au reboot :
+  l'operateur qui reboot depuis Render controle deja le service, un
+  verrou qui le bloquerait avec le bon mot de passe n'apporte rien.
 - **Suppression de compte depuis le panneau admin** : nouvelle route
   `POST /admin/supprimer-compte` (uid en corps, session admin requise,
   compte admin non supprimable) qui efface le registre, le dossier
