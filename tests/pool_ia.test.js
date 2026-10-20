@@ -147,5 +147,8 @@ test('aSecours : des qu un membre additionnel existe, meme seul', () => {
   assert.strictEqual(fabrique({}).aSecours(), false);
   // Un membre seul suffit pour armer le pilier
   assert.strictEqual(fabrique({ env: 'groq|http://g/v1|k|llama' }).aSecours(), true);
-  assert.strictEqual(fabrique({ principal: false, env: 'groq|http://g/v1|k|llama' }).aSecours(), true);
+  assert.strictEqual(
+    fabrique({ principal: false, env: 'groq|http://g/v1|k|llama' }).aSecours(),
+    true
+  );
 });
