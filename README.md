@@ -130,7 +130,7 @@ Trois limites, à connaître :
 
 ### Modules extraits de `server.js`
 
-`server.js` fait encore ~2 500 lignes. Il ne définit plus **aucune route** :
+`server.js` fait encore ~2 800 lignes. Il ne définit plus **aucune route** :
 il branche des modules, qui reçoivent leurs dépendances par injection au
 lieu de les importer. Conséquence directe : ils sont testables sans démarrer
 le serveur — voir `tests/lib.test.js`.
@@ -141,25 +141,28 @@ référence injectée à l'initialisation devient périmée après une restaurat
 de sauvegarde — c'est le piège que `comptes` et `stats` posent, et la
 raison pour laquelle `getComptes()` / `getStats()` existent.
 
-| Module               | Rôle                                                                          | Lignes |
-| -------------------- | ----------------------------------------------------------------------------- | ------ |
-| `lib/config_ia.js`   | Fournisseur, modèles de secours, rotation du dernier modèle répondu           | 136    |
-| `lib/rate_limit.js`  | Fenêtre glissante par IP et par utilisateur, purge périodique                 | 45     |
-| `lib/memoire.js`     | `users/<uid>/`, `memoire.txt` (format plat partagé avec le bot C++)           | 80     |
-| `lib/historique.js`  | `historique_mode<1\|2>.json`, push cloud                                      | 34     |
-| `lib/resume.js`      | Repliage des anciens échanges en tâche de fond                                | 90     |
-| `lib/ia/gemini.js`   | Transport Gemini, historique envoyé au modèle, reprise sur 429, état de quota | 269    |
-| `lib/ia/openai.js`   | Fournisseurs compatibles OpenAI (Groq, DeepSeek, Ollama…), même cascade 429   | 270    |
-| `lib/service_bot.js` | Bot C++ local via HTTP, cache LRU 5 min des messages récurrents               | 122    |
-| `lib/savoir.js`      | Base de connaissances : SQLite, embeddings + Qdrant, banque de replis         | 605    |
+| Module                | Rôle                                                                            | Lignes |
+| --------------------- | ------------------------------------------------------------------------------- | ------ |
+| `lib/config_ia.js`    | Fournisseur, modèles de secours, rotation du dernier modèle répondu             | 181    |
+| `lib/rate_limit.js`   | Fenêtre glissante par IP et par utilisateur, purge périodique                   | 53     |
+| `lib/memoire.js`      | `users/<uid>/`, `memoire.txt` (format plat partagé avec le bot C++)             | 125    |
+| `lib/historique.js`   | `historique_mode<1\|2>.json`, push cloud                                        | 45     |
+| `lib/resume.js`       | Repliage des anciens échanges en tâche de fond                                  | 121    |
+| `lib/pool_ia.js`      | Pool de secours `API_POOL` : ordres de passage, cooldowns, réutilisation sticky | 189    |
+| `lib/keepalive.js`    | Rappel planifié sur `/health` quand personne n'est connecté (anti-veille)       | 107    |
+| `lib/ia/gemini.js`    | Transport Gemini, historique envoyé au modèle, reprise sur 429, état de quota   | 371    |
+| `lib/ia/openai.js`    | Fournisseurs compatibles OpenAI (Groq, DeepSeek, Ollama…), même cascade 429     | 283    |
+| `lib/qdrant_faits.js` | Mémoire vectorielle du savoir (Qdrant) : embeddings injectés ou hachage local   | 423    |
+| `lib/service_bot.js`  | Bot C++ local via HTTP, cache LRU 5 min des messages récurrents                 | 132    |
+| `lib/savoir.js`       | Base de connaissances : SQLite, embeddings + Qdrant, banque de replis           | 641    |
 
 | Module de routes             | Couvre                                                                      | Lignes |
 | ---------------------------- | --------------------------------------------------------------------------- | ------ |
-| `lib/routes/send.js`         | `/send` — message → réponse, streaming SSE, apprentissage avant prompt      | 251    |
-| `lib/routes/admin.js`        | `/ping`, `/health`, `/connexions`, tout `/admin/*`, `/stats`, `/config-api` | 328    |
-| `lib/routes/compte.js`       | `/register`, `/login`, `/logout`, `/invite`, `/savoir`                      | 166    |
-| `lib/routes/consultation.js` | `/historique`, `/proactif`, `/stats-perso`, `/mode`, `/profil`              | 121    |
-| `lib/routes/statique.js`     | Site PWA et panneau admin, avec garde-fous de traversée de chemin           | 76     |
+| `lib/routes/send.js`         | `/send` — message → réponse, streaming SSE, apprentissage avant prompt      | 367    |
+| `lib/routes/admin.js`        | `/ping`, `/health`, `/connexions`, tout `/admin/*`, `/stats`, `/config-api` | 488    |
+| `lib/routes/compte.js`       | `/register`, `/login`, `/logout`, `/invite`, `/savoir`                      | 229    |
+| `lib/routes/consultation.js` | `/historique`, `/proactif`, `/stats-perso`, `/mode`, `/profil`              | 154    |
+| `lib/routes/statique.js`     | Site PWA et panneau admin, avec garde-fous de traversée de chemin           | 97     |
 
 La couche HTTP est intégralement extraite : Gemini (`lib/ia/gemini.js`, sorti
 le premier car il possède un état transversal — rotation des clés, drapeaux
@@ -267,6 +270,10 @@ Voir `.env.example` (commentaires complets). Principales :
 - `ADMIN_PSEUDO`, `ADMIN_UID`
 - `JSONBIN_API_KEY`, `JSONBIN_BIN_ID`, `JSONBIN_API_URL`, `JSONBIN_SNAP_MIN_MS`
 - `PORT`, `BLAMUNE_DATA_DIR`
+- **Côté bot C++ local** (`bot.exe` lit l'environnement système, pas le `.env`) :
+  `BLAMUNE_HOTE` — hôte de la version en ligne qu'un `bot.exe` appelle ;
+  par défaut `blamune.onrender.com`. Utile pour pointer un bot compilé
+  maison vers sa propre instance (test, auto-hébergement).
 
 ## Utilisation
 
@@ -316,32 +323,31 @@ python verifier_deploiement.py
 
 ## Outillage
 
-| Outil                     | Role                                    | Etat                                                |
-| ------------------------- | --------------------------------------- | --------------------------------------------------- |
-| `npm run lint`            | ESLint, 9 fichiers                      | **0 erreur, 0 warning**                             |
-| `.github/dependabot.yml`  | npm, pip, images Docker, actions GitHub | hebdomadaire                                        |
-| `prettier`                | `.prettierrc.json` + `.prettierignore`  | **installe, mais le code n'est pas encore formate** |
-| `verifier_deploiement.py` | garde-fous de depot                     | tourne dans la CI                                   |
+| Outil                     | Role                                    | Etat                         |
+| ------------------------- | --------------------------------------- | ---------------------------- |
+| `npm run lint`            | ESLint (flat config) sur tout le JS     | **0 erreur, 0 warning**      |
+| `.github/dependabot.yml`  | npm, pip, images Docker, actions GitHub | hebdomadaire                 |
+| `prettier`                | `.prettierrc.json` + `.prettierignore`  | **appliqué à tout le dépôt** |
+| `verifier_deploiement.py` | garde-fous de depot                     | tourne dans la CI            |
 
 ### Le cas prettier, en clair
 
-La configuration existe depuis le début, mais `prettier` n'était pas dans
-les dépendances : le fichier était décoratif. Il l'est désormais :
+La configuration a longtemps été décorative (le paquet n'était pas
+installé, puis le code n'était pas passé sous la moulinette). C'est
+réglé : le formatage est appliqué à tout le dépôt, un commit dédié à
+chaque reprise de code pour ne pas masquer les refactorings dans
+`git log -p`.
 
 ```bash
 npm run format        # applique la configuration
 npm run format:check  # signale les écarts sans les corriger
 ```
 
-**Le code n'a pas encore été reformaté**, et la CI ne bloque donc pas sur ce
-point. C'est délibéré : passer `prettier --write .` touche environ 2 000
-lignes sur 17 fichiers, y compris 1 044 lignes du seul `tests/run.js`. Cela
-masquerait les refactorings dans `git log -p` pour un gain purement
-cosmétique. À faire dans un commit dédié, si vous le voulez.
-
 `.prettierignore` écarte les fichiers dont le format **est** la donnée
 (`savoir.txt`, vocabulaires…), le Python, et les scripts Windows dont le
-CRLF est imposé par `.editorconfig`.
+CRLF est imposé par `.editorconfig`. La CI ne bloque pas sur ce point :
+un écart de formatage doit rester cosmétique, jamais un verrou qui
+retarde un correctif.
 
 ### Dependabot
 

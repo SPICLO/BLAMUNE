@@ -3630,14 +3630,36 @@ void enregistrerVocabulairePartage(const std::string& mot, const std::string& de
 }
 
 // ============ EN LIGNE : BLAMUNE SUR ONRENDER (GEMINI) ============
-// Le bot peut repondre via la version en ligne (blamune.onrender.com) :
-// meme Gemini, meme memoire, meme historique que le site. Le flux d'une
-// phrase : savoir.txt d'abord (reponse connue = immediate et gratuit),
-// ensuite l'appel au serveur ; si le reseau, le quota ou le serveur tombe,
-// la fonction renvoie "" et la phrase continue vers le moteur local.
+// Le bot peut repondre via la version en ligne (par defaut,
+// blamune.onrender.com) : meme Gemini, meme memoire, meme historique que
+// le site. Le flux d'une phrase : savoir.txt d'abord (reponse connue =
+// immediate et gratuit), ensuite l'appel au serveur ; si le reseau, le
+// quota ou le serveur tombe, la fonction renvoie "" et la phrase continue
+// vers le moteur local.
 // Fichier "hors_ligne" a la racine : aucun appel reseau.
+//
+// Hote configurable : la variable d'environnement BLAMUNE_HOTE remplace
+// le defaut au lancement (instance de test, auto-hebergement d'un tiers).
+// Sans elle, le defaut de compilation reste l'instance de production :
+// un bot.exe bati par n'importe qui se comporte pareil jusqu'a preuve du
+// contraire, c'est le contrat declare ici.
 #define HOTE_BLAMUNE "blamune.onrender.com"
 #define CHEMIN_SESSION ".blamune_session"
+
+// Resolution lue UNE fois puis mise en cache : ce chemin est pris a
+// chaque phrase poste en ligne, inutile de re-interroger l'environment
+// systeme a chaque appel.
+static std::string hoteResolu = "";
+static bool hoteResoluFait = false;
+
+const char* hoteBlamune() {
+    if (!hoteResoluFait) {
+        hoteResoluFait = true;
+        const char* env = std::getenv("BLAMUNE_HOTE");
+        hoteResolu = (env && env[0] != '\0') ? std::string(env) : std::string(HOTE_BLAMUNE);
+    }
+    return hoteResolu.c_str();
+}
 
 // Session invite locale : uid + jeton recuperes une seule fois sur le
 // serveur (fichier .blamune_session a la racine, jamais commite).
@@ -3700,8 +3722,9 @@ bool horsLigneActive() {
     return f.good();
 }
 
-// POST HTTPS vers blamune.onrender.com (WinINet). Retourne vrai si la
-// reponse HTTP a ete lue ; statut et corps sont renseignes en sortie.
+// POST HTTPS vers l'hote resolu (BLAMUNE_HOTE, sinon le defaut de
+// compilation). Retourne vrai si la reponse HTTP a ete lue ; statut et
+// corps sont renseignes en sortie.
 bool posterBlamune(const char* chemin, const std::string& entetes,
                    const std::string& corps, std::string& reponse,
                    DWORD& statut, int delaiMs) {
@@ -3714,7 +3737,7 @@ bool posterBlamune(const char* chemin, const std::string& entetes,
     InternetSetOptionA(hInet, INTERNET_OPTION_CONNECT_TIMEOUT, &delai, sizeof(delai));
     InternetSetOptionA(hInet, INTERNET_OPTION_SEND_TIMEOUT, &delai, sizeof(delai));
     InternetSetOptionA(hInet, INTERNET_OPTION_RECEIVE_TIMEOUT, &delai, sizeof(delai));
-    HINTERNET hConn = InternetConnectA(hInet, HOTE_BLAMUNE, INTERNET_DEFAULT_HTTPS_PORT, 0, 0,
+    HINTERNET hConn = InternetConnectA(hInet, hoteBlamune(), INTERNET_DEFAULT_HTTPS_PORT, 0, 0,
                                        INTERNET_SERVICE_HTTP, 0, 0);
     if (hConn) {
         DWORD flags = INTERNET_FLAG_SECURE | INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_KEEP_CONNECTION;

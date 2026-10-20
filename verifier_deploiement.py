@@ -144,7 +144,9 @@ for f in ["server.js", "storage.js", "package.json", "package-lock.json",
           "lib/routes/compte.js", "lib/routes/admin.js",
           "lib/routes/consultation.js", "lib/routes/statique.js",
           "lib/routes/send.js", "lib/ia/gemini.js",
-          "lib/keepalive.js", ".github/workflows/keepalive.yml",
+          "lib/keepalive.js", "lib/pool_ia.js", "lib/qdrant_faits.js",
+          "tests/pool_ia.test.js", "tests/qdrant_faits.test.js",
+          ".github/workflows/keepalive.yml",
           ".github/dependabot.yml", "SECURITY.md", "CONTRIBUTING.md",
           ".prettierignore",
           "build_bot.ps1", "build_bot.bat", "requirements.txt",
@@ -197,6 +199,26 @@ for jeton, quoi in [
     ("CONTRIBUTING.md", "guide de contribution"),
 ]:
     check(f"README documente {quoi}", jeton in readme)
+
+# Hote du bot : la variable BLAMUNE_HOTE permet de poster ailleurs que sur
+# l'instance de production (instance de test, auto-hebergement d'un tiers).
+# Deux gardes de depot, pas de test runtime : WinINet (la branche _WIN32)
+# n'est pas executable sous Linux. Retirer l'un ou l'autre fragilise le
+# contrat :
+#   - sans lecture de la variable, un bot.exe recompile ne peut plus etre
+#     pointe ailleurs : tout tiers publie chez nous, a notre insu ;
+#   - sans defaut declare, un bot.exe lance sans variable ne sait plus ou
+#     poster, et l'operateur d'une instance neuve n'a aucun avertissement.
+botcpp = open("bot.cpp", encoding="utf-8").read()
+check("bot.cpp lit BLAMUNE_HOTE (hote configurable)",
+      "BLAMUNE_HOTE" in botcpp,
+      "le bot poste vers la variable d'environnement, defaut : instance de production")
+check("bot.cpp garde un hote par defaut declare",
+      "#define HOTE_BLAMUNE" in botcpp,
+      "sans defaut, un bot.exe lance sans variable ne sait plus ou poster")
+check("README documente BLAMUNE_HOTE",
+      "BLAMUNE_HOTE" in readme,
+      "l'operateur doit savoir comment pointer un bot vers sa propre instance")
 
 section("5. Reproductibilite du build")
 

@@ -4,6 +4,54 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Ce journal démarre avec la mise à niveau « hygiène du dépôt » ci-dessous ; les
 versions antérieures sont visibles dans `git log`.
 
+## [Non publié] - 2026-10-20
+
+### Ajouté
+
+- **BLAMUNE_HOTE : hote du bot configurable** — `bot.cpp` avait
+  `#define HOTE_BLAMUNE "blamune.onrender.com"` en dur : tout `bot.exe`
+  compile par un tiers postait ses connaissances vers cette instance,
+  sans aucun moyen de rediriger. La variable d'environnement
+  `BLAMUNE_HOTE` remplace desormais l'hote au lancement (lue une fois,
+  puis mise en cache) ; le `#define` reste le defaut de compilation,
+  donc sans la variable le comportement ne change rien. Coute zero :
+  le chemin POSIX garde ses stubs, Dockerfile.bot et la stack cloud ne
+  voient aucune difference. `verifier_deploiement.py` surveille les
+  deux moities du contrat (lecture de la variable ET defaut declare) ;
+  la CI compile toujours les branches _WIN32 et POSIX — l'appel WinINet
+  reel reste a tester a la main sous Windows, limite documentee dans
+  SECURITY.md.
+- **Limitation de debit : point tranche dans SECURITY.md** — les
+  compteurs resteront en memoire du processus : assumee tant que le
+  service tient dans une seule instance gratuite (regle du projet :
+  zero dependance npm). Deux declencheurs reouvriront le sujet :
+  exposition vraiment publique, passage multi-instances.
+- **Dependances** : express 4.22.3 (transitives `proxy-addr` 2.0.8 et
+  `qs` 6.16.1 — ferme la faille critique d'usurpation d'IP et trois
+  advisories moderees sur `qs`), `dotenv` 18.0.8 et `eslint` 10.13.0.
+  Batterie complete repassee au vert apres l'application : lint 0/0,
+  82 unitaires, 50 integration, 54 routes, 24 tests Python du service
+  du bot, prettier conforme.
+- `tests/pool_ia.test.js` passe au format prettier (la CI ne bloque pas
+  dessus : il avait echappe au formatage sans qu'aucune porte ne le
+  voie).
+
+### Modifie
+
+- `README.md` rattrape sur le code : tableau des modules complet (12
+  entrees — `lib/pool_ia.js`, `lib/keepalive.js`, `lib/qdrant_faits.js`
+  manquaient a la table) et comptes de lignes a jour ; meme chose pour
+  la table des modules de routes ; `server.js` annonce ~2 800 lignes ;
+  section prettier reecrite (le depot est formate, la note « pas
+  encore » n'a plus de raison d'etre) ; tableau Outillage (ESLint
+  couvre tout le JS, pas « 9 fichiers » ; prettier applique) ;
+  `BLAMUNE_HOTE` documente dans les variables d'environnement.
+- `SECURITY.md` : le point « Endpoint d'administration lié a
+  l'instance de production » passe de « a trancher » a « tranche »
+  (hote configurable, gardes en depot, limite assumee documentee) ; le
+  point « Rate limiting en memoire » devient une decision assumee avec
+  ses declencheurs de rouverture.
+
 ## [Non publié] - 2026-10-05
 
 ### Ajouté
