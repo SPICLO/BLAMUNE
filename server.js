@@ -2701,22 +2701,23 @@ function serverListen() {
     stats.demarrages++;
     // Un compte deja present n est JAMAIS ecrase : c'est ce qui permet de
     // changer le mot de passe sans redemarrer.
-    // Une exception voulue : ADMIN_MDP definie = LA voie de recouvrement.
-    // Le mot de passe admin est recalle sur la variable a chaque
-    // demarrage, meme si le compte existe deja (mot de passe perdu,
-    // affichage unique rate dans les journaux). 8 caracteres minimum,
-    // comme la creation ; pour changer le mot de passe via
-    // /admin/change-mdp, retirer ADMIN_MDP de Render : la variable
-    // reprend la main sinon a chaque boot.
+    // Le verrou anti-echecs est un etat transitoire : ne pas le traverser
+    // a un reboot rend un operateur otage de 5 tentatives ratees. Le
+    // redemarrage exige un acces dashboard Render (= controle total du
+    // service dejа), donc on repart a zero pour l'admin a chaque boot :
+    // ADMIN_MDP definie recale le mot de passe (8 caractères min), sinon
+    // l'acces reste bloque tant que le mot de passe traque ne convient pas.
     const mdpDepuisEnv = String(process.env.ADMIN_MDP || '').trim();
-    if (comptes['admin'] && mdpDepuisEnv.length >= 8) {
-      const selRec = crypto.randomBytes(16).toString('hex');
-      comptes['admin'].sel = selRec;
-      comptes['admin'].hash = hashMdpScrypt(mdpDepuisEnv, selRec);
+    if (comptes['admin']) {
       comptes['admin'].erreursLogin = 0;
       comptes['admin'].lockoutUntil = null;
-      sauvegarderComptes();
-      console.log('[BLAMUNE] ADMIN_MDP definie : mot de passe admin recalcule.');
+      if (mdpDepuisEnv.length >= 8) {
+        const selRec = crypto.randomBytes(16).toString('hex');
+        comptes['admin'].sel = selRec;
+        comptes['admin'].hash = hashMdpScrypt(mdpDepuisEnv, selRec);
+        sauvegarderComptes();
+        console.log('[BLAMUNE] ADMIN_MDP definie : mot de passe admin recalcule.');
+      }
     }
     if (!comptes['admin']) {
       const mdpAdmin = motDePasseAdminInitial();
