@@ -8,6 +8,13 @@ versions antérieures sont visibles dans `git log`.
 
 ### Ajouté
 
+- **Recouvrement du mot de passe admin via ADMIN_MDP** : la variable
+  defini sur Render (8 caracteres min) recalcule le mot de passe du
+  compte admin a chaque demarrage, meme si le compte existe deja — le
+  mot de passe genere n'est affiche qu'une fois dans les journaux et
+  un premier boot rate le rendait impossible a retrouver. Pour changer
+  le mot de passe depuis /admin/change-mdp ensuite, retirer ADMIN_MDP
+  de Render et redeployer (sinon la variable reprend la main).
 - **Suppression de compte depuis le panneau admin** : nouvelle route
   `POST /admin/supprimer-compte` (uid en corps, session admin requise,
   compte admin non supprimable) qui efface le registre, le dossier

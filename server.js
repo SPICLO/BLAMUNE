@@ -2701,6 +2701,23 @@ function serverListen() {
     stats.demarrages++;
     // Un compte deja present n est JAMAIS ecrase : c'est ce qui permet de
     // changer le mot de passe sans redemarrer.
+    // Une exception voulue : ADMIN_MDP definie = LA voie de recouvrement.
+    // Le mot de passe admin est recalle sur la variable a chaque
+    // demarrage, meme si le compte existe deja (mot de passe perdu,
+    // affichage unique rate dans les journaux). 8 caracteres minimum,
+    // comme la creation ; pour changer le mot de passe via
+    // /admin/change-mdp, retirer ADMIN_MDP de Render : la variable
+    // reprend la main sinon a chaque boot.
+    const mdpDepuisEnv = String(process.env.ADMIN_MDP || '').trim();
+    if (comptes['admin'] && mdpDepuisEnv.length >= 8) {
+      const selRec = crypto.randomBytes(16).toString('hex');
+      comptes['admin'].sel = selRec;
+      comptes['admin'].hash = hashMdpScrypt(mdpDepuisEnv, selRec);
+      comptes['admin'].erreursLogin = 0;
+      comptes['admin'].lockoutUntil = null;
+      sauvegarderComptes();
+      console.log('[BLAMUNE] ADMIN_MDP definie : mot de passe admin recalcule.');
+    }
     if (!comptes['admin']) {
       const mdpAdmin = motDePasseAdminInitial();
       const sel = crypto.randomBytes(16).toString('hex');
