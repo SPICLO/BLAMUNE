@@ -342,6 +342,21 @@ function setMemoire(uid, memo) {
   planifierSauvegarde();
 }
 
+/**
+ * Supprime dans le cloud tout ce qui appartient a un utilisateur :
+ * ses historiques (cles "uid_mode" ; le uid ne contient jamais de
+ * underscore, l'indice sert de prefixe) et sa memoire. Appelle a la
+ * suppression d'un compte cote admin.
+ */
+function supprimerTout(uid) {
+  const prefixe = uid + '_';
+  for (const cle of Object.keys(data.historiques)) {
+    if (cle.indexOf(prefixe) === 0) delete data.historiques[cle];
+  }
+  delete data.memories[uid];
+  planifierSauvegarde();
+}
+
 // Etat de la sauvegarde cloud, expose par /stats (admin).
 function etatSauvegarde() {
   return {
@@ -363,6 +378,7 @@ module.exports = {
   setHistorique,
   getMemoire,
   setMemoire,
+  supprimerTout,
   sauvegarderTout,
   enregistrerFabrique,
   getSauvegarde,

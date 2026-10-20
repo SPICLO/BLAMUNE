@@ -2358,6 +2358,27 @@ async function extraireAvecModele(uid, msg) {
   }, EXTRACT_PAUSE_MS);
 }
 
+/**
+ * Suppression d'un compte cote admin : vide la RAM de tout ce qui porte
+ * son uid (minuterie et file d'extraction, historique API tronque,
+ * mode prefere, presence). Les fichiers et le cloud sont traites dans
+ * la route (lib/routes/admin.js).
+ */
+function purgerRamUtilisateur(uid) {
+  if (extractionMinuteur[uid]) {
+    clearTimeout(extractionMinuteur[uid]);
+    delete extractionMinuteur[uid];
+  }
+  delete extractionEnCours[uid];
+  delete extractionFile[uid];
+  delete modeParUser[uid];
+  const prefixe = uid + '_';
+  for (const cle of Object.keys(apiHistoriqueParUser)) {
+    if (cle.indexOf(prefixe) === 0) delete apiHistoriqueParUser[cle];
+  }
+  delete connexionsActives[uid];
+}
+
 async function extraireFileExtraction(uid) {
   if (extractionEnCours[uid]) return;
   const lot = extractionFile[uid] || [];
@@ -2476,6 +2497,9 @@ creerRoutesAdmin(app, {
   appliquerSauvegarde,
   loggerErreur,
   sauvegarderComptes,
+  // Suppression d'un compte : extraction minutee, historiques API,
+  // mode prefere, presence (fichiers et cloud traites dans la route).
+  purgerRamUtilisateur,
   hashMdpScrypt,
   storage
 });

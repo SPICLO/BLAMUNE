@@ -287,9 +287,62 @@ function afficherAlertes(j) {
   bann.textContent = texte;
 }
 
+// Retour discret de la section inscrits (suppression de compte, etc.).
+function messageInscrits(texte, danger) {
+  var z = document.getElementById('inscritsMessage');
+  if (!z) return;
+  z.textContent = texte;
+  z.style.display = 'block';
+  z.style.color = danger ? 'var(--danger)' : 'var(--ok)';
+}
+
+// Suppression d'un compte : destructive et definitive (memoire, resumes,
+// historiques, profil, copie cloud). Vise les comptes de test et les
+// faux comptes ; les comptes admin sont refuses cote serveur.
+async function supprimerCompte(uid, pseudo, btn) {
+  var certain = window.confirm(
+    'Supprimer le compte "' +
+      pseudo +
+      '" ?\n\nMemoire, resumes, historiques et profil seront effaces (cloud inclus). Definitif.'
+  );
+  if (!certain) return;
+  btn.disabled = true;
+  btn.textContent = '...';
+  try {
+    var r = await fetch(API + '/admin/supprimer-compte', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-EGO': adminToken },
+      body: JSON.stringify({ uid: uid })
+    });
+    var j = await r.json().catch(function () {
+      return { ok: false, message: 'Reponse invalide du serveur' };
+    });
+    if (r.status === 403 || r.status === 401) {
+      messageInscrits('Non autorise (session admin expiree ?).', true);
+      btn.disabled = false;
+      btn.textContent = 'Supprimer';
+      return;
+    }
+    if (j.ok) {
+      chargerDonnees();
+      messageInscrits(j.message || 'Compte supprime.', false);
+    } else {
+      messageInscrits(j.message || 'Suppression impossible.', true);
+      btn.disabled = false;
+      btn.textContent = 'Supprimer';
+    }
+  } catch (ex) {
+    messageInscrits('Erreur serveur pendant la suppression.', true);
+    btn.disabled = false;
+    btn.textContent = 'Supprimer';
+  }
+}
+
 async function chargerDonnees() {
   var btn = document.getElementById('btnRefresh');
   if (btn) btn.disabled = true;
+  var inscritsMsgEl = document.getElementById('inscritsMessage');
+  if (inscritsMsgEl) inscritsMsgEl.style.display = 'none';
   try {
     var headers = {};
     if (adminToken) {
@@ -360,7 +413,7 @@ async function chargerDonnees() {
       tableU.style.borderCollapse = 'collapse';
       var theadU = document.createElement('thead');
       var trHU = document.createElement('tr');
-      ['Pseudo', 'Email', 'Date', 'Msg'].forEach(function (txt) {
+      ['Pseudo', 'Email', 'Date', 'Msg', 'Action'].forEach(function (txt) {
         var th = document.createElement('th');
         th.style.cssText =
           'text-align:left;padding:8px;border-bottom:1px solid var(--bordure);color:var(--texte-doux);font-size:12px;';
@@ -386,10 +439,22 @@ async function chargerDonnees() {
         tdMsg.style.cssText =
           'padding:8px;color:var(--texte-doux);font-size:12px;text-align:right;';
         tdMsg.textContent = u.messages || 0;
+        var tdDel = document.createElement('td');
+        tdDel.style.cssText = 'padding:4px 8px;text-align:right;';
+        var btnDel = document.createElement('button');
+        btnDel.type = 'button';
+        btnDel.textContent = 'Supprimer';
+        btnDel.style.cssText =
+          'font-size:11px;color:var(--danger);background:transparent;border:1px solid var(--danger);border-radius:6px;padding:3px 8px;cursor:pointer;';
+        btnDel.onclick = function () {
+          supprimerCompte(u.uid || '', u.pseudo || '-', btnDel);
+        };
+        tdDel.appendChild(btnDel);
         tr.appendChild(tdPseudo);
         tr.appendChild(tdEmail);
         tr.appendChild(tdCree);
         tr.appendChild(tdMsg);
+        tr.appendChild(tdDel);
         tbodyU.appendChild(tr);
       });
       tableU.appendChild(tbodyU);

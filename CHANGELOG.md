@@ -8,6 +8,15 @@ versions antérieures sont visibles dans `git log`.
 
 ### Ajouté
 
+- **Suppression de compte depuis le panneau admin** : nouvelle route
+  `POST /admin/supprimer-compte` (uid en corps, session admin requise,
+  compte admin non supprimable) qui efface le registre, le dossier
+  utilisateur (memoire, historiques, resumes), la copie cloud
+  (historiques + memoire via `supprimerTout()`) et la RAM du serveur
+  (extraction minutee, fichiers d'API, mode prefere, presence). Le
+  panneau liste desormais les uid et arme chaque ligne d'un bouton
+  « Supprimer » avec confirmation. Sert notamment a retirer les comptes
+  de test dont la memoire a ete empoisonnee avant les corrections.
 - **Eclipse Gemini apres saturation** : quand une cascade Gemini complete finit
   en saturation (429 sur tous les modeles), les cles Gemini sont couchees
   pendant `GEMINI_REPOS_MS` (2 min par defaut, 0 pour desactiver). Pendant ce
