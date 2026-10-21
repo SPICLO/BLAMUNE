@@ -245,6 +245,24 @@ check("README documente BLAMUNE_HOTE",
       "BLAMUNE_HOTE" in readme,
       "l'operateur doit savoir comment pointer un bot vers sa propre instance")
 
+# Hygiene de la CI et de l'IP : des etiquettes de depot pour que la
+# discipline ne retombe pas quand personne ne regarde.
+check("server.js declare trust proxy (un maillon)",
+      "app.set('trust proxy'" in srv,
+      "sans lui, req.ip est l'adresse du proxy : une seule pour tout le monde")
+check("getIp ignore l'entete X-Forwarded-For brute",
+      "headers['x-forwarded-for']" not in srv and "req.ip || '127.0.0.1'" in srv,
+      "lue en brut, chaque requete se forgait une cle de rate limit neuve")
+check("la CI verifie la syntaxe de tout le JavaScript suivi",
+      "git ls-files" in ci and "node --check" in ci,
+      "une liste en dur finissait par oublier les fichiers nouveaux")
+check("la CI verifie le format prettier",
+      "format:check" in ci,
+      "les fichiers mal formates ne doivent pas arriver a la revue")
+check("la CI utilise checkout et setup-node v5",
+      "checkout@v5" in ci and "setup-node@v5" in ci,
+      "la v4 cible Node 20, deprecie sur les runners actuels")
+
 section("5. Reproductibilite du build")
 
 # Un build reproductible repose sur deux choses : des dependances installees

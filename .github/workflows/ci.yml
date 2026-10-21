@@ -9,17 +9,20 @@ on:
 jobs:
   test:
     name: Node ${{ matrix.node-version }}
-    runs-on: ubuntu-latest
+    # Epingles, pas ubuntu-latest : le label migre vers Ubuntu 26 depuis
+    # octobre 2026, ce qui changerait le terrain de jeu sans preavis (les
+    # images 24.04 restent gerees au moins jusqu'en 2027).
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         node-version: [22.x]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Installer Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
@@ -28,20 +31,21 @@ jobs:
         run: npm ci
 
       - name: Verifier la syntaxe JavaScript
+        # Liste tiree de git, pas en dur : un fichier nouveau n'est plus
+        # oublie (lib/compression.js avait echappe a la porte).
         run: |
-          for f in server.js storage.js tests/run.js tests/unit.test.js \
-                   tests/lib.test.js lib/rate_limit.js lib/memoire.js \
-                   lib/historique.js lib/resume.js lib/config_ia.js \
-                   lib/routes/compte.js lib/routes/admin.js \
-                   lib/routes/consultation.js lib/routes/statique.js \
-                   lib/routes/send.js lib/ia/gemini.js \
-                   site/app.js site/sw.js admin/admin.js; do
+          echec=0
+          for f in $(git ls-files '*.js' '*.mjs'); do
             echo "check $f"
-            node --check "$f"
+            node --check "$f" || echec=1
           done
+          exit $echec
 
       - name: Linter ESLint
         run: npm run lint
+
+      - name: Format prettier
+        run: npm run format:check
 
       - name: Tests unitaires
         run: npm run test:unit
@@ -71,9 +75,9 @@ jobs:
   # ---------------------------------------------------------------------
   bot-cpp:
     name: Bot C++ (bot.cpp)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Installer le cross-compilateur Windows (mingw-w64)
         run: |

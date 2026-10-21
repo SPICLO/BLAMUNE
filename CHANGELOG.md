@@ -8,6 +8,14 @@ versions antérieures sont visibles dans `git log`.
 
 ### Ajouté
 
+- **Le format prettier est devenu une porte de la CI** — `format:check`
+  tourne avant les tests : un fichier mal formate ne passe plus l'etape.
+  Dans la meme passe, `actions/checkout` et `actions/setup-node` passent
+  en v5 (la v4 ciblait Node 20, depuis deprecie sur les runners — les
+  annotations jaunes s'en vont), et `ubuntu-latest` est epingle sur
+  `ubuntu-24.04` : le label `latest` migre vers Ubuntu 26 depuis le
+  19 octobre 2026, sans preavis sur un depot qui compile mingw.
+
 - **Compression des reponses (zlib natif, zero dependance npm)** — le
   serveur renvoyait tout en texte brut : le bundle IA voyageait sur 6,7 Mo
   a chaque telechargement. Maintenant brotli quand le client le sait lire,
@@ -64,6 +72,22 @@ versions antérieures sont visibles dans `git log`.
 
 ### Corrigé
 
+- **L'attaquant se forgeait sa propre cle de rate limit** — `getIp()`
+  lisait `X-Forwarded-For` tel quel : chaque requete portant une entete
+  forgee redevenait une "nouvelle IP", annulant le quota des routes
+  sensibles (tentatives de connexion, invite...). `server.js` declare
+  `trust proxy = 1` (Render pose un maillon de proxy) et `getIp()` sert
+  `req.ip` — l'adresse reelle du client, resolue par express. Cote tests
+  locaux rien ne change (pas de proxy : `127.0.0.1`).
+- **La liste `node --check` de la CI etait en dur** — `lib/compression.js`
+  avait echappe au filet sans que rien ne le voie. La liste vient
+  maintenant de `git ls-files '*.js' '*.mjs'` : tout JavaScript suivi
+  sera verifie par defaut, sans entretien. Pratique epinglee aussi :
+  `ubuntu-24.04` aux deux jobs, v5 des actions.
+- **`engines.node` elargi a `>=22.5.0 <25`** — le developpement local sur
+  Node 24 ne ramasse plus d'avertissement EBADENGINE. Render reste sur
+  Node 22 (via `.nvmrc`, deja en place), la CI sur 22.x, le Dockerfile
+  sur `node:22-slim` epingle.
 - **`Cache-Control: no-store` placé sur toutes les réponses**, y compris
   les fichiers de `site/` : aucun navigateur ne gardait un asset en cache,
   chaque visite re-telechargeait tout (bundle inclus). Les assets publics

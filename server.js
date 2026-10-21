@@ -33,6 +33,13 @@ const { creerSavoir } = require('./lib/savoir');
 const { creerResume } = require('./lib/resume');
 
 const app = express();
+// Render passe un reverse proxy devant le serveur : sans cette ligne,
+// req.ip serait l'adresse du proxy (une seule pour tout le monde), et
+// le moindre X-Forwarded-For forge par le client serait pris pour
+// argent comptant. Avec trust proxy = 1 (un seul maillon de proxy),
+// req.ip est l'adresse REELLE du client ; les tests locaux (pas de
+// proxy) gardent 127.0.0.1.
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 8080;
 // Repertoire des donnees. Surchargeable par l'environnement pour lancer des
 // tests sans jamais toucher aux vraies donnees (users/, comptes.json...).
@@ -315,7 +322,11 @@ function etatModele() {
 
 // ==================== AUTH ====================
 function getIp(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || '127.0.0.1';
+  // req.ip est resolve par express selon trust proxy (un maillon : voir
+  // app.set('trust proxy') ci-dessus). L'ancienne version lisait
+  // X-Forwarded-For en brut : chaque requete pouvait se forger une
+  // nouvelle "ip" et reinitialiser sa cle de rate limit a l'infini.
+  return req.ip || '127.0.0.1';
 }
 
 function extraireAuth(req) {
