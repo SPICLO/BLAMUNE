@@ -150,6 +150,7 @@ raison pour laquelle `getComptes()` / `getStats()` existent.
 | `lib/resume.js`       | Repliage des anciens échanges en tâche de fond                                  | 121    |
 | `lib/pool_ia.js`      | Pool de secours `API_POOL` : ordres de passage, cooldowns, réutilisation sticky | 189    |
 | `lib/keepalive.js`    | Rappel planifié sur `/health` quand personne n'est connecté (anti-veille)       | 107    |
+| `lib/compression.js`  | Compression des réponses (zlib natif) : brotli puis gzip, cache RAM, ETag       | 338    |
 | `lib/ia/gemini.js`    | Transport Gemini, historique envoyé au modèle, reprise sur 429, état de quota   | 371    |
 | `lib/ia/openai.js`    | Fournisseurs compatibles OpenAI (Groq, DeepSeek, Ollama…), même cascade 429     | 283    |
 | `lib/qdrant_faits.js` | Mémoire vectorielle du savoir (Qdrant) : embeddings injectés ou hachage local   | 423    |

@@ -27,6 +27,7 @@ const { creerRouteSend } = require('./lib/routes/send');
 const { creerGemini, estQuota } = require('./lib/ia/gemini');
 const { creerPoolIA } = require('./lib/pool_ia');
 const { demarrerKeepalive } = require('./lib/keepalive');
+const { creerCompression } = require('./lib/compression');
 const { creerServiceBot } = require('./lib/service_bot');
 const { creerSavoir } = require('./lib/savoir');
 const { creerResume } = require('./lib/resume');
@@ -81,6 +82,13 @@ const SENSITIVE_FILES = [
   'stats.json',
   'erreurs.log'
 ];
+// Assets publics : les fichiers ressources de site/, servis par le
+// catcher wildcard. Pour eux, le Cache-Control global no-store est le
+// contraire du but : en leur absence, serve-static installe son
+// 'public, max-age=0' — revalide par ETag a chaque usage, sans jamais
+// garder un vieux corps, et les JSON de l'API restent no-store.
+const ASSETS_PUBLICS_RE =
+  /\.(css|js|mjs|html?|svg|png|jpe?g|ico|txt|xml|json|map|webp|wasm|woff2?)$/i;
 app.use((req, res, next) => {
   const reqPath = req.path.toLowerCase();
   if (SENSITIVE_FILES.some((f) => reqPath.endsWith(f))) return res.status(404).end();
@@ -97,7 +105,14 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-UID, X-EGO, X-Jeton');
   res.setHeader('Access-Control-Expose-Headers', 'Content-Length');
-  res.setHeader('Cache-Control', 'no-store');
+  // no-store : le corps d'une reponse API change d'un utilisateur a
+  // l'autre, aucun entrepot ne doit la garder. Les assets publics de
+  // site/ y derogent (voir ASSETS_PUBLICS_RE ci-dessus) : leur corps ne
+  // change qu'au deploiement, et l'ETag revalide a chaque usage.
+  const assetPublic =
+    (req.method === 'GET' && reqPath === '/') ||
+    (req.method === 'GET' && ASSETS_PUBLICS_RE.test(reqPath) && !reqPath.startsWith('/admin'));
+  if (!assetPublic) res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
@@ -114,6 +129,12 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.status(204).end();
   next();
 });
+
+// Compression des reponses lisibles (zlib natif, zero dependance npm) :
+// les SSE, plages 206, corps courts et types binaires passent tels quels
+// (gardes-fous detailles dans lib/compression.js). Place APRES le bloc
+// ci-dessus, qui decide deja quelles reponses portent un Cache-Control.
+app.use(creerCompression({ logger: loggerErreur }));
 
 // ==================== CONFIG ====================
 // Fournisseur, liste de modeles et rotation : implementation dans

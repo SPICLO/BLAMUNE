@@ -145,6 +145,7 @@ for f in ["server.js", "storage.js", "package.json", "package-lock.json",
           "lib/routes/consultation.js", "lib/routes/statique.js",
           "lib/routes/send.js", "lib/ia/gemini.js",
           "lib/keepalive.js", "lib/pool_ia.js", "lib/qdrant_faits.js",
+          "lib/compression.js",
           "tests/pool_ia.test.js", "tests/qdrant_faits.test.js",
           ".github/workflows/keepalive.yml",
           ".github/dependabot.yml", "SECURITY.md", "CONTRIBUTING.md",
@@ -161,6 +162,30 @@ for f in ["server.js", "storage.js", "package.json", "package-lock.json",
 for d in ["site", "admin", "lib"]:
     check(f"dossier {d}/ suivi par git",
           any(x.startswith(d + "/") for x in SUIVIS))
+
+# Compression des reponses : quatre non-regressions a garder en vie.
+#   - la zlib integree seule (zero dependance npm ajoutee) ;
+#   - l'installation reelle dans server.js (sans elle, tout part en
+#     texte brut : 6,7 Mo pour le bundle IA) ;
+#   - les assets publics restent exclus du no-store global : sinon les
+#     navigateurs ne gardent aucun fichier en cache ET le cache RAM du
+#     serveur reste vide, et chaque visite re-telecharge tout ;
+#   - le flux SSE passe sans transformation (comprimer un flux le
+#     retarderait morceau par morceau, jusqu'a un faux "plus rien"). 
+compjs = open("lib/compression.js", encoding="utf-8").read()
+srv = open("server.js", encoding="utf-8").read()
+check("lib/compression.js comprime avec la zlib integree",
+      "createGzip" in compjs and "createBrotliCompress" in compjs
+      and "require('zlib')" in compjs,
+      "brotli + gzip via node:zlib, sans dependance npm")
+check("server.js installe la compression des reponses",
+      "creerCompression" in srv)
+check("server.js tient les assets hors du no-store global",
+      "ASSETS_PUBLICS_RE" in srv and "if (!assetPublic)" in srv,
+      "un no-store inconditionnel remettrait chaque visite a " "re-telecharger chaque fichier, cache RAM compris")
+check("lib/compression.js laisse passer le flux SSE",
+      "event-stream" in compjs,
+      "comprimer un flux SSE le retarderait morceau par morceau")
 
 section("4. Coverage du bot C++ (regressions deja corrigees)")
 

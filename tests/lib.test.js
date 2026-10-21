@@ -16,6 +16,8 @@ const { creerHistorique } = require('../lib/historique');
 const { creerResume } = require('../lib/resume');
 const { creerConfigIA } = require('../lib/config_ia');
 const { demarrerKeepalive } = require('../lib/keepalive');
+const { creerCompression } = require('../lib/compression');
+const zlib = require('node:zlib');
 
 // Storage cloud desactive : ces tests ne doivent toucher aucun service.
 const storageFaux = { estConfigure: () => false, setMemoire() {}, setHistorique() {} };
@@ -831,4 +833,181 @@ test('appelerOpenAI : un membre SEUL arme la pile meme sans principal (aSecours)
   assert.strictEqual(rep, 'le membre seul repond');
   // La cascade historique (ordreModeles -> modeles 'a','b') ne doit pas tourner
   assert.deepStrictEqual(m._traces.alertes, []);
+});
+
+// ============================ COMPRESSION ============================
+
+// Faux res : ce que le middleware de compression touche, sans Express.
+// res.write est toujours pret (le drain ne bloque jamais) : on teste la
+// decision et les en-tetes, pas le ralentissement d'un vrai client.
+function fauxRes(entetes, statut) {
+  const r = {
+    headers: Object.assign({}, entetes),
+    statusCode: statut || 200,
+    ecrits: [],
+    finie: false,
+    getHeader(k) {
+      return r.headers[String(k).toLowerCase()];
+    },
+    setHeader(k, v) {
+      r.headers[String(k).toLowerCase()] = v;
+    },
+    removeHeader(k) {
+      delete r.headers[String(k).toLowerCase()];
+    },
+    write(c, enc) {
+      r.ecrits.push(Buffer.from(c, enc || 'utf8'));
+      return true;
+    },
+    end(c, enc) {
+      if (c) r.ecrits.push(Buffer.from(c, enc || 'utf8'));
+      r.finie = true;
+    },
+    on() {
+      return r;
+    },
+    once() {
+      return r;
+    }
+  };
+  Object.defineProperty(r, 'writableEnded', { get: () => r.finie });
+  return r;
+}
+
+function fauxReq(entetes, chemin) {
+  return { method: 'GET', headers: entetes || {}, path: chemin || '/x.css' };
+}
+
+function jusquA(cond, ms) {
+  return new Promise((resoudre, rejeter) => {
+    const depart = Date.now();
+    (function boucle() {
+      if (cond()) return resoudre();
+      if (Date.now() - depart > ms) return rejeter(new Error('delai depasse'));
+      setTimeout(boucle, 5);
+    })();
+  });
+}
+
+test('compression : un gros JSON part comprime et revient identique', async () => {
+  const compression = creerCompression({ cacheActiver: false });
+  const corps = JSON.stringify({ j: 'x'.repeat(20000) });
+  const res = fauxRes({
+    'content-type': 'application/json',
+    'content-length': String(corps.length)
+  });
+  compression(fauxReq({ 'accept-encoding': 'gzip' }, '/api.json'), res, () => {});
+  res.write(corps);
+  res.end();
+  await jusquA(() => res.finie, 2000);
+  assert.strictEqual(res.headers['content-encoding'], 'gzip');
+  // Le corps est plus court : le gain a replacé le seuil.
+  const sorti = Buffer.concat(res.ecrits);
+  assert(sorti.length < corps.length, 'le corps comprime doit etre plus court que l original');
+  assert.strictEqual(zlib.gunzipSync(sorti).toString('utf8'), corps);
+  assert.strictEqual(res.headers['content-length'], undefined, 'Content-Length doit origine');
+});
+
+test('compression : un petit corps reste tel quel (avec Vary honnete)', () => {
+  const compression = creerCompression({ cacheActiver: false });
+  const res = fauxRes({ 'content-type': 'text/plain', 'content-length': '100' });
+  compression(fauxReq({ 'accept-encoding': 'gzip' }, '/petit.txt'), res, () => {});
+  res.write('x'.repeat(100));
+  res.end();
+  assert.strictEqual(Buffer.concat(res.ecrits).toString(), 'x'.repeat(100));
+  assert.strictEqual(res.headers['content-encoding'], undefined);
+  assert.strictEqual(res.headers.vary, 'Accept-Encoding', 'Vary doit annoncer la variance');
+});
+
+test('compression : le flux SSE traverse au fil de l eau, sans transformation', () => {
+  const compression = creerCompression({ cacheActiver: false });
+  const res = fauxRes({ 'content-type': 'text/event-stream' });
+  compression(fauxReq({ 'accept-encoding': 'gzip, br' }, '/send'), res, () => {});
+  res.write('data: a\n\n');
+  res.write('data: b\n\n');
+  res.end();
+  assert.strictEqual(res.headers['content-encoding'], undefined);
+  assert.strictEqual(res.ecrits.length, 2, 'les deux morceaux doivent partir sans tassement');
+});
+
+test('compression : brotli prefere quand le client l accepte', async () => {
+  const compression = creerCompression({ cacheActiver: false });
+  const corps = 'y'.repeat(9000);
+  const res = fauxRes({
+    'content-type': 'text/javascript',
+    'content-length': String(corps.length)
+  });
+  compression(fauxReq({ 'accept-encoding': 'gzip, deflate, br' }, '/grand.js'), res, () => {});
+  res.write(corps);
+  res.end();
+  await jusquA(() => res.finie, 2000);
+  assert.strictEqual(res.headers['content-encoding'], 'br');
+  assert.strictEqual(zlib.brotliDecompressSync(Buffer.concat(res.ecrits)).toString('utf8'), corps);
+});
+
+test('compression : une plage 206 reste integre (pas de transformation)', () => {
+  const compression = creerCompression({ cacheActiver: false });
+  const res = fauxRes({
+    'content-type': 'text/plain',
+    'content-range': 'bytes 0-9/5000',
+    'content-length': '10'
+  });
+  compression(fauxReq({ 'accept-encoding': 'br, gzip' }, '/vert.txt'), res, () => {});
+  res.write('0123456789');
+  res.end();
+  assert.strictEqual(res.headers['content-encoding'], undefined);
+  assert.strictEqual(Buffer.concat(res.ecrits).toString(), '0123456789');
+});
+
+test('compression : jamais pour une methode POST', () => {
+  const compression = creerCompression({ cacheActiver: false });
+  const res = fauxRes({ 'content-type': 'application/json', 'content-length': '50000' });
+  const req = { method: 'POST', headers: { 'accept-encoding': 'gzip' }, path: '/send' };
+  compression(req, res, () => {});
+  assert.strictEqual(res.headers['content-encoding'], undefined);
+});
+
+test('compression : un corps arrive par end() seul est lui aussi comprime', async () => {
+  const compression = creerCompression({ cacheActiver: false });
+  const corps = 'q'.repeat(8000);
+  const res = fauxRes({ 'content-type': 'text/plain', 'content-length': String(corps.length) });
+  compression(fauxReq({ 'accept-encoding': 'gzip' }, '/tout.txt'), res, () => {});
+  res.end(corps);
+  await jusquA(() => res.finie, 2000);
+  assert.strictEqual(res.headers['content-encoding'], 'gzip');
+  assert.strictEqual(zlib.gunzipSync(Buffer.concat(res.ecrits)).toString('utf8'), corps);
+});
+
+test('compression : le cache sert de la RAM, rejoue l etag puis repond 304', async () => {
+  const ETAG = '"colonne-abc123"';
+  const compression = creerCompression(); // cache actif
+  const chemin = '/v' + Math.random().toString(36).slice(2) + '.css';
+  const corps = 'z'.repeat(5000);
+
+  // 1. Premier aller : compresse et memorise avec l etag du moment.
+  const r1 = fauxRes({
+    'content-type': 'text/css',
+    'content-length': String(corps.length),
+    etag: ETAG
+  });
+  compression(fauxReq({ 'accept-encoding': 'gzip' }, chemin), r1, () => {});
+  r1.write(corps);
+  r1.end();
+  await jusquA(() => r1.finie, 2000);
+  assert.strictEqual(r1.headers['content-encoding'], 'gzip');
+
+  // 2. Deuxieme aller : servie depuis le cache, sans rouvrir la route.
+  const r2 = fauxRes({ 'content-type': 'text/css', 'content-length': String(corps.length) });
+  compression(fauxReq({ 'accept-encoding': 'gzip' }, chemin), r2, () => {});
+  assert.strictEqual(r2.finie, true, 'la reponse du cache doit repartir sans attendre');
+  assert.strictEqual(r2.statusCode, 200);
+  assert.strictEqual(r2.headers['content-encoding'], 'gzip');
+  assert.strictEqual(r2.headers.etag, ETAG, 'le meme etag doit etre rejoue');
+  assert.strictEqual(zlib.gunzipSync(Buffer.concat(r2.ecrits)).toString('utf8'), corps);
+
+  // 3. Revalidation : If-None-Match reconnu -> 304 sans corps.
+  const r3 = fauxRes({ 'content-type': 'text/css', 'content-length': String(corps.length) });
+  compression(fauxReq({ 'accept-encoding': 'gzip', 'if-none-match': ETAG }, chemin), r3, () => {});
+  assert.strictEqual(r3.statusCode, 304);
+  assert.strictEqual(r3.ecrits.length, 0, 'un 304 ne porte aucun corps');
 });

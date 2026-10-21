@@ -9,6 +9,7 @@ const net = require('net');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const zlib = require('zlib');
 
 const RACINE = path.resolve(__dirname, '..');
 
@@ -42,6 +43,35 @@ function requete(port, chemin, methode, entetes) {
       }
     );
     req.on('error', (e) => resolve({ code: 0, type: '', corps: String(e) }));
+    req.end();
+  });
+}
+
+// Comme requete, mais octets bruts : la compression binaire (gzip, brotli)
+// doit arriver delai par delai sans passer par une conversion texte.
+function requeteBrute(port, chemin, entetes) {
+  return new Promise((resolve) => {
+    const req = http.request(
+      {
+        host: '127.0.0.1',
+        port,
+        path: chemin,
+        method: 'GET',
+        headers: entetes || {}
+      },
+      (res) => {
+        const morceaux = [];
+        res.on('data', (d) => morceaux.push(Buffer.from(d)));
+        res.on('end', () => {
+          resolve({
+            code: res.statusCode,
+            entetes: res.headers,
+            corps: Buffer.concat(morceaux)
+          });
+        });
+      }
+    );
+    req.on('error', (e) => resolve({ code: 0, entetes: {}, corps: Buffer.alloc(0) }));
     req.end();
   });
 }
@@ -355,6 +385,74 @@ function requete(port, chemin, methode, entetes) {
     verif(false, 'conditions du test réunies (compte + admin)');
   }
 
+  // ------------------------------------------------------------------
+  // 4e partie : COMPRESSION DES REPONSES.
+  //
+  // Vraie mesure : le meme fichier, demande sans puis avec
+  // Accept-Encoding, doit redecompresser a l'identique. Le dernier
+  // controle verifie la revalidation ETag sur la representation en
+  // cache (la deuxieme demande passe par la RAM, pas par les routes).
+  // ------------------------------------------------------------------
+  console.log('');
+  console.log('  -- compression des reponses --');
+  let extraC = 0;
+  const verifCompr = (bon, libelle, detail) => {
+    extraC++;
+    if (bon) {
+      ok++;
+      console.log('  [OK ] ' + libelle.padEnd(36) + (detail || ''));
+    } else {
+      ko.push('compression : ' + libelle);
+      console.log('  [KO ] ' + libelle.padEnd(36) + (detail || ''));
+    }
+  };
+  {
+    const rNue = await requeteBrute(port, '/style.css');
+    verifCompr(
+      rNue.code === 200 && !rNue.entetes['content-encoding'],
+      'sans demande : pas compresse',
+      '-> HTTP ' + rNue.code
+    );
+    const rGz = await requeteBrute(port, '/style.css', {
+      'Accept-Encoding': 'gzip'
+    });
+    verifCompr(
+      rGz.entetes['content-encoding'] === 'gzip',
+      'style.css part en gzip',
+      rNue.corps.length + ' -> ' + rGz.corps.length + ' octets'
+    );
+    verifCompr(
+      (() => {
+        try {
+          return zlib.gunzipSync(rGz.corps).equals(rNue.corps);
+        } catch (e) {
+          return false;
+        }
+      })(),
+      'le gzip redecompresse l original exactement'
+    );
+    // Le gros morceau : le bundle IA (6,6 Mo) doit partir en brotli.
+    const rBr = await requeteBrute(port, '/ia-webllm.mjs', {
+      'Accept-Encoding': 'gzip, deflate, br'
+    });
+    const tailleBrut = fs.statSync(path.join(RACINE, 'site', 'ia-webllm.mjs')).size;
+    verifCompr(
+      rBr.entetes['content-encoding'] === 'br',
+      'bundle IA part en brotli',
+      Math.round(tailleBrut / 1024) + ' Ko -> ' + Math.round(rBr.corps.length / 1024) + ' Ko'
+    );
+    verifCompr(rBr.corps.length < tailleBrut / 3, 'le brotli divise le poids par plus de 3');
+    // Revalidation sur la representation en cache : 2e demande sertie
+    // depuis la RAM porte le meme etag ; reconnu, elle devient un 304.
+    const etag = rGz.entetes.etag || '';
+    verifCompr(etag !== '', 'un etag accompagne la representation');
+    const r304 = await requeteBrute(port, '/style.css', {
+      'Accept-Encoding': 'gzip',
+      'If-None-Match': etag
+    });
+    verifCompr(r304.code === 304, 'revalidation depuis le cache -> 304', '-> HTTP ' + r304.code);
+  }
+
   // Attendre la FIN du processus avant de nettoyer : SQLite garde le fichier
   // ouvert, et un rm dans la foulée echoue en EBUSY.
   const termine = new Promise((r) => srv.on('exit', r));
@@ -368,7 +466,7 @@ function requete(port, chemin, methode, entetes) {
   }
 
   console.log('');
-  const total = CAS.length + (u.ego ? AUTH.length : 1) + extra;
+  const total = CAS.length + (u.ego ? AUTH.length : 1) + extra + extraC;
   console.log(ok + '/' + total + ' controles reussis');
   if (ko.length) {
     console.log('PROBLEMES :');

@@ -4,9 +4,18 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Ce journal démarre avec la mise à niveau « hygiène du dépôt » ci-dessous ; les
 versions antérieures sont visibles dans `git log`.
 
-## [Non publié] - 2026-10-20
+## [Non publié] - 2026-10-21
 
 ### Ajouté
+
+- **Compression des reponses (zlib natif, zero dependance npm)** — le
+  serveur renvoyait tout en texte brut : le bundle IA voyageait sur 6,7 Mo
+  a chaque telechargement. Maintenant brotli quand le client le sait lire,
+  sinon gzip : bundle IA 6,7 Mo -> 1,5 Mo, app.js 65 Ko -> 17 Ko, style.css
+  34 Ko -> 8 Ko. Les reponses courtes, les SSE, les plages 206 et les
+  types deja binaires passent sans transformation ; une URL statique deja
+  comprimee sertie depuis la RAM ne se recomprime plus et rejoue son ETag
+  (revalidation 304 gratuite, bornee a 10 entrees / 12 Mo).
 
 - **La sauvegarde cloud finit son travail a l'arret** — la sauvegarde
   part 3 s apres la derniere ecriture (debounce) ; un SIGTERM direct
@@ -55,6 +64,12 @@ versions antérieures sont visibles dans `git log`.
 
 ### Corrigé
 
+- **`Cache-Control: no-store` placé sur toutes les réponses**, y compris
+  les fichiers de `site/` : aucun navigateur ne gardait un asset en cache,
+  chaque visite re-telechargeait tout (bundle inclus). Les assets publics
+  (GET hors panneau) reçoivent maintenant `public, max-age=0` —
+  revalidés par ETag a chaque usage, jamais servis vieux — tandis que
+  l'API et le panneau admin restent sans aucune mémorisation.
 - `/admin/supprimer-compte` valide desormais le format du uid cible
   (`inv_` + 24 hex ou `u` + 12 hex) AVANT le `fs.rmSync` : la cible
   arrivait telle quelle du corps, un copier-coller rate pouvait effacer
