@@ -8,6 +8,23 @@ versions antérieures sont visibles dans `git log`.
 
 ### Ajouté
 
+- **La sauvegarde cloud finit son travail a l'arret** — la sauvegarde
+  part 3 s apres la derniere ecriture (debounce) ; un SIGTERM direct
+  tuait le minuteur, et chaque redeploiement Render perdait les
+  derniers messages et memoires des utilisateurs.
+  `storage.sauvegarderFinale()` vide le minuteur et fait le PUT tout
+  de suite ; server.js attend la fin (filet de 5 s, jamais plus).
+- **Reprise apres echec de sauvegarde** — delai croissant 3 s, 12 s,
+  27 s... plafonne a 60 s. Sinon, une panne reseau suivie d'une heure
+  sans ecriture laissait les donnees non sauvegardees tout ce temps.
+  Le nombre d'echecs se voit dans /stats (`sauvegarde.nbEchecs`).
+- **La route destructive a enfin ses tests** — `/admin/supprimer-compte`
+  etait la plus puissante du serveur et la seule sans filet. Smoke :
+  six controles de plus (refus hors admin, admin non supprimable, uid
+  hors format, suppression reussie, dossier efface du disque, 404 au
+  deuxieme passage). Integration : un compte inscrit de A a Z, efface,
+  et ses trois endroits verifies (registre, dossier, cloud).
+
 - **BLAMUNE_HOTE : hote du bot configurable** — `bot.cpp` avait
   `#define HOTE_BLAMUNE "blamune.onrender.com"` en dur : tout `bot.exe`
   compile par un tiers postait ses connaissances vers cette instance,
@@ -35,6 +52,17 @@ versions antérieures sont visibles dans `git log`.
 - `tests/pool_ia.test.js` passe au format prettier (la CI ne bloque pas
   dessus : il avait echappe au formatage sans qu'aucune porte ne le
   voie).
+
+### Corrigé
+
+- `/admin/supprimer-compte` valide desormais le format du uid cible
+  (`inv_` + 24 hex ou `u` + 12 hex) AVANT le `fs.rmSync` : la cible
+  arrivait telle quelle du corps, un copier-coller rate pouvait effacer
+  un dossier arbitraire hors de `users/`.
+- `/admin/change-mdp` exige desormais 8 caracteres, comme ADMIN_MDP.
+  La variable d'environnement et le panneau doivent exiger la meme
+  politique, sinon on peut affaiblir depuis le panneau ce que
+  l'environnement interdit.
 
 ### Modifie
 

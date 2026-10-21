@@ -304,6 +304,57 @@ function requete(port, chemin, methode, entetes) {
     }
   }
 
+  // ------------------------------------------------------------------
+  // 3e partie : SUPPRESSION DE COMPTE (route destructive).
+  //
+  // C'est la route la plus puissante du serveur : registre, dossier
+  // utilisateur, copie cloud et RAM partent d'un seul appel. En l'absence
+  // de test, une regression supprimerait plus (ou moins) en silence.
+  // Decorde fourni : d'abord les trois refus, puis le vrai effacement,
+  // verifie AU SYSTEME DE FICHIERS, puis l'obsolence de la cible.
+  // ------------------------------------------------------------------
+  console.log('');
+  console.log('  -- suppression de compte (route destructive) --');
+  let extra = 0;
+  const verif = (bon, libelle, detail) => {
+    extra++;
+    if (bon) {
+      ok++;
+      console.log('  [OK ] ' + libelle.padEnd(36) + (detail || ''));
+    } else {
+      ko.push('suppression compte : ' + libelle);
+      console.log('  [KO ] ' + libelle.padEnd(36) + (detail || ''));
+    }
+  };
+  if (u.ego && adminCompte) {
+    const rHorsAdmin = await poster('/admin/supprimer-compte', { uid: u.uid }, hUtilisateur);
+    verif(rHorsAdmin.code === 403, 'refusee hors admin (403)', '-> HTTP ' + rHorsAdmin.code);
+    const rCibleAdmin = await poster('/admin/supprimer-compte', { uid: adminCompte.uid }, hAdmin);
+    verif(
+      rCibleAdmin.code === 400,
+      'compte admin non supprimable (400)',
+      '-> HTTP ' + rCibleAdmin.code
+    );
+    const rUidInvalide = await poster('/admin/supprimer-compte', { uid: '../fuyard' }, hAdmin);
+    verif(
+      rUidInvalide.code === 400,
+      'uid hors format refuse (400)',
+      '-> HTTP ' + rUidInvalide.code
+    );
+    const dossierCible = path.join(dataDir, 'users', u.uid);
+    const rSupprime = await poster('/admin/supprimer-compte', { uid: u.uid }, hAdmin);
+    verif(rSupprime.code === 200, 'suppression reussie (200)', '-> HTTP ' + rSupprime.code);
+    verif(!fs.existsSync(dossierCible), 'dossier utilisateur efface du disque');
+    const rIntrouvable = await poster('/admin/supprimer-compte', { uid: u.uid }, hAdmin);
+    verif(
+      rIntrouvable.code === 404,
+      'compte deja partie -> introuvable (404)',
+      '-> HTTP ' + rIntrouvable.code
+    );
+  } else {
+    verif(false, 'conditions du test réunies (compte + admin)');
+  }
+
   // Attendre la FIN du processus avant de nettoyer : SQLite garde le fichier
   // ouvert, et un rm dans la foulée echoue en EBUSY.
   const termine = new Promise((r) => srv.on('exit', r));
@@ -317,7 +368,7 @@ function requete(port, chemin, methode, entetes) {
   }
 
   console.log('');
-  const total = CAS.length + (u.ego ? AUTH.length : 1);
+  const total = CAS.length + (u.ego ? AUTH.length : 1) + extra;
   console.log(ok + '/' + total + ' controles reussis');
   if (ko.length) {
     console.log('PROBLEMES :');

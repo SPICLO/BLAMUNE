@@ -945,6 +945,66 @@ async function main() {
       );
       ok.push('cloud: sauvegarde complete poussee automatiquement');
 
+      // 15ter. Suppression de compte (admin) : l'entree du registre, le
+      // dossier utilisateur ET la copie cloud partent. La cible est un
+      // compte reellement inscrit, comme le panneau admin en liste.
+      const compteCible = await requete(
+        portA,
+        '/register',
+        'POST',
+        'pseudo=ciblesupp&mdp=' + encodeURIComponent('motdepasse8') + '&email=cible@exemple.fr'
+      );
+      assert(
+        compteCible.json && compteCible.json.ok,
+        'compte a supprimer cree: ' + compteCible.texte.substring(0, 120)
+      );
+      const uidCible = compteCible.json.uid;
+      const supp1 = await requete(
+        portA,
+        '/send',
+        'POST',
+        'msg=' + encodeURIComponent('sa memoire partira avec lui') + '&mode=2',
+        { 'X-UID': uidCible, 'X-EGO': compteCible.json.ego }
+      );
+      assert.strictEqual(supp1.status, 200, 'message envoye par le compte cible');
+      const supp = await requete(
+        portA,
+        '/admin/supprimer-compte',
+        'POST',
+        JSON.stringify({ uid: uidCible }),
+        Object.assign(
+          { 'Content-Type': 'application/json' },
+          {
+            'X-UID': etatLogin.json.uid,
+            'X-EGO': etatLogin.json.ego
+          }
+        )
+      );
+      assert.strictEqual(
+        supp.status,
+        200,
+        'suppression admin: HTTP ' + supp.status + ' ' + supp.texte.substring(0, 150)
+      );
+      assert(
+        !fs.existsSync(path.join(dataA, 'users', uidCible)),
+        'dossier utilisateur efface sur instance A'
+      );
+      await condition(
+        () => {
+          const rec = binFaux && binFaux.record;
+          if (!rec) return false;
+          const resteHisto = Object.keys(rec.historiques || {}).some(
+            (k) => k.indexOf(uidCible + '_') === 0
+          );
+          const resteMemo = !!(rec.memories && rec.memories[uidCible]);
+          const resteCompte = !!(rec.comptes && rec.comptes['ciblesupp']);
+          return !resteHisto && !resteMemo && !resteCompte;
+        },
+        25000,
+        'cloud: traces utilisateur purges apres suppression de compte'
+      );
+      ok.push('cloud: suppression de compte nettoie disque et cloud');
+
       await envoiFils(serveurA);
       journal += '\n--- instance A (perdue) ---\n' + journalA;
 

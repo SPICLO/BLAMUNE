@@ -2769,14 +2769,21 @@ if (storage.estConfigure()) {
   setInterval(() => storage.declencherSauvegarde(), 600000);
 }
 setInterval(sauverStats, 60000);
-process.on('SIGTERM', () => {
+// A l'arret, la sauvegarde cloud pendante doit partir : elle est buffered
+// de 3 s (storage.js) et un exit direct tuerait le minuteur, perdant les
+// dernieres ecritures des utilisateurs a chaque redoploiement. Filet de
+// 5 s : le PUT doit avoir le temps de partir, sans jamais retenir
+// l'instance en otage au moment ou l'hebergeur coupe.
+function fermerProperement() {
   sauverStats();
-  process.exit(0);
-});
-process.on('SIGINT', () => {
-  sauverStats();
-  process.exit(0);
-});
+  const filet = setTimeout(() => process.exit(0), 5000);
+  if (filet.unref) filet.unref();
+  Promise.resolve(storage.sauvegarderFinale ? storage.sauvegarderFinale() : null)
+    .catch(() => {})
+    .then(() => process.exit(0));
+}
+process.on('SIGTERM', fermerProperement);
+process.on('SIGINT', fermerProperement);
 
 // Cleanup old connections every 5 min
 setInterval(() => {

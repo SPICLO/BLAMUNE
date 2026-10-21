@@ -67,17 +67,35 @@ function getSauvegarde() {
   return data.sauvegarde;
 }
 
-function planifierSauvegarde() {
+// Debouncing pour la sauvegarde cloud
+let _saveTimer = null;
+const SAVE_DELAY = 3000; // 3 secondes
+// Reprise apres echec : 3 s, puis 12 s, 27 s... crible a 60 s. Sans
+// reprise, une panne reseau suivie d'une tranche sans ecriture laissait
+// les donnees non sauvegardees jusqu'au prochain utilisateur.
+let echecSauvegarde = 0;
+
+function planifierSauvegarde(retardMs) {
   if (_saveTimer) clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => {
     _saveTimer = null;
     sauvegarderTout().catch(() => {});
-  }, SAVE_DELAY);
+  }, retardMs || SAVE_DELAY);
 }
 
-// Debouncing pour la sauvegarde cloud
-let _saveTimer = null;
-const SAVE_DELAY = 3000; // 3 secondes
+/**
+ * Sauvegarde immediate, sans debouncing. Appelee a l'arret du processus
+ * (SIGTERM/SIGINT) : Render donne quelques secondes de grace, sans elle
+ * le minuteur de 3 s mourrait avec le processus et les dernieres
+ * ecritures des utilisateurs seraient perdues a chaque redoploiement.
+ */
+function sauvegarderFinale() {
+  if (_saveTimer) {
+    clearTimeout(_saveTimer);
+    _saveTimer = null;
+  }
+  return sauvegarderTout();
+}
 
 // Requete HTTP vers JSONBin (API_URL surchargeable pour les tests)
 function jsonbinRequest(method, chemin, corps, entetes) {
@@ -269,9 +287,15 @@ async function sauvegarderTout() {
     await jsonbinRequest('PUT', `/v3/b/${id}`, data);
     derniereSauvegarde = new Date().toISOString();
     derniereErreur = null;
+    echecSauvegarde = 0;
   } catch (e) {
     derniereErreur = e.message;
-    console.log(`[storage] Erreur sauvegarde (bin=${binIdCourant || 'inconnu'}):`, e.message);
+    echecSauvegarde += 1;
+    // Reprise a dosage croissant : l'ecriture suivante redeclenche aussi
+    // la sauvegarde, mais si personne n'ecrit plus, la file reste vivante
+    // jusqu'au plafond de 60 s.
+    planifierSauvegarde(Math.min(SAVE_DELAY * echecSauvegarde * echecSauvegarde, 60000));
+    console.log(`[storage] Erreur sauvegarde (bin=${binIdCourant || 'inconnu'}) :`, e.message);
   }
 }
 
@@ -365,6 +389,7 @@ function etatSauvegarde() {
     decouverte,
     derniereSauvegarde,
     derniereErreur,
+    nbEchecs: echecSauvegarde,
     derniereTaille,
     chargee: !!(data && data.sauvegarde)
   };
@@ -380,6 +405,7 @@ module.exports = {
   setMemoire,
   supprimerTout,
   sauvegarderTout,
+  sauvegarderFinale,
   enregistrerFabrique,
   getSauvegarde,
   etatSauvegarde,
