@@ -4,9 +4,20 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Ce journal démarre avec la mise à niveau « hygiène du dépôt » ci-dessous ; les
 versions antérieures sont visibles dans `git log`.
 
-## [Non publié] - 2026-10-21
+## [Non publié] - 2026-10-21/22
 
 ### Ajouté
+
+- **Sprint D : l'apprentissage immediat a ses tests unitaires** — la
+  fonction qui capte un nom, un age une ville, des gouts ou un fait
+  « retiens que... » et les ecrit tout de suite etait branchee dans
+  server.js sans aucun test direct. Elle vit maintenant dans
+  `lib/auto_apprentissage.js` (module injectable) et `tests/lib.test.js`
+  la couvre par 7 cas : apprentissage multi-champs en un message,
+  capture gourmande coupee au premier delimiteur, enseignement enregistre
+  dans le savoir, humeur jamais prise pour un nom, promesse gardee sans
+  doublon, souvenir ecrit dans l'etat interieur, humeur de BLAMUNE a la
+  commande (« sois calme »).
 
 - **Le format prettier est devenu une porte de la CI** — `format:check`
   tourne avant les tests : un fichier mal formate ne passe plus l'etape.
@@ -72,6 +83,14 @@ versions antérieures sont visibles dans `git log`.
 
 ### Corrigé
 
+- **Express 5 casse les routes qui lisaient un corps absent** — v4
+  fournissait `req.body = {}` quand aucun parser ne tournait (POST sans
+  corps ni Content-Type), v5 laisse `req.body` undefined : `/register`
+  et `/login` partaient en 500 avec la page d'erreur d'Express des que
+  la requete arrivait sans corps. Un middleware apres les parsers retablit
+  le contrat v4 pour toutes les routes d'un coup — un POST sans corps
+  rend desormais le 400 legitime (« Pseudo trop court »).
+
 - **L'attaquant se forgeait sa propre cle de rate limit** — `getIp()`
   lisait `X-Forwarded-For` tel quel : chaque requete portant une entete
   forgee redevenait une "nouvelle IP", annulant le quota des routes
@@ -103,7 +122,24 @@ versions antérieures sont visibles dans `git log`.
   politique, sinon on peut affaiblir depuis le panneau ce que
   l'environnement interdit.
 
-### Modifie
+### Modifié
+
+- **Express 4 -> 5** — la dependance passe sur `^5.3.0`. Deux ruptures de
+  ce framework majeur vous touchaient directement : `app.get('*')` est
+  refuse au demarrage par path-to-regexp v8 (un wildcard porte un nom
+  desormais, `/*splat`), et un wildcard n'attrape jamais `/` — la racine
+  a desormais sa route explicite. Le reste du depot n'utilise aucune API
+  supprimee (`res.sendfile`, `req.param()`, `req.query` reaffectable...).
+
+- **server.js perd ~440 lignes : l'auto-apprentissage est externalise**
+  dans `lib/auto_apprentissage.js`, comme memoire, historique ou savoir
+  avant lui. Le cablage arrive apres la creation du savoir dans le
+  fichier : un fait appris s'enregistre aussi en base de connaissances,
+  donc `savoirEnregistrer` doit exister au moment de la fabrique.
+  `nettoyerValeur`, `PAS_UN_NOM`, `MOOD_MOTS` et `MOIS_FR` restent
+  importables par server.js : l'extraction par modele les reutilise.
+  Comportement identique : 97 tests unitaires, 51 integration et 67
+  smoke passes au meme niveau qu'avant l'extraction.
 
 - `README.md` rattrape sur le code : tableau des modules complet (12
   entrees — `lib/pool_ia.js`, `lib/keepalive.js`, `lib/qdrant_faits.js`

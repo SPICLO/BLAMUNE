@@ -1,8 +1,8 @@
 // Verification comportementale du refactor des routes.
 // Demarre le VRAI server.js puis interroge chaque route : le test cherche a
-// detecter une routeCapturee par un wildcard (le catcher app.get('*') doit
-// rester le dernier). Un registre qui renvoie du HTML ou "Page introuvable"
-// la ou on attend du JSON signale une route ombriquee.
+// detecter une routeCapturee par un wildcard (le catcher app.get('/*splat')
+// doit rester le dernier). Un registre qui renvoie du HTML ou "Page
+// introuvable" la ou on attend du JSON signale une route ombriquee.
 const { spawn } = require('child_process');
 const http = require('http');
 const net = require('net');

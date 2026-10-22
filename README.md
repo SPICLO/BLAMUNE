@@ -130,7 +130,7 @@ Trois limites, à connaître :
 
 ### Modules extraits de `server.js`
 
-`server.js` fait encore ~2 800 lignes. Il ne définit plus **aucune route** :
+`server.js` fait encore ~2 400 lignes. Il ne définit plus **aucune route** :
 il branche des modules, qui reçoivent leurs dépendances par injection au
 lieu de les importer. Conséquence directe : ils sont testables sans démarrer
 le serveur — voir `tests/lib.test.js`.
@@ -141,21 +141,22 @@ référence injectée à l'initialisation devient périmée après une restaurat
 de sauvegarde — c'est le piège que `comptes` et `stats` posent, et la
 raison pour laquelle `getComptes()` / `getStats()` existent.
 
-| Module                | Rôle                                                                            | Lignes |
-| --------------------- | ------------------------------------------------------------------------------- | ------ |
-| `lib/config_ia.js`    | Fournisseur, modèles de secours, rotation du dernier modèle répondu             | 181    |
-| `lib/rate_limit.js`   | Fenêtre glissante par IP et par utilisateur, purge périodique                   | 53     |
-| `lib/memoire.js`      | `users/<uid>/`, `memoire.txt` (format plat partagé avec le bot C++)             | 125    |
-| `lib/historique.js`   | `historique_mode<1\|2>.json`, push cloud                                        | 45     |
-| `lib/resume.js`       | Repliage des anciens échanges en tâche de fond                                  | 121    |
-| `lib/pool_ia.js`      | Pool de secours `API_POOL` : ordres de passage, cooldowns, réutilisation sticky | 189    |
-| `lib/keepalive.js`    | Rappel planifié sur `/health` quand personne n'est connecté (anti-veille)       | 107    |
-| `lib/compression.js`  | Compression des réponses (zlib natif) : brotli puis gzip, cache RAM, ETag       | 338    |
-| `lib/ia/gemini.js`    | Transport Gemini, historique envoyé au modèle, reprise sur 429, état de quota   | 371    |
-| `lib/ia/openai.js`    | Fournisseurs compatibles OpenAI (Groq, DeepSeek, Ollama…), même cascade 429     | 283    |
-| `lib/qdrant_faits.js` | Mémoire vectorielle du savoir (Qdrant) : embeddings injectés ou hachage local   | 423    |
-| `lib/service_bot.js`  | Bot C++ local via HTTP, cache LRU 5 min des messages récurrents                 | 132    |
-| `lib/savoir.js`       | Base de connaissances : SQLite, embeddings + Qdrant, banque de replis           | 641    |
+| Module                      | Rôle                                                                            | Lignes |
+| --------------------------- | ------------------------------------------------------------------------------- | ------ |
+| `lib/config_ia.js`          | Fournisseur, modèles de secours, rotation du dernier modèle répondu             | 181    |
+| `lib/rate_limit.js`         | Fenêtre glissante par IP et par utilisateur, purge périodique                   | 53     |
+| `lib/memoire.js`            | `users/<uid>/`, `memoire.txt` (format plat partagé avec le bot C++)             | 125    |
+| `lib/historique.js`         | `historique_mode<1\|2>.json`, push cloud                                        | 45     |
+| `lib/resume.js`             | Repliage des anciens échanges en tâche de fond                                  | 121    |
+| `lib/pool_ia.js`            | Pool de secours `API_POOL` : ordres de passage, cooldowns, réutilisation sticky | 189    |
+| `lib/keepalive.js`          | Rappel planifié sur `/health` quand personne n'est connecté (anti-veille)       | 107    |
+| `lib/compression.js`        | Compression des réponses (zlib natif) : brotli puis gzip, cache RAM, ETag       | 338    |
+| `lib/ia/gemini.js`          | Transport Gemini, historique envoyé au modèle, reprise sur 429, état de quota   | 371    |
+| `lib/ia/openai.js`          | Fournisseurs compatibles OpenAI (Groq, DeepSeek, Ollama…), même cascade 429     | 283    |
+| `lib/qdrant_faits.js`       | Mémoire vectorielle du savoir (Qdrant) : embeddings injectés ou hachage local   | 423    |
+| `lib/service_bot.js`        | Bot C++ local via HTTP, cache LRU 5 min des messages récurrents                 | 132    |
+| `lib/savoir.js`             | Base de connaissances : SQLite, embeddings + Qdrant, banque de replis           | 641    |
+| `lib/auto_apprentissage.js` | Apprentissage immédiat du message (nom, âge, goûts, « retiens que... »)         | 501    |
 
 | Module de routes             | Couvre                                                                      | Lignes |
 | ---------------------------- | --------------------------------------------------------------------------- | ------ |

@@ -1011,3 +1011,81 @@ test('compression : le cache sert de la RAM, rejoue l etag puis repond 304', asy
   assert.strictEqual(r3.statusCode, 304);
   assert.strictEqual(r3.ecrits.length, 0, 'un 304 ne porte aucun corps');
 });
+
+// ======================= AUTO-APPRENTISSAGE ==========================
+
+const { creerAutoApprentissage } = require('../lib/auto_apprentissage');
+
+// Instancie le module avec un faux memoire, un faux etat interieur et un
+// faux savoir : autoApprentissage apprend sans toucher au disque.
+function blamuneApprentissage() {
+  const etats = {};
+  const savoirs = [];
+  let memo = {};
+  const A = creerAutoApprentissage({
+    lireMemoire: () => Object.assign({}, memo),
+    sauvegarderMemoireComplete: (uid, m) => (memo = m),
+    lireEtat: (uid) => (etats[uid] = etats[uid] || { souvenirs: [] }),
+    sauvegarderEtat: () => {},
+    savoirEnregistrer: (cle, valeur, source, origine) => {
+      savoirs.push({ cle, valeur, origine });
+      return true;
+    }
+  });
+  return { A, savoirs, memo: () => memo, etat: (u) => etats[u] };
+}
+
+test('auto-apprentissage : nom, age, ville et plat passes de ce premier message', () => {
+  const { A, memo } = blamuneApprentissage();
+  A.autoApprentissage(
+    'u_aap0001',
+    "je m'appelle Leo, j'ai 12 ans, j'habite a Lyon, mon plat prefere c'est des nouilles"
+  );
+  const mem = memo();
+  assert.strictEqual(mem.nom, 'Leo');
+  assert.strictEqual(mem.age, '12');
+  assert.strictEqual(mem.ville, 'Lyon');
+  assert.strictEqual(mem.plat, 'des nouilles');
+});
+
+test('auto-apprentissage : une capture gourmande est coupee au premier delimiteur', () => {
+  const { A, memo } = blamuneApprentissage();
+  A.autoApprentissage('u_aap0002', "je joue au foot et j'ecoute du rap");
+  assert.strictEqual(memo().sport, 'foot');
+});
+
+test('auto-apprentissage : un fait "retiens que" part dans le savoir', () => {
+  const { A, savoirs } = blamuneApprentissage();
+  A.autoApprentissage('u_aap0003', 'retiens que tokyo est la capitale du japon');
+  assert.strictEqual(savoirs.length, 1);
+  assert.strictEqual(savoirs[0].cle, 'tokyo');
+  assert.strictEqual(savoirs[0].valeur, 'tokyo est la capitale du japon');
+  assert.strictEqual(savoirs[0].origine, 'auto');
+});
+
+test('auto-apprentissage : une humeur n est jamais un prenom', () => {
+  const { A, memo } = blamuneApprentissage();
+  A.autoApprentissage('u_aap0004', 'je suis triste');
+  assert.strictEqual(memo().nom, undefined, 'triste est un etat, pas un nom');
+  assert.strictEqual(memo().humeurUser, 'triste');
+});
+
+test('auto-apprentissage : une promesse est gardee, jamais dupliquee', () => {
+  const { A, memo } = blamuneApprentissage();
+  A.autoApprentissage('u_aap0005', 'rappelle-moi de faire mes devoirs');
+  assert.strictEqual(memo().promesses, 'faire mes devoirs');
+  A.autoApprentissage('u_aap0005', 'rappelle-moi de faire mes devoirs');
+  assert.strictEqual(memo().promesses, 'faire mes devoirs', 'pas de doublon');
+});
+
+test('auto-apprentissage : un evenement marque l etat interieur', () => {
+  const { A, etat } = blamuneApprentissage();
+  A.autoApprentissage('u_aap0006', 'je passe le permis demain');
+  assert.ok(etat('u_aap0006').souvenirs.length >= 1, 'souvenir absent de l etat interieur');
+});
+
+test('auto-apprentissage : humeur de BLAMUNE sur commande directe', () => {
+  const { A, memo } = blamuneApprentissage();
+  A.autoApprentissage('u_aap0007', 'sois calme');
+  assert.strictEqual(memo().humeur, 'calme');
+});

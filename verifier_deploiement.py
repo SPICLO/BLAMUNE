@@ -145,7 +145,7 @@ for f in ["server.js", "storage.js", "package.json", "package-lock.json",
           "lib/routes/consultation.js", "lib/routes/statique.js",
           "lib/routes/send.js", "lib/ia/gemini.js",
           "lib/keepalive.js", "lib/pool_ia.js", "lib/qdrant_faits.js",
-          "lib/compression.js",
+          "lib/compression.js", "lib/auto_apprentissage.js",
           "tests/pool_ia.test.js", "tests/qdrant_faits.test.js",
           ".github/workflows/keepalive.yml",
           ".github/dependabot.yml", "SECURITY.md", "CONTRIBUTING.md",
@@ -186,6 +186,41 @@ check("server.js tient les assets hors du no-store global",
 check("lib/compression.js laisse passer le flux SSE",
       "event-stream" in compjs,
       "comprimer un flux SSE le retarderait morceau par morceau")
+
+# Sprint D : Express 5 et l'auto-apprentissage extrait. Si Express
+# repassait en 4, le depot compilerait avec le wildcard v4 app.get('*')
+# qui fait planter le demarrage en Express 5 ; a l'inverse, un retour
+# a l'ancien code rendrait impossible le check exprime sur la syntaxe
+# v8. Et l'auto-apprentissage hors de server.js est ce qui rend
+# possible ses tests unitaires (sans fabrique injectable, aucun cas
+# dedie ne peut tourner sans demarrer le serveur entier).
+stq = open("lib/routes/statique.js", encoding="utf-8").read()
+pkgj = open("package.json", encoding="utf-8").read()
+aap = open("lib/auto_apprentissage.js", encoding="utf-8").read()
+
+check("express 5 declare comme dependance de production",
+      '"express": "^5.' in pkgj,
+      "express 4.x nest plus maintenu ; la migration majeure est faite")
+
+check("les wildcards Express sont nommes (/*splat, jamais * nu)",
+      "'/*splat'" in stq and "app.get('*'" not in stq,
+      "Express 5 refuse le wildcard nu au demarrage : path-to-regexp v8")
+
+check("la racine a sa route explicite (un /*splat ne couvre pas /)",
+      "app.get('/'," in stq,
+      "sans elle, la page daccueil devient un 404 sous Express 5")
+
+check("l auto-apprentissage vit dans lib/, plus dans server.js",
+      "creerAutoApprentissage" in srv and "function autoApprentissage(" not in srv,
+      "la plus grosse fonction du serveur est desormais un module injectable")
+
+check("l apprentissage immediat ecrit aussi dans le savoir",
+      "savoirEnregistrer" in aap,
+      "\"retiens que tokyo est la capitale du japon\" reste un fait persistent")
+
+check("le filet req.body (express 5 / body-parser 2.x) est en place",
+      "if (req.body === undefined) req.body = {};" in srv,
+      "v5 ne fournit plus req.body = {} : /register et /login partaient en 500 sans corps")
 
 section("4. Coverage du bot C++ (regressions deja corrigees)")
 
