@@ -2205,6 +2205,85 @@ creerRoutesConsultation(app, {
   histoAffichageMax: HISTO_AFFICHAGE_MAX
 });
 
+// ==================== WEB PUSH (sprint E) ====================
+// Notifications hors conversation. VAPID et chiffrement vivent dans
+// lib/push.js (zero dependance npm) ; l'abonnement navigateur dans
+// users/<uid>/abonnement.json. Sans VAPID_PRIVATE_KEY, la fabrique est
+// inactive : les routes existent, rien ne part, la sonde /proactif reste
+// le seul chemin (comportement intact).
+const { creerPush } = require('./lib/push');
+const { creerRoutesPush } = require('./lib/routes/push');
+
+function cheminAbonnement(uid) {
+  return path.join(dossierUser(uid), 'abonnement.json');
+}
+function lireAbonnement(uid) {
+  try {
+    const p = cheminAbonnement(uid);
+    return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null;
+  } catch (e) {
+    return null;
+  }
+}
+function ecrireAbonnement(uid, ab) {
+  try {
+    fs.mkdirSync(dossierUser(uid), { recursive: true });
+    fs.writeFileSync(cheminAbonnement(uid), JSON.stringify(ab, null, 2) + '\n');
+  } catch (e) {
+    loggerErreur('push', 'ecriture abonnement : ' + e.message);
+  }
+}
+function supprimerAbonnement(uid) {
+  try {
+    const p = cheminAbonnement(uid);
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+  } catch (e) {}
+}
+
+const push = creerPush({
+  clePrivee: process.env.VAPID_PRIVATE_KEY || '',
+  sujet: process.env.VAPID_SUBJECT || '',
+  lireAbonnement,
+  ecrireAbonnement,
+  supprimerAbonnement,
+  loggerErreur
+});
+
+creerRoutesPush(app, { push, extraireAuth, checkRateLimit, loggerErreur });
+
+// La vague d'arriere-plan (toutes les PUSH_CHECK_MS) : pour chaque
+// utilisateur INJOIGNABLE (dernier contact plus vieux que
+// PUSH_ABSENCE_MS — la sonde /proactif ne tourne pas chez lui) qui a un
+// abonnement, livrerProactif() applique les memes regles que la sonde
+// (anniversaire, absence, promesse, cooldowns compris). Si un message
+// est livre, il part en notification ; l'ecriture dans l'historique est
+// dans livrerProactif, donc la bulle est la au rechargement, sans
+// doublon possible. PUSH_CHECK_MS=0 (ou pas de VAPID) coupe la vague.
+const PUSH_CHECK_MS = parseInt(process.env.PUSH_CHECK_MS || '600000', 10);
+const PUSH_ABSENCE_MS = parseInt(process.env.PUSH_ABSENCE_MS || '1200000', 10);
+if (push.actif && PUSH_CHECK_MS > 0) {
+  const vaguePush = setInterval(() => {
+    try {
+      for (const d of fs.readdirSync(USERS_DIR, { withFileTypes: true })) {
+        if (!d.isDirectory()) continue;
+        const uid = d.name;
+        if (!lireAbonnement(uid)) continue;
+        const etatU = lireEtat(uid);
+        if (!etatU.dernierContact) continue; // jamais vu : rien a dire
+        if (Date.now() - etatU.dernierContact < PUSH_ABSENCE_MS) continue;
+        const message = livrerProactif(uid);
+        if (!message) continue;
+        push
+          .envoyer(uid, { titre: 'BLAMUNE', corps: message.texte })
+          .catch((e) => loggerErreur('push', 'vague : ' + e.message));
+      }
+    } catch (e) {
+      loggerErreur('push', 'vague : ' + e.message);
+    }
+  }, PUSH_CHECK_MS);
+  vaguePush.unref(); // ne retient jamais l'arret du process (flush 5 s)
+}
+
 // Fichiers statiques (site PWA + panneau admin) :
 // implementation dans lib/routes/statique.js.
 creerRoutesStatique(app, {

@@ -8,6 +8,30 @@ versions antérieures sont visibles dans `git log`.
 
 ### Ajouté
 
+- **Sprint E, étape 4 : BLAMUNE écrit hors du site (Web Push)** — la sonde
+  `/proactif` ne livre que quand l'utilisateur rafraîchit la page ; à
+  partir de là, plus personne ne reçoit les anniversaires ni les rappels
+  de promesse. Le Web Push arrive : clés générées par
+  `node scripts/generer_cles_push.js` (une seule clé privée à poser en
+  `VAPID_PRIVATE_KEY` ; la clé publique est dérivée et exposée par
+  `/push/config`), **zéro dépendance npm** — VAPID (RFC 8292) et le
+  chiffrement aes128gcm (RFC 8291/8188) tiennent dans le crypto natif de
+  Node, testés en roundtrip complet dans `tests/lib.test.js` (un
+  déchiffreur récepteur conforme lit ce que le module chiffre). Côté
+  site : un bouton « Notifications » (caché quand le serveur n'est pas
+  configuré), abonnement via `pushManager.subscribe` stocké dans
+  `users/<uid>/abonnement.json` ; le service worker affiche la
+  notification et adresse le clic vers le site. Côté serveur : une
+  vague d'arrière-plan (toutes les 10 min, `PUSH_CHECK_MS`) applique les
+  **mêmes règles proactives** (`livrerProactif`, cooldowns inclus) aux
+  absents de plus de 20 min (`PUSH_ABSENCE_MS`) et pousse le message ; il
+  est déjà dans l'historique, donc aucun doublon au retour. Sans `VAPID`
+  configuré, la fonctionnalité est éteinte de part en part (bouton
+  invisible, vague non démarrée, usage du site inchangé). Un abonnement
+  déclaré mort (404/410) est purgé automatiquement. Intégration
+  complète par un faux service push local (config, abonnement, essai
+  chiffré, purge).
+
 - **Sprint E, étape 3 : l'état intérieur de BLAMUNE devient visible** —
   l'humeur commandée (« sois calme »), ce qu'elle a noté de l'utilisateur
   et les promesses en cours vivaient dans la mémoire, invisibles hors du

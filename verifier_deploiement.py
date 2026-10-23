@@ -143,9 +143,10 @@ for f in ["server.js", "storage.js", "package.json", "package-lock.json",
           "lib/config_ia.js",
           "lib/routes/compte.js", "lib/routes/admin.js",
           "lib/routes/consultation.js", "lib/routes/statique.js",
-          "lib/routes/send.js", "lib/ia/gemini.js",
+          "lib/routes/push.js", "lib/routes/send.js", "lib/ia/gemini.js",
           "lib/keepalive.js", "lib/pool_ia.js", "lib/qdrant_faits.js",
-          "lib/compression.js", "lib/auto_apprentissage.js",
+          "lib/compression.js", "lib/auto_apprentissage.js", "lib/push.js",
+          "scripts/generer_cles_push.js",
           "tests/pool_ia.test.js", "tests/qdrant_faits.test.js",
           ".github/workflows/keepalive.yml",
           ".github/dependabot.yml", "SECURITY.md", "CONTRIBUTING.md",
@@ -238,6 +239,27 @@ check("la recherche d historique passe par ?q= via un module testable",
 check("l etat interieur de BLAMUNE est expose par /stats-perso",
       "blamune: {" in consjs and "humeurUser" in consjs and "promesses" in consjs,
       "la memoire emotionnelle est visible, pas enfermee dans le profil")
+
+# Sprint E, etape 4 : Web Push. Trois garanties independantes :
+#   1. la crypto vit dans lib/ SANS dependance npm (VAPID + aes128gcm) —
+#      pas de moment ou un paquet externe aurait la main sur les cles ;
+#   2. le service worker sait recevoir ET faire son travail au clic —
+#      sinon la notification arrive dans le vide ;
+#   3. le 410 du service purge l'abonnement — sinon le serveur retente
+#      un abonnement mort a chaque vague d'arriere-plan, pour toujours.
+pushjs = open("lib/push.js", encoding="utf-8").read()
+swjs2 = open("site/sw.js", encoding="utf-8").read()
+check("Web Push vit dans lib/, chiffre par le module, sans dependance npm",
+      "creerJetonVAPID" in pushjs
+      and "aes128gcm" in pushjs
+      and "require('web-push')" not in pushjs,
+      "VAPID RFC 8292 + aes128gcm RFC 8291 tiennent dans le crypto natif")
+check("le service worker recoit la notification et reagit au clic",
+      "addEventListener('push'" in swjs2 and "notificationclick" in swjs2,
+      "une notification blanche et muette serait pire que rien")
+check("l abonnement push est purge quand le service le declare mort",
+      "abonnement.json" in srv and "404" in pushjs and "410" in pushjs,
+      "sans purge, chaque vague retente un abonnement mort pour toujours")
 
 section("4. Coverage du bot C++ (regressions deja corrigees)")
 

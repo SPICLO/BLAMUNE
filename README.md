@@ -37,6 +37,10 @@ fournisseur compatible OpenAI) pour la conversation intelligente.
   utilisateurs, logs, sauvegarde/restauration).
 - **Multi-fournisseur IA** : Gemini par defaut, ou tout endpoint compatible OpenAI.
 - Le bot C++ (`bot.exe`) repond **sans aucune cle** : l'IA en ligne est optionnelle.
+- **Recherche dans l'historique** : le dossier entier est fouille, pas juste
+  l'ecran. **Etat interieur visible** : humeur de BLAMUNE, ce qu'elle a note
+  de toi, promesses en cours. **Notifications push** (Web Push, VAPID,
+  zero dependance) quand BLAMUNE ose ecrire en ton absence.
 
 ## Architecture
 
@@ -177,6 +181,7 @@ raison pour laquelle `getComptes()` / `getStats()` existent.
 | `lib/savoir.js`             | Base de connaissances : SQLite, embeddings + Qdrant, banque de replis           | 641    |
 | `lib/auto_apprentissage.js` | Apprentissage immédiat du message (nom, âge, goûts, « retiens que... »)         | 501    |
 | `lib/recherche.js`          | Recherche d'historique (`?q=`) : sans accents, casse insensible, bornée         | 50     |
+| `lib/push.js`               | Web Push : VAPID (RFC 8292) + chiffrement aes128gcm (RFC 8291), zéro dépendance | 333    |
 
 | Module de routes             | Couvre                                                                      | Lignes |
 | ---------------------------- | --------------------------------------------------------------------------- | ------ |
@@ -184,6 +189,7 @@ raison pour laquelle `getComptes()` / `getStats()` existent.
 | `lib/routes/admin.js`        | `/ping`, `/health`, `/connexions`, tout `/admin/*`, `/stats`, `/config-api` | 488    |
 | `lib/routes/compte.js`       | `/register`, `/login`, `/logout`, `/invite`, `/savoir`                      | 229    |
 | `lib/routes/consultation.js` | `/historique`, `/proactif`, `/stats-perso`, `/mode`, `/profil`              | 154    |
+| `lib/routes/push.js`         | `/push/config`, `/push/abonnement`, `/push/essai`, `/push/retirer`          | 76     |
 | `lib/routes/statique.js`     | Site PWA et panneau admin, avec garde-fous de traversée de chemin           | 97     |
 
 La couche HTTP est intégralement extraite : Gemini (`lib/ia/gemini.js`, sorti

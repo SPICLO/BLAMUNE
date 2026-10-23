@@ -21,6 +21,18 @@ const RACINE = path.resolve(__dirname, '..');
 const PORT_APP = librePort();
 const PORT_MOCK = librePort();
 const BASE_MOCK = `http://127.0.0.1:${PORT_MOCK}/v1beta`;
+
+// Cles VAPID de test (sprint E, Web Push) : le serveur principal tourne
+// avec les notifications actives. La cle publique du test est derivee
+// exactement comme le serveur la deverrait (on verifie plus bas qu ils
+// coincident). La vague proactive d'arriere-plan est poussée a une heure
+// (PUSH_CHECK_MS) : elle ne peut pas se declencher pendant la suite.
+const paireVapid = require('crypto').generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+const cleVapidPrivee = paireVapid.privateKey.export({ format: 'jwk' }).d;
+const { clePriveeDepuisBase64url, clePubliqueBrute } = require(path.join(RACINE, 'lib', 'push'));
+const cleVapidPublique = clePubliqueBrute(clePriveeDepuisBase64url(cleVapidPrivee)).toString(
+  'base64url'
+);
 const MOIS = [
   'janvier',
   'fevrier',
@@ -274,6 +286,11 @@ async function main() {
     // Regroupement des extractions (8 s en prod) : desactive pour que chaque
     // message soit extrait immediatement comme avant, sans rallonger la suite.
     EXTRACT_PAUSE_MS: '0',
+    // Web Push actif dans le test (cles generees ci-dessus) ; vague
+    // d'arriere-plan reportee a une heure : jamais declenchee ici.
+    VAPID_PRIVATE_KEY: cleVapidPrivee,
+    VAPID_SUBJECT: 'mailto:test@blamune.test',
+    PUSH_CHECK_MS: '3600000',
     // L'attente avant la seconde passe est bornee : la suite ne doit pas
     // dormir 60 s le temps que la fenetre de quota se recharge.
     QUOTA_ATTENTE_MAX_MS: '1000'
@@ -473,6 +490,98 @@ async function main() {
       'la commande d humeur remonte dans l etat visible'
     );
     ok.push('etat interieur visible (bloc blamune, humeur commande)');
+
+    // 6. Web Push (sprint E) : /push/config donne la cle publique (derivee
+    // fidele de la cle injectee au serveur) ; un abonnement navigateur de
+    // test est stocke, /push/essai livre un corps aes128gcm chiffre a un
+    // faux service push local, et un 410 purge l'abonnement automatiquement.
+    const pc = await requete(PORT_APP, '/push/config', 'GET', null, h);
+    assert.strictEqual(pc.status, 200, 'config push repond');
+    assert(pc.json.ok && pc.json.actif, 'push actif (cles injectees)');
+    assert.strictEqual(pc.json.cle, cleVapidPublique, 'cle publique derivee fidelement');
+
+    // Un faux navigateur : paire ECDH de test quit rend sa cle publique
+    // p256dh et son secret auth, comme le ferait pushManager.subscribe().
+    const ecdhNav = crypto.createECDH('prime256v1');
+    ecdhNav.generateKeys();
+    const pubNav = ecdhNav.getPublicKey();
+    const authNav = crypto.randomBytes(16);
+
+    function dechiffrerRun(corps) {
+      const salt = corps.slice(0, 16);
+      const idlen = corps[20];
+      const ephPub = corps.slice(21, 21 + idlen);
+      const chiffre = corps.slice(21 + idlen);
+      const ecdhR = crypto.createECDH('prime256v1');
+      ecdhR.setPrivateKey(ecdhNav.getPrivateKey());
+      const ikm = Buffer.concat([ecdhR.computeSecret(ephPub), authNav]);
+      const hkdf = (s, i, info, l) => Buffer.from(crypto.hkdfSync('sha256', i, s, info, l));
+      const infoOut = Buffer.concat([Buffer.from('WebPush: info\0'), pubNav, ephPub]);
+      const prk = hkdf(salt, ikm, infoOut, 32);
+      const info2 = (t) => Buffer.concat([Buffer.from(t, 'utf8'), Buffer.from([0, 1])]);
+      const cek = hkdf(salt, prk, info2('Content-Encoding: aes128gcm'), 16);
+      const nonce = hkdf(salt, prk, info2('Content-Encoding: nonce'), 12);
+      const d = crypto.createDecipheriv('aes-128-gcm', cek, nonce);
+      d.setAuthTag(chiffre.slice(chiffre.length - 16));
+      return Buffer.concat([d.update(chiffre.slice(0, chiffre.length - 16)), d.final()]);
+    }
+
+    const captures = [];
+    let codeFauxPush = 201;
+    const fauxPush = http.createServer((req, res) => {
+      const morceaux = [];
+      req.on('data', (c) => morceaux.push(c));
+      req.on('end', () => {
+        captures.push({
+          authorization: String(req.headers.authorization || ''),
+          contentEncoding: String(req.headers['content-encoding'] || ''),
+          corps: Buffer.concat(morceaux),
+          code: codeFauxPush
+        });
+        res.writeHead(codeFauxPush);
+        res.end('ok');
+      });
+    });
+    const portFauxPush = await new Promise((r) =>
+      fauxPush.listen(0, '127.0.0.1', () => r(fauxPush.address().port))
+    );
+
+    try {
+      const abonnementNav = {
+        endpoint: 'http://127.0.0.1:' + portFauxPush + '/livraison',
+        keys: { p256dh: pubNav.toString('base64url'), auth: authNav.toString('base64url') }
+      };
+      const pab = await requete(
+        PORT_APP,
+        '/push/abonnement',
+        'POST',
+        JSON.stringify({ abonnement: abonnementNav }),
+        Object.assign({ 'Content-Type': 'application/json' }, h)
+      );
+      assert.strictEqual(pab.status, 200, 'abonnement navigateur stocke');
+
+      const pes = await requete(PORT_APP, '/push/essai', 'POST', '', h);
+      assert.strictEqual(pes.status, 200, 'essai envoye');
+      assert(pes.json.ok, 'le service push a repondu ok');
+      assert.strictEqual(captures.length, 1, 'le faux service a recu une requete');
+      assert(captures[0].authorization.startsWith('vapid t='), 'inrepresented par vapid t=, k=');
+      assert(captures[0].authorization.includes(', k='), 'j contient la cle publique');
+      assert(captures[0].contentEncoding === 'aes128gcm', 'chiffrement announce et applique');
+      const clairRun = dechiffrerRun(captures[0].corps);
+      const finRun = clairRun.indexOf(0) >= 0 ? clairRun.indexOf(0) : clairRun.length;
+      const congru = JSON.parse(clairRun.slice(0, finRun).toString('utf8'));
+      assert.strictEqual(congru.titre, 'BLAMUNE', 'titre transporté');
+
+      // abonnement mort (410) : purge automatique, essai suivant cle sage.
+      codeFauxPush = 410;
+      const pel = await requete(PORT_APP, '/push/essai', 'POST', '', h);
+      assert.strictEqual(pel.json.statut, 410, 'code du service transporté');
+      const pel2 = await requete(PORT_APP, '/push/essai', 'POST', '', h);
+      assert.strictEqual(pel2.status, 400, 'plus d abonnement : refus clair');
+      ok.push('web push (config, abonnement, essai chiffre, purge 410)');
+    } finally {
+      await new Promise((r) => fauxPush.close(r));
+    }
 
     // 5. Anniversaire : appris au meme message, annonce si proche
     const dans10 = new Date(Date.now() + 10 * 86400000);

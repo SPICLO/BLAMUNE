@@ -1,5 +1,5 @@
-// BLAMUNE Service Worker - offline cache
-const CACHE = 'blamune-v10';
+// BLAMUNE Service Worker - offline cache + notifications push
+const CACHE = 'blamune-v11';
 const ASSETS = [
   '/',
   '/index.html',
@@ -43,6 +43,7 @@ self.addEventListener('fetch', (e) => {
     url.pathname.startsWith('/logout') ||
     url.pathname.startsWith('/profil') ||
     url.pathname.startsWith('/stats') ||
+    url.pathname.startsWith('/push') ||
     url.pathname.startsWith('/admin') ||
     url.pathname.startsWith('/ping') ||
     url.pathname.startsWith('/health') ||
@@ -81,5 +82,38 @@ self.addEventListener('fetch', (e) => {
         .catch(() => null);
       return cached || (await reval) || new Response('', { status: 504 });
     })()
+  );
+});
+
+// ---------------- WEB PUSH (sprint E) ----------------
+// La notification est dechiffree par le navigateur (aes128gcm) : le
+// payload est notre JSON { titre, corps, url }. Clic : la page est ouverte,
+// on la focus ; sinon on l'ouvre. Aucun appel reseau ici.
+self.addEventListener('push', (e) => {
+  let contenu = {};
+  try {
+    contenu = e.data ? e.data.json() : {};
+  } catch (err) {}
+  e.waitUntil(
+    self.registration.showNotification(contenu.titre || 'BLAMUNE', {
+      body: contenu.corps || 'BLAMUNE a quelque chose a te dire.',
+      icon: '/logo.png',
+      badge: '/logo.png',
+      tag: 'blamune',
+      data: { url: contenu.url || '/' }
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const cible = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((liste) => {
+      for (const fenetre of liste) {
+        if ('focus' in fenetre) return fenetre.focus();
+      }
+      return self.clients.openWindow(cible);
+    })
   );
 });

@@ -712,6 +712,7 @@ function initAuth() {
   }
 
   initialiserRecherche();
+  initialiserNotifications();
 
   // Position initiale de la pilule EGO / BLAMUNE
   setTimeout(function () {
@@ -1328,6 +1329,75 @@ async function actualiserEtatIA() {
     if (!r.ok) return;
     var j = await r.json();
     if (j.ok) majEtatIA(j);
+  } catch (e) {}
+}
+
+// ---------------- NOTIFICATIONS PUSH (sprint E) ----------------
+// Un seul bouton, une seule decision : /push/config dit si le serveur est
+// capable d'envoyer (VAPID configure). Bouton cache sinon. L'abonnement
+// n'est pas regenere a chaque visite : on le relit, on l'envoie une fois,
+// puis le bouton passe a l'etat label repose.
+function clesDeApplicationServerKey(b64url) {
+  var pad = '='.repeat((4 - (b64url.length % 4)) % 4);
+  var brut = window.atob((b64url + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  var octets = new Uint8Array(brut.length);
+  for (var i = 0; i < brut.length; i++) octets[i] = brut.charCodeAt(i);
+  return octets;
+}
+
+async function initialiserNotifications() {
+  var btn = document.getElementById('btnNotifications');
+  if (!btn) return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    var rc = await fetch('/push/config');
+    if (!rc.ok) return;
+    var cfg = await rc.json();
+    if (!cfg || cfg.ok === false || !cfg.actif || !cfg.cle) return;
+    var reg = (await navigator.serviceWorker.getRegistration()) || null;
+    var sub = reg ? await reg.pushManager.getSubscription() : null;
+    if (sub) {
+      btn.textContent = 'Notifications OK';
+      btn.disabled = true;
+      return;
+    }
+    btn.textContent = 'Activer les notifications';
+    btn.addEventListener('click', async function () {
+      try {
+        var permission =
+          window.Notification && window.Notification.requestPermission
+            ? await window.Notification.requestPermission()
+            : 'granted';
+        if (permission !== 'granted') {
+          ajouterInfo(
+            'Notifications refusees — active-les dans les reglages du site si tu changes d avis.'
+          );
+          return;
+        }
+        var pret = await navigator.serviceWorker.ready;
+        var ab = await pret.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: clesDeApplicationServerKey(cfg.cle)
+        });
+        var envoi = await fetch('/push/abonnement', {
+          method: 'POST',
+          headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+          body: JSON.stringify({ abonnement: ab.toJSON ? ab.toJSON() : ab })
+        });
+        var reponse = await envoi.json();
+        if (reponse.ok) {
+          btn.textContent = 'Notifications OK';
+          btn.disabled = true;
+          ajouterInfo(
+            'Notifications activees : BLAMUNE pourra t ecrire meme quand le site est ferme.'
+          );
+        } else {
+          ajouterInfo('L abonnement a ete refuse : ' + (reponse.message || 'raison inconnue'));
+        }
+      } catch (e) {
+        ajouterInfo("Les notifications n'ont pas pu s activer sur cet appareil.");
+      }
+    });
   } catch (e) {}
 }
 

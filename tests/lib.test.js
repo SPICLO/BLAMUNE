@@ -18,6 +18,7 @@ const { creerConfigIA } = require('../lib/config_ia');
 const { demarrerKeepalive } = require('../lib/keepalive');
 const { creerCompression } = require('../lib/compression');
 const zlib = require('node:zlib');
+const cryptoModule = require('node:crypto');
 
 // Storage cloud desactive : ces tests ne doivent toucher aucun service.
 const storageFaux = { estConfigure: () => false, setMemoire() {}, setHistorique() {} };
@@ -1145,4 +1146,238 @@ test('recherche : une entree sans texte est sautee, jamais plantage', () => {
     'pizza'
   );
   assert.strictEqual(r.total, 1);
+});
+
+// ================================= WEB PUSH =================================
+
+const PUSH = require('../lib/push');
+
+function paireRecepteurTest() {
+  const ecdh = cryptoModule.createECDH('prime256v1');
+  ecdh.generateKeys();
+  return { prive: ecdh.getPrivateKey(), pub: ecdh.getPublicKey(), ecdh };
+}
+
+// Le recepteur aes128gcm (RFC 8291) implemente dans le test : si le module
+// chiffre quelque chose que CE decrypteur lit, un navigateur le lira aussi
+// (meme norme, meme bibliographie : serveur = sender, le test = receiver).
+function dechiffrerAes128gcm(corps, recepteur) {
+  const salt = corps.slice(0, 16);
+  const rs = corps.readUInt32BE(16);
+  const idlen = corps[20];
+  const ephPub = corps.slice(21, 21 + idlen);
+  const chiffre = corps.slice(21 + idlen);
+  const ecdhR = cryptoModule.createECDH('prime256v1');
+  ecdhR.setPrivateKey(recepteur.prive);
+  const ikm = Buffer.concat([ecdhR.computeSecret(ephPub), recepteur.auth]);
+  const hkdf = (s, i, info, l) => Buffer.from(cryptoModule.hkdfSync('sha256', i, s, info, l));
+  const infoOut = Buffer.concat([Buffer.from('WebPush: info\0'), recepteur.pub, ephPub]);
+  const prk = hkdf(salt, ikm, infoOut, 32);
+  const info2 = (texte) => Buffer.concat([Buffer.from(texte, 'utf8'), Buffer.from([0, 1])]);
+  const cek = hkdf(salt, prk, info2('Content-Encoding: aes128gcm'), 16);
+  const nonce = hkdf(salt, prk, info2('Content-Encoding: nonce'), 12);
+  const d = cryptoModule.createDecipheriv('aes-128-gcm', cek, nonce);
+  d.setAuthTag(chiffre.slice(chiffre.length - 16));
+  const clair = Buffer.concat([d.update(chiffre.slice(0, chiffre.length - 16)), d.final()]);
+  return { clair, rs };
+}
+
+test('push : cle privee 32 octets -> derivee publique fidele', () => {
+  const { generateKeyPairSync } = cryptoModule;
+  const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const jwk = privateKey.export({ format: 'jwk' });
+  const ko = PUSH.clePriveeDepuisBase64url(jwk.d);
+  assert(ko && ko.type === 'private', 'cle privee rechargee');
+  const brute = PUSH.clePubliqueBrute(ko);
+  const attendue = publicKey.export({ type: 'spki', format: 'der' }).slice(-65);
+  assert.strictEqual(brute.length, 65, 'point P-256 non compresse');
+  assert(brute.equals(attendue), 'la derivation rejoint la paire d origine');
+  let refuse = false;
+  try {
+    PUSH.clePriveeDepuisBase64url(Buffer.from('court').toString('base64url'));
+  } catch (e) {
+    refuse = true;
+  }
+  assert(refuse, 'une cle autre que 32 octets est refusee');
+});
+
+test('push : jeton VAPID ES256 verifiable avec la cle publique derivee', () => {
+  const { generateKeyPairSync } = cryptoModule;
+  const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const cle = PUSH.clePriveeDepuisBase64url(privateKey.export({ format: 'jwk' }).d);
+  const jeton = PUSH.creerJetonVAPID(
+    cle,
+    'mailto:test@blamune.test',
+    'https://fcm.example',
+    1717000000000
+  );
+  const parties = jeton.split('.');
+  const charge = JSON.parse(Buffer.from(parties[1], 'base64url').toString('utf8'));
+  assert.strictEqual(charge.aud, 'https://fcm.example');
+  assert(/^mailto:/.test(charge.sub), 'sub est un mailto');
+  assert(charge.exp > Math.floor(1717000000000 / 1000), 'exp dans le futur');
+  const verif = cryptoModule.verify(
+    null,
+    Buffer.from(parties[0] + '.' + parties[1]),
+    { key: cryptoModule.createPublicKey(cle), dsaEncoding: 'ieee-p1363' },
+    Buffer.from(parties[2], 'base64url')
+  );
+  assert.strictEqual(verif, true, 'signature ES256 valide');
+});
+
+test('push : roundtrip aes128gcm complet, delimiter et taille de record', () => {
+  const rec = paireRecepteurTest();
+  rec.auth = cryptoModule.randomBytes(16);
+  const charge = Buffer.from('{"titre":"BLAMUNE","corps":"salut a distance","url":"/"}', 'utf8');
+  const rs = 4096;
+  const corps = PUSH.chiffrerPayload(rec.pub, rec.auth, charge, {
+    tailleRecord: rs,
+    salt: cryptoModule.randomBytes(16)
+  });
+  const lu = dechiffrerAes128gcm(corps, rec);
+  assert.strictEqual(lu.rs, rs, 'taille de record transportee');
+  assert(lu.clair.slice(0, charge.length).equals(charge), 'payload reconstitue au debut');
+  assert.strictEqual(lu.clair[lu.clair.length - 1], 2, 'delimiteur final 0x02');
+  let refuse = false;
+  try {
+    PUSH.chiffrerPayload(rec.pub, rec.auth, Buffer.alloc(5000, 7), { tailleRecord: rs });
+  } catch (e) {
+    refuse = true;
+  }
+  assert(refuse, 'payload trop long : refus propre, pas un plantage');
+});
+
+test('push : validation d abonnement stricte', () => {
+  const rec = paireRecepteurTest();
+  const auth = cryptoModule.randomBytes(16);
+  const base = {
+    endpoint: 'https://fcm.example/fcm/send/abc',
+    keys: { p256dh: rec.pub.toString('base64url'), auth: auth.toString('base64url') }
+  };
+  assert.strictEqual(PUSH.validerAbonnement(base), null, 'abonnement conforme accepte');
+  assert(PUSH.validerAbonnement(null) !== null, 'nul refuse');
+  assert(PUSH.validerAbonnement({}) !== null, 'vide refuse');
+  const httpHorsTest = { endpoint: 'http://fcm.example/x', keys: base.keys };
+  assert(PUSH.validerAbonnement(httpHorsTest) !== null, 'http refuse hors test');
+  const httpLocal = { endpoint: 'http://127.0.0.1:9/x', keys: base.keys };
+  assert.strictEqual(
+    PUSH.validerAbonnement(httpLocal, { NODE_ENV: 'test' }),
+    null,
+    'http localhost accepte seulement en test (faux service push)'
+  );
+  const cleCourt = {
+    endpoint: base.endpoint,
+    keys: { p256dh: rec.pub.slice(0, 30).toString('base64url'), auth: base.keys.auth }
+  };
+  assert(PUSH.validerAbonnement(cleCourt) !== null, 'p256dh altere refuse');
+  const authCourt = {
+    endpoint: base.endpoint,
+    keys: { p256dh: base.keys.p256dh, auth: Buffer.from([1, 2, 3]).toString('base64url') }
+  };
+  assert(PUSH.validerAbonnement(authCourt) !== null, 'secret auth trop court refuse');
+});
+
+let comptesErreurs = [];
+
+test('push : fabrique inactive sans cle, config le dit franchement', async () => {
+  comptesErreurs = [];
+  const memoireCles = new Map();
+  const fabriqueIn = PUSH.creerPush({
+    clePrivee: '',
+    lireAbonnement: (u) => memoireCles.get(u) || null,
+    ecrireAbonnement: (u, a) => memoireCles.set(u, a),
+    supprimerAbonnement: (u) => memoireCles.delete(u),
+    loggerErreur: (cat, msg) => comptesErreurs.push(cat + ': ' + msg)
+  });
+  assert.strictEqual(fabriqueIn.actif, false);
+  assert.strictEqual(fabriqueIn.config().actif, false);
+  assert.strictEqual(fabriqueIn.config().cle, '');
+  const r = await fabriqueIn.envoyer('u1', { titre: 'x', corps: 'y' });
+  assert.strictEqual(r.raison, 'pas d abonnement', 'pas d abonnement : reponse claire');
+});
+
+test('push : fabrique active — envoi, purge des abonnements morts', async () => {
+  comptesErreurs = [];
+  const rec = paireRecepteurTest();
+  rec.auth = cryptoModule.randomBytes(16);
+  const { generateKeyPairSync } = cryptoModule;
+  const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const clePrivee = privateKey.export({ format: 'jwk' }).d;
+  const memoireCles = new Map();
+  let purges = 0;
+  const fabrique = PUSH.creerPush({
+    clePrivee,
+    sujet: 'mailto:test@blamune.test',
+    env: { NODE_ENV: 'test' },
+    lireAbonnement: (u) => memoireCles.get(u) || null,
+    ecrireAbonnement: (u, a) => memoireCles.set(u, a),
+    supprimerAbonnement: (u) => {
+      purges++;
+      memoireCles.delete(u);
+    },
+    loggerErreur: (cat, msg) => comptesErreurs.push(cat + ': ' + msg)
+  });
+  assert.strictEqual(fabrique.actif, true, 'fabrique active avec cle');
+  assert.strictEqual(Buffer.from(fabrique.config().cle, 'base64url').length, 65, 'cle pub 65 o');
+
+  // Un faux service push LOCAL : l'endpoint est libre, le module ne fait
+  // qu'envoyer la requete au service deduit de l'abonnement.
+  const http = require('node:http');
+  const capture = { entetes: null, corps: null };
+  const fauxPort = 18400 + (process.pid % 500);
+  const faux = http.createServer((req, res) => {
+    const morceaux = [];
+    req.on('data', (d) => morceaux.push(d));
+    req.on('end', () => {
+      capture.entetes = req.headers;
+      capture.corps = Buffer.concat(morceaux);
+      const code = faux.repCode;
+      res.writeHead(code || 201);
+      res.end('ok');
+    });
+  });
+  await new Promise((r) => faux.listen(fauxPort, '127.0.0.1', r));
+
+  // abonnement valide navigateur -> enregistre
+  const ab = {
+    endpoint: 'http://127.0.0.1:' + fauxPort + '/livraison',
+    keys: { p256dh: rec.pub.toString('base64url'), auth: rec.auth.toString('base64url') }
+  };
+  await fabrique.abonnementSauver('u_push1', ab);
+  assert(memoireCles.get('u_push1'), 'abonnement stocke apres validation');
+
+  try {
+    // envoi : le faux service recupere un corps aes128gcm + entete VAPID
+    faux.repCode = 201;
+    const resultat = await fabrique.envoyer('u_push1', {
+      titre: 'BLAMUNE',
+      corps: 'on se parle de loin'
+    });
+    assert.strictEqual(resultat.ok, true, 'HTTP ' + resultat.statut);
+    assert(String(capture.entetes.authorization).startsWith('vapid t='), 'Authorization vapid');
+    assert(capture.entetes['content-encoding'] === 'aes128gcm', 'Content-Encoding');
+    assert(capture.entetes.ttl !== undefined, 'TTL present');
+
+    // Le reseau est le meme chemin qu'un vrai navigateur : on dechiffre.
+    const lu = dechiffrerAes128gcm(capture.corps, rec);
+    // Le module met le payload au debut puis un padding de zeros ; le JSON
+    // texte n'a pas de nul interne, fin au premier 0x00.
+    const croise = lu.clair.indexOf(0) >= 0 ? lu.clair.indexOf(0) : lu.clair.length;
+    const message = JSON.parse(lu.clair.slice(0, croise).toString('utf8'));
+    assert.strictEqual(message.titre, 'BLAMUNE');
+    assert.strictEqual(message.corps, 'on se parle de loin');
+
+    // Le service repond 410 (abonnement mort) -> purge automatique...
+    faux.repCode = 410;
+    const r2 = await fabrique.envoyer('u_push1', {});
+    assert.strictEqual(r2.ok, false);
+    assert.strictEqual(r2.statut, 410);
+    assert.strictEqual(purges, 1, 'abonnement mort retire automatiquement');
+
+    // ...puis un envoi suivant dit franchement qu il n y a plus rien.
+    const r3 = await fabrique.envoyer('u_push1', {});
+    assert.strictEqual(r3.raison, 'pas d abonnement');
+  } finally {
+    await new Promise((r) => faux.close(r));
+  }
 });
