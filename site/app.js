@@ -169,6 +169,9 @@ function afficherApp() {
     appContenu.style.flexDirection = 'column';
   }
   finaliserAffichageApp();
+  // L'etat interieur de BLAMUNE (pastille) suit chaque entree dans l'app :
+  // chargement initial, (re)connexion, sorties d'invite.
+  actualiserEtatIA();
 }
 
 function finaliserAffichageApp() {
@@ -1269,6 +1272,65 @@ function initialiserRecherche() {
   });
 }
 
+// ---------------- ETAT DE BLAMUNE VISIBLE (sprint E) ----------------
+// L'humeur de BLAMUNE et ce qu'elle a note de l'utilisateur vivent dans la
+// memoire, mais etaient invisibles hors du profil complet. Une pastille dis-
+// crete sous le statut les rend visibles, seulement quand il y a quelque
+// chose a dire : pas d'humeur, pas d'humeur detectee, aucune promesse en
+// cours -> la pastille se retire.
+
+var LIBELLES_HUMEUR = {
+  calme: 'au calme',
+  joyeux: 'joyeuse',
+  triste: 'triste',
+  energique: 'energique'
+};
+var LIBELLES_HUMEUR_USER = {
+  calme: 'au calme',
+  joyeux: 'joyeux ou joyeuse',
+  triste: 'triste',
+  fatigue: 'fatigue(e)',
+  energique: "plein(e) d'energie"
+};
+
+function majEtatIA(j) {
+  var el = document.getElementById('etatIA');
+  if (!el) return;
+  var b = j && j.blamune;
+  var morceaux = [];
+  if (b && b.humeur) {
+    morceaux.push('BLAMUNE se sent ' + (LIBELLES_HUMEUR[b.humeur] || b.humeur));
+  }
+  if (b && b.humeurUser) {
+    morceaux.push('Tu sembles ' + (LIBELLES_HUMEUR_USER[b.humeurUser] || b.humeurUser));
+  }
+  if (b && b.promesses && b.promesses.length) {
+    morceaux.push(
+      'Promesse en cours : ' +
+        b.promesses.slice(0, 2).join(', ') +
+        (b.promesses.length > 2 ? '...' : '')
+    );
+  }
+  var texte = morceaux.join(' \u00b7 ');
+  if (!texte) {
+    el.style.display = 'none';
+    el.textContent = '';
+    return;
+  }
+  el.textContent = texte;
+  el.style.display = 'block';
+}
+
+async function actualiserEtatIA() {
+  if (!getAuthUserId()) return;
+  try {
+    var r = await fetch('/stats-perso', { headers: authHeaders() });
+    if (!r.ok) return;
+    var j = await r.json();
+    if (j.ok) majEtatIA(j);
+  } catch (e) {}
+}
+
 // ---------------- ACTIONS ----------------
 
 function desactiver(on) {
@@ -1521,7 +1583,22 @@ async function traiterCommande(m) {
                 ')'
               : '');
       }
+      // Etat interieur (sprint E) : la memoire emotionnelle, en clair.
+      var b = j.blamune || {};
+      if (b.humeur) {
+        lignes += '\nHumeur de BLAMUNE : ' + (LIBELLES_HUMEUR[b.humeur] || b.humeur) + '.';
+      }
+      if (b.humeurUser) {
+        lignes +=
+          "\nCe qu'elle a note chez toi : tu sembles " +
+          (LIBELLES_HUMEUR_USER[b.humeurUser] || b.humeurUser) +
+          '.';
+      }
+      if (b.promesses && b.promesses.length) {
+        lignes += '\nPromesses en cours : ' + b.promesses.join(' ; ');
+      }
       ajouterSysteme(lignes);
+      majEtatIA(j);
     } catch (e) {
       ajouterInfo('Stats indisponibles pour le moment.');
     }
@@ -1758,6 +1835,9 @@ async function envoyer() {
     z.focus();
     setTimeout(function () {
       charger();
+      // L'apprentissage vient de tourner : l'etat affiche peut avoir change
+      // (humeur, promesse). On rafraichit apres le rechargement du fil.
+      setTimeout(actualiserEtatIA, 600);
     }, 500);
   }
 }

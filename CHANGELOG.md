@@ -8,6 +8,16 @@ versions antérieures sont visibles dans `git log`.
 
 ### Ajouté
 
+- **Sprint E, étape 3 : l'état intérieur de BLAMUNE devient visible** —
+  l'humeur commandée (« sois calme »), ce qu'elle a noté de l'utilisateur
+  et les promesses en cours vivaient dans la mémoire, invisibles hors du
+  profil complet. `/stats-perso` expose désormais un bloc `blamune` —
+  discret à dessein : une pastille, pas un rapport — rendu visible sous
+  le statut du site (retiré quand il n'y a rien à dire), rafraîchi à
+  l'entrée dans l'app et après chaque message, et détaillé par la
+  commande `/stats`. Intégrée par un nouveau cas (`sois calme` remonte
+  dans l'état visible) ; +1 check vocabulaire.
+
 - **Sprint E, étape 2 : retrouver une phrase dans tout l'historique** — le
   fil n'affiche que les dernières bulles (au-delà, le rendu fige la
   page), et rien ne permettait de relire une conversation d'il y a des

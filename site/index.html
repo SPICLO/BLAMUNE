@@ -149,6 +149,20 @@
               <span class="point" id="pointStatut"></span>
               <span id="texteStatut">Connexion...</span>
             </div>
+            <!-- Etat interieur visible (sprint E) : humeur de BLAMUNE et ce
+                 qu'elle a note de toi — alimente par /stats-perso, disparaît
+                 quand il n'y a rien a dire. -->
+            <div
+              id="etatIA"
+              aria-live="polite"
+              style="
+                display: none;
+                color: var(--texte-doux);
+                font-size: 11px;
+                line-height: 14px;
+                max-width: 260px;
+              "
+            ></div>
           </div>
         </div>
         <div id="boutons">

@@ -457,6 +457,23 @@ async function main() {
     assert(hq0.json.recherche === undefined, 'un seul caractere : pas de mode recherche');
     ok.push('recherche historique (q, accents, motif trop court)');
 
+    // 5. Etat interieur visible (sprint E) : « sois calme » passe par
+    // l'auto-apprentissage, et /stats-perso porte desormais le bloc blamune
+    // (humeur de BLAMUNE, humeur detectee chez l'utilisateur, promesses).
+    const st0 = await requete(PORT_APP, '/stats-perso', 'GET', null, h);
+    assert.strictEqual(st0.status, 200);
+    assert(st0.json.ok && st0.json.blamune, 'bloc blamune present dans /stats-perso');
+    assert(Array.isArray(st0.json.blamune.promesses), 'promesses en tableau');
+    const soisCalme = await requete(PORT_APP, '/send', 'POST', 'msg=sois+calme&mode=2', h);
+    assert.strictEqual(soisCalme.status, 200, 'sois calme accepte par /send');
+    const st1 = await requete(PORT_APP, '/stats-perso', 'GET', null, h);
+    assert.strictEqual(
+      st1.json.blamune.humeur,
+      'calme',
+      'la commande d humeur remonte dans l etat visible'
+    );
+    ok.push('etat interieur visible (bloc blamune, humeur commande)');
+
     // 5. Anniversaire : appris au meme message, annonce si proche
     const dans10 = new Date(Date.now() + 10 * 86400000);
     await envoyer('mon anniversaire est le ' + dans10.getDate() + ' ' + MOIS[dans10.getMonth()]);

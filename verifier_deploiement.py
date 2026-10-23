@@ -232,6 +232,13 @@ check("la recherche d historique passe par ?q= via un module testable",
       "filtrerHistorique" in consjs and "filtrerHistorique" in rechjs,
       "l'archive entiere est fouillee, insensible aux accents et a la casse")
 
+# Sprint E, etape 3 : l'etat interieur de BLAMUNE (humeur commandee, ce
+# qu'elle a note de l'utilisateur, promesses) doit sortir du coffre — il est
+# desormais dans /stats-perso (bloc blamune), consommable par la pastille.
+check("l etat interieur de BLAMUNE est expose par /stats-perso",
+      "blamune: {" in consjs and "humeurUser" in consjs and "promesses" in consjs,
+      "la memoire emotionnelle est visible, pas enfermee dans le profil")
+
 section("4. Coverage du bot C++ (regressions deja corrigees)")
 
 ci = open(".github/workflows/ci.yml", encoding="utf-8").read()
