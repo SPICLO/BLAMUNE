@@ -1354,6 +1354,9 @@ async function initialiserNotifications() {
     if (!rc.ok) return;
     var cfg = await rc.json();
     if (!cfg || cfg.ok === false || !cfg.actif || !cfg.cle) return;
+    // Le bouton est masque par defaut dans index.html (feature eteinte) :
+    // la config OK est le seul endroit qui le demasque.
+    btn.style.display = '';
     var reg = (await navigator.serviceWorker.getRegistration()) || null;
     var sub = reg ? await reg.pushManager.getSubscription() : null;
     if (sub) {

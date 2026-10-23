@@ -140,6 +140,14 @@ versions antérieures sont visibles dans `git log`.
 
 ### Corrigé
 
+- **Le bouton « Notifications » restait invisible** — son libellé
+  changeait (« Activer les notifications ») mais le style `display:none`
+  de départ dans `index.html` n'était jamais retiré : le clic était
+  câblé, le bouton ne s'affichait pas. Repéré en vérifiant l'interface
+  dans un vrai navigateur (pastille d'état et recherche validées au
+  passage : « sois calme » fait bien apparaître « BLAMUNE se sent au
+  calme », à l'écran comme dans `/stats`).
+
 - **Express 5 casse les routes qui lisaient un corps absent** — v4
   fournissait `req.body = {}` quand aucun parser ne tournait (POST sans
   corps ni Content-Type), v5 laisse `req.body` undefined : `/register`
