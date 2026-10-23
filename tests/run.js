@@ -421,6 +421,42 @@ async function main() {
     assert(JSON.parse(brut).length >= 3, 'historique lisible');
     ok.push('historique compact');
 
+    // 4ter. Recherche dans l'historique (sprint E) : ?q= fouille l'archive
+    // entiere, insensible a la casse et aux accents ; un motif trop court
+    // retombe sur le fil normal.
+    const hfil = await requete(PORT_APP, '/historique', 'GET', null, h);
+    assert.strictEqual(hfil.status, 200);
+    assert(
+      hfil.json.ok && hfil.json.recherche === undefined,
+      'fil normal : pas de marque recherche'
+    );
+    assert(hfil.json.historique.length >= 3, 'fil normal porte tout l echange');
+    const hq1 = await requete(PORT_APP, '/historique?q=Theo', 'GET', null, h);
+    assert.strictEqual(hq1.status, 200, 'recherche repond');
+    assert(hq1.json.ok && hq1.json.recherche === 'Theo', 'la reponse porte le motif');
+    assert(hq1.json.total >= 1, 'au moins une correspondance');
+    assert(
+      hq1.json.historique.every(
+        (x) =>
+          String(x.texte || '')
+            .toLowerCase()
+            .indexOf('theo') >= 0
+      ),
+      'le resultat ne porte que les bulles correspondantes'
+    );
+    const hq2 = await requete(
+      PORT_APP,
+      '/historique?q=' + encodeURIComponent('Théo'),
+      'GET',
+      null,
+      h
+    );
+    assert.strictEqual(hq2.status, 200);
+    assert.strictEqual(hq2.json.total, hq1.json.total, 'accents et casse neutralises');
+    const hq0 = await requete(PORT_APP, '/historique?q=T', 'GET', null, h);
+    assert(hq0.json.recherche === undefined, 'un seul caractere : pas de mode recherche');
+    ok.push('recherche historique (q, accents, motif trop court)');
+
     // 5. Anniversaire : appris au meme message, annonce si proche
     const dans10 = new Date(Date.now() + 10 * 86400000);
     await envoyer('mon anniversaire est le ' + dans10.getDate() + ' ' + MOIS[dans10.getMonth()]);

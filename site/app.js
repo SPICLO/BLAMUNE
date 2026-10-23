@@ -708,6 +708,8 @@ function initAuth() {
     });
   }
 
+  initialiserRecherche();
+
   // Position initiale de la pilule EGO / BLAMUNE
   setTimeout(function () {
     deplacerPilule(chargerProfilLocal().mode === '1' ? '1' : '2', true);
@@ -1090,6 +1092,9 @@ function afficherAccueil() {
 async function charger() {
   // FIX #5: guard against missing UID
   if (!getAuthUserId()) return;
+  // Une recherche en cours n'est pas le fil : les resultats affiches ne
+  // doivent pas etre ecrases par un rechargement arrive pendant la lecture.
+  if (rechercheActive()) return;
   if (chargerEnCours || actionEnCours) {
     _chargerPending = true;
     return;
@@ -1118,6 +1123,7 @@ async function charger() {
     if (j.etat === 'pret' || j.etat === 'demarrage') arretSignale = false;
     if (j.etat === 'pret' || j.etat === 'arrete' || j.etat === 'erreur') nbPollsDemarrage = 0;
     var hist = j.historique || [];
+    _histFil = hist; // memorise : sert a restaurer le fil a la fermeture de recherche
     var c = conteneur();
     if (!c) {
       chargerEnCours = false;
@@ -1129,22 +1135,8 @@ async function charger() {
     var nbExistants = existants.length;
     var nbHistorique = hist.length;
     if (modeChange || nbExistants !== nbHistorique) {
-      viderChat();
-      if (nbHistorique > 0) {
-        var accueilEl = c.querySelector('.accueil');
-        if (accueilEl) accueilEl.remove();
-        hist.forEach(function (h) {
-          if (h.qui === 'systeme') ajouterSysteme(h.texte);
-          else if (h.qui === 'bot' || h.qui === 'moi') {
-            // Photo envoyee : seul le marqueur revient du serveur (pas de
-            // base64 dans l'historique), donc un simple emoji dans la bulle.
-            var texteAffiche = h.image
-              ? (h.texte || '') + (h.texte || '' ? ' ' : '') + '\ud83d\udcf7'
-              : h.texte;
-            ajouterMessage(h.qui, texteAffiche, undefined, h.t);
-          } else ajouterInfo(h.texte);
-        });
-      } else if (j.etat === 'pret' || j.etat === 'demarrage') {
+      afficherFil(hist);
+      if (nbHistorique === 0 && (j.etat === 'pret' || j.etat === 'demarrage')) {
         afficherAccueil();
       }
     } else if (
@@ -1180,6 +1172,101 @@ async function charger() {
     if (nbErreursConnexion < 30)
       setTimeout(charger, Math.min(4000 + nbErreursConnexion * 1000, 30000));
   }
+}
+
+// ---------------- RECHERCHE DANS L'HISTORIQUE (sprint E) ----------------
+
+// Dernier fil normal charge (hors recherche) : c'est lui qu'on re-affiche
+// quand la recherche se ferme, sans attendre le reseau.
+var _histFil = [];
+
+function afficherFil(hist) {
+  var c = conteneur();
+  if (!c) return;
+  viderChat();
+  (hist || []).forEach(function (h) {
+    if (h.qui === 'systeme') ajouterSysteme(h.texte);
+    else if (h.qui === 'bot' || h.qui === 'moi') {
+      // Photo envoyee : seul le marqueur revient du serveur (pas de
+      // base64 dans l'historique), donc un simple emoji dans la bulle.
+      var texteAffiche = h.image
+        ? (h.texte || '') + (h.texte || '' ? ' ' : '') + '\ud83d\udcf7'
+        : h.texte;
+      ajouterMessage(h.qui, texteAffiche, undefined, h.t);
+    } else ajouterInfo(h.texte);
+  });
+}
+
+// La recherche est active tant que le panneau est ouvert avec un motif
+// de deux caracteres ou plus : charger() s'abstient tant qu'on lit.
+function rechercheActive() {
+  var z = document.getElementById('zoneRecherche');
+  if (!z || z.style.display === 'none') return false;
+  var champ = document.getElementById('champRecherche');
+  return !!champ && String(champ.value || '').trim().length >= 2;
+}
+
+// sansCharger : true quand on ferme juste avant d'envoyer un message
+// (envoyer()), pour ne pas demeler le rendu qui suit le flux.
+function fermerRecherche(sansCharger) {
+  var z = document.getElementById('zoneRecherche');
+  var champ = document.getElementById('champRecherche');
+  var note = document.getElementById('noteRecherche');
+  if (z) z.style.display = 'none';
+  if (champ) champ.value = '';
+  if (note) note.textContent = '';
+  afficherFil(_histFil);
+  if (!sansCharger) charger();
+}
+
+var _delaiRecherche = null;
+
+async function lancerRecherche(q) {
+  q = String(q || '').trim();
+  var note = document.getElementById('noteRecherche');
+  if (q.length < 2) {
+    if (note) note.textContent = '';
+    afficherFil(_histFil);
+    return;
+  }
+  try {
+    var r = await fetch('/historique?q=' + encodeURIComponent(q), {
+      headers: authHeaders()
+    });
+    if (!r.ok) return;
+    var j = await r.json();
+    if (j.ok === false) return;
+    afficherFil(j.historique || []);
+    if (note) note.textContent = j.total + ' correspondance' + (j.total <= 1 ? '' : 's');
+  } catch (e) {}
+}
+
+function initialiserRecherche() {
+  var z = document.getElementById('zoneRecherche');
+  var btn = document.getElementById('btnRechercher');
+  var champ = document.getElementById('champRecherche');
+  var fermer = document.getElementById('btnFermerRecherche');
+  if (!z || !btn || !champ || !fermer) return;
+  btn.addEventListener('click', function () {
+    var ouvert = z.style.display !== 'none';
+    if (ouvert) fermerRecherche();
+    else {
+      z.style.display = 'flex';
+      lancerRecherche(champ.value);
+      champ.focus();
+    }
+  });
+  fermer.addEventListener('click', function () {
+    fermerRecherche();
+  });
+  champ.addEventListener('input', function () {
+    if (_delaiRecherche) clearTimeout(_delaiRecherche);
+    var v = champ.value;
+    _delaiRecherche = setTimeout(function () {
+      _delaiRecherche = null;
+      lancerRecherche(v);
+    }, 300);
+  });
 }
 
 // ---------------- ACTIONS ----------------
@@ -1504,6 +1591,9 @@ async function verifierProactif() {
 
 async function envoyer() {
   if (!getAuthUserId()) return;
+  // Une recherche ouverte va etre ecrasee par les bulles qui arrivent :
+  // on restaure le fil avant d'envoyer (sans recharger, le flux s'en charge).
+  if (rechercheActive()) fermerRecherche(true);
   var z = document.getElementById('zone');
   if (!z) return;
   var m = z.value.trim();

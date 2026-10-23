@@ -176,6 +176,7 @@ raison pour laquelle `getComptes()` / `getStats()` existent.
 | `lib/service_bot.js`        | Bot C++ local via HTTP, cache LRU 5 min des messages récurrents                 | 132    |
 | `lib/savoir.js`             | Base de connaissances : SQLite, embeddings + Qdrant, banque de replis           | 641    |
 | `lib/auto_apprentissage.js` | Apprentissage immédiat du message (nom, âge, goûts, « retiens que... »)         | 501    |
+| `lib/recherche.js`          | Recherche d'historique (`?q=`) : sans accents, casse insensible, bornée         | 50     |
 
 | Module de routes             | Couvre                                                                      | Lignes |
 | ---------------------------- | --------------------------------------------------------------------------- | ------ |

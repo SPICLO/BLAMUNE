@@ -8,6 +8,17 @@ versions antérieures sont visibles dans `git log`.
 
 ### Ajouté
 
+- **Sprint E, étape 2 : retrouver une phrase dans tout l'historique** — le
+  fil n'affiche que les dernières bulles (au-delà, le rendu fige la
+  page), et rien ne permettait de relire une conversation d'il y a des
+  semaines. Le bouton « Rechercher » du site ouvre un champ qui interroge
+  `/historique?q=` : **l'archive entière est fouillée côté serveur**,
+  insensible à la casse et aux accents, réponses bornées (40 plus
+  récentes). Module pur `lib/recherche.js` testé sans Express (3 cas :
+  accents des deux côtés, motif trop court, bornage), intégrée par un
+  cas de plus dans `tests/run.js`, et l'UI reprend le même rendu que le
+  fil (envoi pendant une lecture ferme proprement la recherche).
+
 - **Sprint E, étape 1 : le coût du cloud et le sort des serveurs locaux
   sont écrits** — 2 600 lignes de PowerShell attendaient une décision :
   `serveur_bot.ps1` (2 078) et `serveur_admin.ps1` (513) deviennent le

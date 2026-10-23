@@ -222,6 +222,16 @@ check("le filet req.body (express 5 / body-parser 2.x) est en place",
       "if (req.body === undefined) req.body = {};" in srv,
       "v5 ne fournit plus req.body = {} : /register et /login partaient en 500 sans corps")
 
+# Sprint E, etape 2 : la recherche d'historique. Son interet entier est de
+# trouver au-dela des dernieres bulles affichees (le fil normal fige le DOM a
+# HISTO_AFFICHAGE_MAX) : si un jour l'implementation repart du fil tronque,
+# il ne reste qu'un faux moteur de recherche — c'est ce que ce check empeche.
+rechjs = open("lib/recherche.js", encoding="utf-8").read()
+consjs = open("lib/routes/consultation.js", encoding="utf-8").read()
+check("la recherche d historique passe par ?q= via un module testable",
+      "filtrerHistorique" in consjs and "filtrerHistorique" in rechjs,
+      "l'archive entiere est fouillee, insensible aux accents et a la casse")
+
 section("4. Coverage du bot C++ (regressions deja corrigees)")
 
 ci = open(".github/workflows/ci.yml", encoding="utf-8").read()

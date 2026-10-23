@@ -1089,3 +1089,60 @@ test('auto-apprentissage : humeur de BLAMUNE sur commande directe', () => {
   A.autoApprentissage('u_aap0007', 'sois calme');
   assert.strictEqual(memo().humeur, 'calme');
 });
+
+// ============================ RECHERCHE ==============================
+
+const { creerRecherche } = require('../lib/recherche');
+
+test('recherche : insensible a la casse et aux accents, deux cotes', () => {
+  const { filtrerHistorique } = creerRecherche();
+  const hist = [
+    { qui: 'moi', texte: "J'habite a Paris" },
+    { qui: 'bot', texte: 'Le foot, c est ma vie' },
+    { qui: 'moi', texte: 'Paris la nuit' },
+    { qui: 'bot', texte: 'Mon anniversaire : le 5 février' }
+  ];
+  const r1 = filtrerHistorique(hist, 'PARIS');
+  assert.strictEqual(r1.total, 2);
+  assert.strictEqual(r1.liste[0].texte, "J'habite a Paris");
+  const r2 = filtrerHistorique(hist, 'fevrier');
+  assert.strictEqual(r2.total, 1, 'accents neutralises des deux cotes');
+  assert.strictEqual(r2.liste[0].texte, 'Mon anniversaire : le 5 février');
+});
+
+test('recherche : un motif trop court ou vide retombe sur le fil normal', () => {
+  const { filtrerHistorique, tailleMin } = creerRecherche();
+  const hist = [{ qui: 'moi', texte: 'salut' }];
+  assert.strictEqual(filtrerHistorique(hist, ''), null);
+  assert.strictEqual(filtrerHistorique(hist, 's'), null, 'un caractere = pas de recherche');
+  assert.strictEqual(filtrerHistorique(hist, '  '), null);
+  assert.strictEqual(tailleMin, 2);
+  const ok1 = filtrerHistorique(hist, 'sal');
+  assert.strictEqual(ok1.total, 1);
+});
+
+test('recherche : les resultats sont bornes aux plus recents', () => {
+  const { filtrerHistorique, maxResultats } = creerRecherche();
+  assert.strictEqual(maxResultats, 40);
+  const hist = [];
+  for (let i = 0; i < 60; i++) hist.push({ qui: 'moi', texte: 'mot' + i + ' avec pizza' });
+  const r = filtrerHistorique(hist, 'pizza');
+  assert.strictEqual(r.total, 60, 'total sans borne');
+  assert.strictEqual(r.liste.length, 40, 'liste bornee');
+  assert.strictEqual(
+    r.liste[r.liste.length - 1].texte,
+    'mot59 avec pizza',
+    'les plus recents gardes'
+  );
+});
+
+test('recherche : une entree sans texte est sautee, jamais plantage', () => {
+  const { filtrerHistorique } = creerRecherche();
+  const rien = filtrerHistorique(null, 'pizza');
+  assert.strictEqual(rien.total, 0, 'historique absent : aucune correspondance, pas de crash');
+  const r = filtrerHistorique(
+    [null, { qui: 'bot', image: true }, { qui: 'moi', texte: 'Pizza un jour pizza toujours' }],
+    'pizza'
+  );
+  assert.strictEqual(r.total, 1);
+});
