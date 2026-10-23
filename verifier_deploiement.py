@@ -260,6 +260,15 @@ for jeton, quoi in [
 ]:
     check(f"README documente {quoi}", jeton in readme)
 
+# Sprint E, etape 1 : deux decisions ecrites pour ne plus etre a lire.
+cloudmd = open("CLOUD.md", encoding="utf-8").read()
+check("README tranche le statut des serveurs PowerShell (miroir local)",
+      "miroir local" in readme and "serveur_bot.ps1" in readme,
+      "sans ecrit, on rouvre chaque mois le sujet de la suppression")
+check("CLOUD.md documente les plafonds JSONBin (100 Ko / 10 000 requetes)",
+      "100 Ko" in cloudmd and "10 000" in cloudmd and "15 $" in cloudmd,
+      "le payload de sauvegarde depasse le plafond gratuit : le plan Pro est un prerequis")
+
 # Hote du bot : la variable BLAMUNE_HOTE permet de poster ailleurs que sur
 # l'instance de production (instance de test, auto-hebergement d'un tiers).
 # Deux gardes de depot, pas de test runtime : WinINet (la branche _WIN32)

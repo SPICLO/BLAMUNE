@@ -102,6 +102,25 @@ lancent le bon serveur et, pour le bot, compilent `bot.exe` s'il est absent.
 version locale, distincts de `server.js`. Ils tournent en parallèle de la
 version web, pas à sa place.
 
+### Les serveurs PowerShell, « miroir local » — décision actée (octobre 2026)
+
+Ces ~2 600 lignes de PowerShell (`serveur_bot.ps1` 2 078 + `serveur_admin.ps1` 513) sont **conservées, en miroir local**. Ce qu'elles sont : un chemin
+Windows sans aucune installation (pas de Node requis) qui sert `site/`, fait
+tourner `bot.exe` et Ollama sur ce poste, et un panneau admin local (port 8081) qui lit le serveur local. Ce qu'elles ne sont pas : un clone de
+`server.js` — pas de compte, pas de chiffre de requêtes, pas de cloud.
+
+Les règles qui suivent cette décision :
+
+- `server.js` reste **la référence** pour la sécurité (rate limit, trust
+  proxy, headers) et l'API qu'utilisent les clients web réels. Aucun
+  correctif de sécurité ne peut rester uniquement côté PowerShell ;
+  - un changement arrive dans le miroir seulement s'il a un sens local
+    (textes du bot, vocabulaire, lancement). Parité totale, non recherchée ;
+  - la CI ne compile et ne teste que du Node/C++/Python : les .ps1 ne sont pas
+    testés automatiquement ; tout changement y est vérifié a la main ;
+  - si un jour le local passe par `server.js` (Node sur le poste), les
+    deux fichiers seront retirés : c'est la fin de route prévue du miroir.
+
 ### protection.ps1
 
 Sert à vérifier qu'aucun fichier critique n'a été modifié, et à surveiller

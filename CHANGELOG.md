@@ -4,9 +4,21 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Ce journal démarre avec la mise à niveau « hygiène du dépôt » ci-dessous ; les
 versions antérieures sont visibles dans `git log`.
 
-## [Non publié] - 2026-10-21/22
+## [Non publié] - 2026-10-21/23
 
 ### Ajouté
+
+- **Sprint E, étape 1 : le coût du cloud et le sort des serveurs locaux
+  sont écrits** — 2 600 lignes de PowerShell attendaient une décision :
+  `serveur_bot.ps1` (2 078) et `serveur_admin.ps1` (513) deviennent le
+  « miroir local » officiel — chemin Windows sans installation, server.js
+  reste la référence sécurité/API, parité non recherchée, fin de route
+  prévue : Node sur le poste (voir README). Côté cloud, `CLOUD.md` porte
+  désormais la fiche JSONBin : 10 000 requêtes à vie et JSON de 100 Ko au
+  plan gratuit, 15 $ le plan Pro (100 000 requêtes, 10 Mo). Notre payload
+  de sauvegarde (dump SQL du savoir + historiques) dépasse déjà 100 Ko —
+  le plan Pro y est un prérequis, pas une option ; cadences d'usure
+  explicites (debounce 3 s, snapshot ≤ 1/min, GET au démarrage seul).
 
 - **Sprint D : l'apprentissage immediat a ses tests unitaires** — la
   fonction qui capte un nom, un age une ville, des gouts ou un fait

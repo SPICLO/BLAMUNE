@@ -189,3 +189,45 @@ Le bot Windows local pousse ses connaissances vers `/savoir` (route
   il faudrait une instance par session ou une refonte en bibliothèque.
 - **512 Mo de RAM ne suffit pas.** Le plan gratuit Render ne peut pas faire
   tourner Ollama.
+
+---
+
+## 10. JSONBin : le coût réel du stockage cloud
+
+Le stockage cloud (`storage.js`) place **toute** la sauvegarde applicative
+dans UN bin : `comptes.json`, `invites.json`, les `users/<uid>/*`, et le
+dump SQL du savoir (`savoir.sql`, réimporté par la restauration). La
+sauvegarde va loin — mais le service a des plafonds fermes (faits relevés
+sur https://jsonbin.io/pricing, octobre 2026) :
+
+|                           | Gratuit | Pro (15 $/mois)                     |
+| ------------------------- | ------- | ----------------------------------- |
+| Requêtes                  | 10 000  | 100 000                             |
+| Taille max d'un JSON      | 100 Ko  | 10 Mo                               |
+| Versions/bin (historique) | non     | jusqu'a 1 000                       |
+| Recharge du credit        | jamais  | une fois a l'upgrade, packs ensuite |
+
+Trois consequences a connaitre avant de dependre du cloud :
+
+1. **Le payload dépasse déjà le plafond gratuit.** Le dump SQL du savoir
+   atteint a lui seul l'ordre de grandeur de la base (`savoir.db` local :
+   228 Ko), et les historiques utilisateurs viennent s'empiler dessus :
+   on est plusieurs fois au-dessus de 100 Ko. Un compte gratuit refuse ces
+   PUT (HTTP 413). **Le plan Pro est donc un prérequis du deploiement
+   cloud**, pas une option de confort — c'est le seul engagements
+   financier de toute la pile (le reste : Render, Ollama, C++).
+2. **Le credit de requêtes ne se renouvelle pas.** Nos ecritures sont
+   déjà economes (debounce 3 s : une rafale de messages ne part qu'au
+   moment calme ; le snapshot de sauvegarde est reconstruit au plus une
+   fois par minute — c'est de la CPU locale, pas une requete), et les
+   GET sont limites au démarrage et à la decouverture du bin
+   (`JSONBIN_BIN_ID` fige le bin, `.bin-id` le reprend sans le redécouvrir
+   a chaque run). Ordre de grandeur : **1 PUT toutes les 3 à 60 s en
+   activite** — un credit Pro de 100 000 represente largement des mois
+   d'usage réel ; un credit gratuit de 10 000 s'use en quelques semaines.
+3. **Surveillance sans surprise** : `/stats` porte le bloc `sauvegarde`
+   (moment de la dernière réussite, taille envoyée, `nbEchecs`). Un échec
+   413/429 remonte la-bas et dans `logs/erreurs.log`. Et pour une copie
+   hors quota d'occasion : `/admin/backup` télécharge la sauvegarde
+   complete — `POST /admin/restore` la remet dans un bin neuf sur une
+   instance redeploiee.
