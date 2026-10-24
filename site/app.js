@@ -346,8 +346,13 @@ async function authRegister() {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body
     }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
+      // Un 4xx ("pseudo deja pris", "mot de passe trop court") est une
+      // reponse JSON voulue : l'ancien throw la noyait dans le catch, qui
+      // affichait le faux "Serveur injoignable." pour une erreur connue.
+      // Seul un vrai echec reseau (ou un corps illisible) bascule le catch.
+      return r.json().catch(function () {
+        return { ok: false, message: 'Reponse du serveur illisible.' };
+      });
     });
     var j = (await Promise.all([req, delai(1500)]))[0];
     if (j.ok) {
@@ -400,8 +405,11 @@ async function authLogin() {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body
     }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
+      // Meme regle que /register : un 4xx est une reponse voulue, pas une
+      // panne. "Identifiants invalides" doit s'afficher tel quel.
+      return r.json().catch(function () {
+        return { ok: false, message: 'Reponse du serveur illisible.' };
+      });
     });
     var j = (await Promise.all([req, delai(1400)]))[0];
     if (j.ok) {
@@ -431,19 +439,34 @@ async function authInvite() {
   btnInvite.disabled = true;
   try {
     var req = fetch('/invite', { method: 'POST' }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
+      // JSON des 4xx aussi : un refus annonce (quota, invitations fermees)
+      // doit se voir tel quel. L'ancienne version passait tout au catch,
+      // qui clamait "Mode invite actif !" sans un mot du refus.
+      return r.json().catch(function () {
+        return null;
+      });
     });
     var j = (await Promise.all([req, delai(1200)]))[0];
-    if (j.ok) {
+    if (j && j.ok) {
       localStorage.removeItem(AUTH_CLES.ego);
       localStorage.removeItem(AUTH_CLES.pseudo);
       localStorage.setItem(AUTH_CLES.userId, j.uid);
       if (j.jeton) localStorage.setItem(AUTH_CLES.jeton, j.jeton);
       jouerTransitionConnexion('Mode invite active !');
+    } else if (j) {
+      // Serveur vivant mais refuse : pas de faux "Mode invite actif !".
+      afficherToastDeco(j.message || 'Invitation refusee.', '');
+    } else {
+      // Reellement injoignable : on retombe sur un uid local (fallback).
+      localStorage.removeItem(AUTH_CLES.ego);
+      localStorage.removeItem(AUTH_CLES.pseudo);
+      if (!localStorage.getItem(AUTH_CLES.userId)) {
+        localStorage.setItem(AUTH_CLES.userId, genererUserId());
+      }
+      jouerTransitionConnexion('Mode invite active !');
     }
   } catch (e) {
-    // Fallback local si le serveur est injoignable
+    // Le fetch lui-meme a echoue (reseau mort) : fallback local, meme code.
     localStorage.removeItem(AUTH_CLES.ego);
     localStorage.removeItem(AUTH_CLES.pseudo);
     if (!localStorage.getItem(AUTH_CLES.userId)) {
@@ -1158,24 +1181,24 @@ async function charger() {
     if (j.etat === 'arrete' || j.etat === 'erreur') signalerArret();
     else if (j.etat === 'demarrage') {
       nbPollsDemarrage++;
-      if (nbPollsDemarrage < MAX_POLLS_DEMARRAGE) setTimeout(charger, 1500);
+      if (nbPollsDemarrage < MAX_POLLS_DEMARRAGE) _chargerInterval = setTimeout(charger, 1500);
       else majStatut('erreur', 'Demarrage trop long');
     }
     chargerEnCours = false;
     if (_chargerPending) {
       _chargerPending = false;
-      setTimeout(charger, 100);
+      _chargerInterval = setTimeout(charger, 100);
     }
   } catch (e) {
     chargerEnCours = false;
     if (_chargerPending) {
       _chargerPending = false;
-      setTimeout(charger, 100);
+      _chargerInterval = setTimeout(charger, 100);
     }
     nbErreursConnexion++;
     majStatut('horsligne', 'Serveur injoignable');
     if (nbErreursConnexion < 30)
-      setTimeout(charger, Math.min(4000 + nbErreursConnexion * 1000, 30000));
+      _chargerInterval = setTimeout(charger, Math.min(4000 + nbErreursConnexion * 1000, 30000));
   }
 }
 
@@ -1788,6 +1811,10 @@ async function envoyer() {
   var z = document.getElementById('zone');
   if (!z) return;
   var m = z.value.trim();
+  // Le texte TEL QU'IL ETAIT au moment de l'envoi : si l'utilisateur tape
+  // pendant la generation, la fin de la reponse ne doit pas lui ecraser
+  // le clavier (l'ancienne version vidait le champ inconditionnellement).
+  var texteEnvoye = z.value;
   if (m.charAt(0) === '/') {
     traiterCommande(m);
     return;
@@ -1803,6 +1830,12 @@ async function envoyer() {
   // Bulle du bot : creee des le premier fragment recu.
   var bulleBot = null;
   var termine = false; // une fois la reponse finalisee, plus aucun fragment
+
+  // Vide le champ seulement si l'utilisateur n'y a rien retape depuis
+  // l'envoi ; sinon son brouillon en cours est conserve.
+  function viderSiIntact() {
+    if (z.value === texteEnvoye) z.value = '';
+  }
 
   function direct(texte) {
     if (termine || !texte) return;
@@ -1823,7 +1856,7 @@ async function envoyer() {
     if (termine) return;
     termine = true;
     attente(false);
-    z.value = '';
+    viderSiIntact();
     majStatut(j.etat);
     var reps = j.reponses || [];
     if (reps.length > 0) {
@@ -1869,7 +1902,7 @@ async function envoyer() {
       signal: abortCtrl.signal
     });
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    z.value = '';
+    viderSiIntact();
     retirerPhotoChoisie();
     var ct = r.headers.get('content-type') || '';
     if (ct.indexOf('text/event-stream') >= 0 && r.body && r.body.getReader) {
@@ -1890,7 +1923,7 @@ async function envoyer() {
     attente(false);
     if (bulleBot) {
       // Une partie de la reponse est deja arrivee : on la garde.
-      z.value = '';
+      viderSiIntact();
       majStatut('horsligne', 'Connexion interrompue');
     } else {
       // Serveur injoignable : cascade de replis cote navigateur.
@@ -1918,7 +1951,9 @@ async function envoyer() {
           lireVoix(texteWebgpu);
         } else {
           if (msgNode) msgNode.remove();
-          z.value = m;
+          // Message remis dans le champ pour pouvoir le renvoyer — sauf si
+          // l'utilisateur a deja commence autre chose pendant l'attente.
+          if (z.value === texteEnvoye) z.value = m;
           majStatut('horsligne', 'Serveur injoignable');
           ajouterInfo('Envoi echoue : le serveur ne repond pas (timeout 120s). Reessaie.');
           if (local.erreur && /30 s/i.test(local.erreur.message || '')) {

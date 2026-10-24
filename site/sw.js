@@ -20,8 +20,8 @@ self.addEventListener('activate', (e) => {
     caches
       .keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (e) => {
@@ -97,8 +97,11 @@ self.addEventListener('push', (e) => {
   e.waitUntil(
     self.registration.showNotification(contenu.titre || 'BLAMUNE', {
       body: contenu.corps || 'BLAMUNE a quelque chose a te dire.',
-      icon: '/logo.png',
-      badge: '/logo.png',
+      // icon-192 (192 px de vrai) et non logo.png (2000 x 2000 reels) : un
+      // logo 16 fois trop grand est decode a CHAQUE notification ; le badge,
+      // lui, ne garde que la silhouette alpha.
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
       tag: 'blamune',
       data: { url: contenu.url || '/' }
     })
@@ -109,11 +112,41 @@ self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   const cible = (e.notification.data && e.notification.data.url) || '/';
   e.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((liste) => {
+    (async () => {
+      const liste = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      // Une fenetre DEJA sur la cible : on la focus, point. L'ancienne
+      // version focusait la premiere venue, meme si elle etait sur une
+      // tout autre page (ex. /admin) : la notification envoyait vers
+      // /discuter sans que rien ne change a l'ecran.
+      let cheminCible = null;
+      try {
+        cheminCible = new URL(cible, self.location.origin).pathname;
+      } catch (errUrl) {
+        cheminCible = null;
+      }
+      if (cheminCible) {
+        for (const fenetre of liste) {
+          try {
+            if (new URL(fenetre.url, self.location.origin).pathname === cheminCible) {
+              if ('focus' in fenetre) return fenetre.focus();
+            }
+          } catch (errFen) {
+            /* url non parseable : fenetre suivante */
+          }
+        }
+      }
+      // Sinon on navigue une fenetre existante (pas de doublon d'onglet),
+      // et seulement a defaut on en ouvre une.
       for (const fenetre of liste) {
-        if ('focus' in fenetre) return fenetre.focus();
+        if ('navigate' in fenetre && fenetre.url.startsWith(self.location.origin)) {
+          try {
+            return await fenetre.navigate(cible);
+          } catch (errNav) {
+            break; // navigation hors-scope : tenter openWindow
+          }
+        }
       }
       return self.clients.openWindow(cible);
-    })
+    })()
   );
 });

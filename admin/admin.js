@@ -106,8 +106,8 @@ function initDashboard() {
       var msgEl = document.getElementById('mdpMessage');
       var btn = this;
       var mdp = input.value.trim();
-      if (!mdp || mdp.length < 6) {
-        msgEl.textContent = '6 caracteres minimum.';
+      if (!mdp || mdp.length < 8) {
+        msgEl.textContent = '8 caracteres minimum.';
         msgEl.style.color = 'var(--danger)';
         return;
       }
