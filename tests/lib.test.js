@@ -1182,6 +1182,47 @@ function dechiffrerAes128gcm(corps, recepteur) {
   return { clair, rs };
 }
 
+// Recepteur complet (records multiples, nonces a compteur) : si le
+// module chiffre et que CE decodeur le relit, tout recepteur conforme a
+// la norme le relira aussi — navigateurs compris.
+function dechiffrerTousRecords(corps, rec) {
+  const salt = corps.slice(0, 16);
+  const rs = corps.readUInt32BE(16);
+  const idlen = corps[20];
+  const ephPub = corps.slice(21, 21 + idlen);
+  const chiffreTout = corps.slice(21 + idlen);
+  const ecdhR = cryptoModule.createECDH('prime256v1');
+  ecdhR.setPrivateKey(rec.prive);
+  const ikm = Buffer.concat([ecdhR.computeSecret(ephPub), rec.auth]);
+  const hkdf = (s, i, info, l) => Buffer.from(cryptoModule.hkdfSync('sha256', i, s, info, l));
+  const infoOut = Buffer.concat([Buffer.from('WebPush: info\0'), rec.pub, ephPub]);
+  const prk = hkdf(salt, ikm, infoOut, 32);
+  const info2 = (t) => Buffer.concat([Buffer.from(t, 'utf8'), Buffer.from([0, 1])]);
+  const cek = hkdf(salt, prk, info2('Content-Encoding: aes128gcm'), 16);
+  const nonceBase = hkdf(salt, prk, info2('Content-Encoding: nonce'), 12);
+
+  const nRec = Math.ceil(chiffreTout.length / rs);
+  const parties = [];
+  for (let i = 0; i < nRec; i++) {
+    const c = chiffreTout.slice(i * rs, Math.min((i + 1) * rs, chiffreTout.length));
+    let nonce = nonceBase;
+    if (i > 0) {
+      nonce = Buffer.from(nonceBase);
+      const compteur = Buffer.alloc(12);
+      compteur.writeUInt32LE(i, 0);
+      for (let j = 0; j < 12; j++) nonce[j] ^= compteur[j];
+    }
+    const d = cryptoModule.createDecipheriv('aes-128-gcm', cek, nonce);
+    d.setAuthTag(c.slice(c.length - 16));
+    const clair = Buffer.concat([d.update(c.slice(0, c.length - 16)), d.final()]);
+    // contenu : debut -> premier 0x00 (les charges de test n'ont pas de
+    // nul interne) ; derniere fin : le delimiter (2) termine le record.
+    const borne = clair.indexOf(0);
+    parties.push(clair.slice(0, borne >= 0 ? borne : clair.length - 1));
+  }
+  return { rs, nRec, contenu: Buffer.concat(parties) };
+}
+
 test('push : cle privee 32 octets -> derivee publique fidele', () => {
   const { generateKeyPairSync } = cryptoModule;
   const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
@@ -1238,13 +1279,34 @@ test('push : roundtrip aes128gcm complet, delimiter et taille de record', () => 
   assert.strictEqual(lu.rs, rs, 'taille de record transportee');
   assert(lu.clair.slice(0, charge.length).equals(charge), 'payload reconstitue au debut');
   assert.strictEqual(lu.clair[lu.clair.length - 1], 2, 'delimiteur final 0x02');
-  let refuse = false;
-  try {
-    PUSH.chiffrerPayload(rec.pub, rec.auth, Buffer.alloc(5000, 7), { tailleRecord: rs });
-  } catch (e) {
-    refuse = true;
-  }
-  assert(refuse, 'payload trop long : refus propre, pas un plantage');
+});
+
+test('push : corps sous la limite FCM et records multiples corrects', () => {
+  const rec = paireRecepteurTest();
+  rec.auth = cryptoModule.randomBytes(16);
+  const rs = 4096;
+
+  // Notification typique : le corps doit rester strictement sous les
+  // 4096 octets que FCM accepte (sinon : « binary data... » 400).
+  const petit = PUSH.chiffrerPayload(rec.pub, rec.auth, Buffer.alloc(350, 7), {
+    tailleRecord: rs,
+    salt: cryptoModule.randomBytes(16)
+  });
+  assert(petit.length < 4096, 'corps de ' + petit.length + ' octets : sous la limite');
+
+  // Longue charge : decoupee en records — reversibles par un recepteur
+  // conforme (records pleins + dernier court, nonces a compteur).
+  const gros = PUSH.chiffrerPayload(rec.pub, rec.auth, Buffer.alloc(5000, 7), {
+    tailleRecord: rs,
+    salt: cryptoModule.randomBytes(16)
+  });
+  const r = dechiffrerTousRecords(gros, rec);
+  assert.strictEqual(r.nRec, Math.ceil(5000 / (rs - 17)), 'nombre de records');
+  assert.strictEqual(r.contenu.length, 5000, 'longueur reconstituee');
+  assert(
+    r.contenu.every((o) => o === 7),
+    'contenu intact octet par octet'
+  );
 });
 
 test('push : validation d abonnement stricte', () => {
@@ -1360,9 +1422,10 @@ test('push : fabrique active — envoi, purge des abonnements morts', async () =
 
     // Le reseau est le meme chemin qu'un vrai navigateur : on dechiffre.
     const lu = dechiffrerAes128gcm(capture.corps, rec);
-    // Le module met le payload au debut puis un padding de zeros ; le JSON
-    // texte n'a pas de nul interne, fin au premier 0x00.
-    const croise = lu.clair.indexOf(0) >= 0 ? lu.clair.indexOf(0) : lu.clair.length;
+    // Contenu : jusqu'au premier 0x00 (start du padding) ; sinon, le
+    // delimiteur est le dernier octet du record final.
+    const borne = lu.clair.indexOf(0);
+    const croise = borne >= 0 ? borne : lu.clair.length - 1;
     const message = JSON.parse(lu.clair.slice(0, croise).toString('utf8'));
     assert.strictEqual(message.titre, 'BLAMUNE');
     assert.strictEqual(message.corps, 'on se parle de loin');

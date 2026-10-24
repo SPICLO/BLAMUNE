@@ -564,11 +564,14 @@ async function main() {
       assert.strictEqual(pes.status, 200, 'essai envoye');
       assert(pes.json.ok, 'le service push a repondu ok');
       assert.strictEqual(captures.length, 1, 'le faux service a recu une requete');
-      assert(captures[0].authorization.startsWith('vapid t='), 'inrepresented par vapid t=, k=');
+      assert(
+        captures[0].authorization.startsWith('vapid t='),
+        'authorization commence par vapid t=, k='
+      );
       assert(captures[0].authorization.includes(', k='), 'j contient la cle publique');
       assert(captures[0].contentEncoding === 'aes128gcm', 'chiffrement announce et applique');
       const clairRun = dechiffrerRun(captures[0].corps);
-      const finRun = clairRun.indexOf(0) >= 0 ? clairRun.indexOf(0) : clairRun.length;
+      const finRun = clairRun.indexOf(0) >= 0 ? clairRun.indexOf(0) : clairRun.length - 1;
       const congru = JSON.parse(clairRun.slice(0, finRun).toString('utf8'));
       assert.strictEqual(congru.titre, 'BLAMUNE', 'titre transporté');
 

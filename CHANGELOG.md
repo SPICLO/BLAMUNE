@@ -142,6 +142,18 @@ versions antérieures sont visibles dans `git log`.
 
 ### Corrigé
 
+- **Web Push refusé par FCM (400 « binary data passed in the request
+  must be less than 4096 bytes »)** — le chiffrement remplissait un
+  record entier : un corps de 4181 octets (86 d'entête + 4095 de
+  chiffré) qui dépassait la limite froide du service. La norme
+  (RFC 8188) autorise un dernier record plus court : le rembourrage du
+  dernier record est désormais minimal (contenu + délimiteur, comme le
+  font les vrais navigateurs) ; les records intermédiaires restent
+  remplis à `rs`, requis par le framing, avec un nonce par compteur.
+  Une notification typique voyage maintenant à ~450 octets. Repéré par
+  des essais réels sur la production — le nouveau champ `detail` de
+  `/push/essai` portait le motif exact de FCM.
+
 - **Le bouton « Notifications » restait invisible** — son libellé
   changeait (« Activer les notifications ») mais le style `display:none`
   de départ dans `index.html` n'était jamais retiré : le clic était
