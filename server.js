@@ -167,7 +167,8 @@ const {
   ordreModeles,
   memoriserModeleOk,
   restaureModeleOk,
-  dernierModeleOkConnu
+  dernierModeleOkConnu,
+  persisterConfig
 } = creerConfigIA({
   racine: RACINE,
   onModeleOk: (modele) => {
@@ -339,9 +340,20 @@ function getIp(req) {
   return req.ip || '127.0.0.1';
 }
 
+// Un uid est fabrique par ce serveur : invite = 'inv_' + 24 hex, compte =
+// 'u' + 12 hex (meme regle que la suppression admin, lib/routes/admin.js).
+// Tout uid qui ne repond pas a ces formes ne peut pas etre legitime :
+// l'accepter serait laisser un 'inv_x/../../victime' prendre l'identite
+// d'un dossier tier.
+const FORMAT_UID = /^(inv_[0-9a-f]{24}|u[0-9a-f]{12})$/;
+
 function extraireAuth(req) {
-  let uid = req.headers['x-uid'] || req.query.uid || req.body?.uid || '';
-  let ego = req.headers['x-ego'] || req.query.ego || req.body?.ego || '';
+  // Express 5 rend un TABLEAU pour ?uid=a&uid=b, et un corps JSON peut
+  // porter un nombre : String() normalise le tout avant les tests, sinon
+  // uid.startsWith leve une TypeError et chaque route authentifiee
+  // repond un 500 HTML.
+  let uid = String(req.headers['x-uid'] || req.query.uid || req.body?.uid || '');
+  let ego = String(req.headers['x-ego'] || req.query.ego || req.body?.ego || '');
   if (ego) {
     const maintenant = Date.now();
     for (const cle of Object.keys(comptes)) {
@@ -355,6 +367,10 @@ function extraireAuth(req) {
       }
     }
   }
+  // La liste blanche DOIT se trouver ici, avant dossierUser : c'est la
+  // seule garde qui interdit un '.' / un separateur dans l'identite. En
+  // amont de toutes les lectures et ecritures de dossier utilisateur.
+  if (uid && !FORMAT_UID.test(uid)) return { uid: '', ego: '' };
   if (uid && !uid.startsWith('inv_') && !ego) return { uid: '', ego: '' };
   // Jeton invite : un uid invite avec enregistrement n'est accepte QUE
   // muni de son jeton (possession du uid ne suffit plus).
@@ -644,10 +660,11 @@ const { dossierUser, lireMemoire, ecrireMemoire, sauvegarderMemoireComplete } = 
 // ==================== HISTORIQUE ====================
 // Implementation dans lib/historique.js, cablee ici parce qu'elle a besoin
 // de dossierUser() ci-dessus.
-const { cheminHistorique, chargerHistorique, sauvegarderHistorique } = creerHistorique({
-  dossierUser,
-  storage
-});
+const { cheminHistorique, chargerHistorique, sauvegarderHistorique, avecHistorique } =
+  creerHistorique({
+    dossierUser,
+    storage
+  });
 
 // Transport Gemini, historique envoye au modele, reprise sur erreur et quota :
 // implementation dans lib/ia/gemini.js.
@@ -1887,9 +1904,12 @@ function livrerProactif(uid) {
   ecrireProactif(uid, p);
 
   const mode = modeParUser[uid] || '2';
-  const hist = chargerHistorique(uid, mode);
-  hist.push({ qui: 'bot', texte: ev.texte, t: Math.floor(maintenant / 1000), proactif: ev.type });
-  sauvegarderHistorique(uid, mode, hist);
+  // File sequentielle : le cycle lecture-modification-ecriture de
+  // l'historique ne peut pas repasser entre deux messages envoyes en
+  // parallele (sinon le dernier ecrivain efface les entrees du premier).
+  avecHistorique(uid, mode, (hist) => {
+    hist.push({ qui: 'bot', texte: ev.texte, t: Math.floor(maintenant / 1000), proactif: ev.type });
+  }).catch((e) => loggerErreur('proactif', e.message));
 
   const h = apiHistoriqueParUser[uid + '_' + mode];
   if (h && h.length && h[0] && h[0].role === 'system') {
@@ -2075,6 +2095,9 @@ creerRoutesAdmin(app, {
   getComptes: () => comptes,
   getStats: () => stats,
   getConfig: () => config,
+  // Persistance des reglages saisis dans le panneau (config.json), honnete
+  // face a l'env : ce que l'environnement fixe n'est pas re-ecrit.
+  persisterConfig,
   getEtat: () => etat,
   // Etat du pool IA (cooldowns par fournisseur) pour /health.
   getPoolSante: () => pool.sante(),
@@ -2158,6 +2181,7 @@ creerRouteSend(app, {
   egoSystemPrompt: EGO_SYSTEM_PROMPT,
   contexteHeureEGO,
   chargerHistorique,
+  avecHistorique,
   sauvegarderHistorique,
   autoApprentissage,
   lireMemoire,

@@ -35,10 +35,18 @@ function ouvrirBase(fichier) {
       const Database = require('better-sqlite3');
       return { db: new Database(fichier), moteur: 'better-sqlite3' };
     } catch (e2) {
+      // Ne pas masquer la cause reelle : "SQLite indisponible" a deja ete
+      // emis alors que node:sqlite etait disponible et que le vrai probleme
+      // etait filesysteme (dossier absent, droit d'ecriture). Chainer les
+      // deux messages rend le diagnostic immediat.
       throw new Error(
         'SQLite indisponible. Utilise Node >= 22.5 (module natif node:sqlite) ' +
           'ou installe better-sqlite3. Node detecte : ' +
-          process.version
+          process.version +
+          ' — cause : node:sqlite -> ' +
+          (e.message || e) +
+          ' ; better-sqlite3 -> ' +
+          (e2.message || e2)
       );
     }
   }
@@ -250,7 +258,10 @@ class SavoirDB {
   //     (source 'migration') : une ligne retiree du fichier disparait de la base ;
   //   - les connaissances APPRISES en cours d'usage (source 'apprentissage',
   //     'bot-local', 'serveur') ne sont jamais supprimees, meme absentes du
-  //     fichier : elles n'ont pas de contrepartie dans le depot.
+  //     fichier : elles n'ont pas de contrepartie dans le depot ;
+  //   - une cle APPRISE qui existe aussi dans le fichier NE RETROGRADE PAS :
+  //     source reste 'apprentissage' (sinon la purge du depot la supprimerait
+  //     alors que son contenu a ete appris/corrige en usage).
   synchroniserFichier(fichier) {
     const lignes = this._analyserFichier(fichier);
     const dansFichier = new Set(lignes.map((l) => l.cle_norm));
@@ -263,7 +274,7 @@ class SavoirDB {
         reponse = CASE WHEN excluded.reponse <> '' THEN excluded.reponse ELSE savoir.reponse END,
         categorie = COALESCE(excluded.categorie, savoir.categorie),
         rang = COALESCE(savoir.rang, excluded.rang),
-        source = excluded.source,
+        source = CASE WHEN savoir.source <> 'migration' THEN savoir.source ELSE excluded.source END,
         maj_le = excluded.maj_le
     `);
       lignes.forEach((e, i) => stmt.run(Object.assign({ rang: i }, e)));
@@ -367,33 +378,79 @@ class SavoirDB {
   // Restaure depuis un dump SQL. On repart d'une base vide puis on rejoue les
   // insertions : le resultat est exactement l'etat sauvegarde, y compris les
   // suppressions (contrairement a une simple fusion).
+  //
+  // Le repere de fin de VALUES est cherche EN RESPECTANT LES CHAINES : une
+  // reponse apprise peut contenir ");" (visiteur tapant "blabla);..."). La
+  // premiere version codait ce scan par regex ([\s\S]*?)\);?, qui s'arretait
+  // au premier ");" meme au milieu d'une valeur : le DELETE qui suit (base
+  // videe) perdait la ligne. Un scanner, pas une regex.
   importerSql(dump) {
     const texte = String(dump || '');
     if (!texte.trim()) return 0;
-    // [\s\S] et non . : une reponse peut contenir un saut de ligne, et "." ne
-    // matche pas les retours a la ligne sans l'option "s".
-    const extraction = /INSERT INTO savoir\s*\([^)]*\)\s*VALUES\s*\(([\s\S]*?)\);?/gi;
     const lignes = [];
-    let m;
-    while ((m = extraction.exec(texte)) !== null) {
+    const MARQUE = 'INSERT INTO savoir';
+    let pos = texte.indexOf(MARQUE);
+    while (pos >= 0) {
+      const marches = texte.toUpperCase().indexOf(' VALUES ', pos + MARQUE.length);
+      if (marches < 0) break;
+      const parenthese = texte.indexOf('(', marches);
+      if (parenthese < 0) break;
+      let prof = 1;
+      let enChaine = false;
+      let corps = '';
+      let fin = -1;
+      for (let i = parenthese + 1; i < texte.length; i++) {
+        const c = texte[i];
+        if (enChaine) {
+          if (c === "'") {
+            if (texte[i + 1] === "'") {
+              corps += "''";
+              i++;
+              continue;
+            }
+            enChaine = false;
+          }
+          corps += c;
+          continue;
+        }
+        if (c === "'") {
+          enChaine = true;
+          corps += c;
+          continue;
+        }
+        if (c === '(') prof++;
+        if (c === ')') {
+          prof--;
+          if (prof === 0) {
+            if (texte[i + 1] === ';') i++;
+            fin = i;
+            break;
+          }
+        }
+        corps += c;
+      }
+      if (fin < 0) break; // dump tronque : on garde ce qui a deja ete extrait
       // Decoupe la liste de valeurs en respectant les apostrophes doublées.
-      const corps = m[1];
+      // On garde l'echappement SQL TEL QUEL (une paire '' reste '') : la
+      // lecture unique se fait dans lire() ci-dessous. Une double decodage
+      // (une ici, une dans lire) ecrasait DEUX apostrophes adjacentes en
+      // une seule : une reponse "simple ''" revenait "simple '".
       const valeurs = [];
       let courant = '';
-      let enChaine = false;
+      let chaine = false;
       for (let i = 0; i < corps.length; i++) {
         const c = corps[i];
         if (c === "'") {
-          if (enChaine && corps[i + 1] === "'") {
-            courant += "'";
+          if (chaine && corps[i + 1] === "'") {
+            courant += "''";
             i++;
             continue;
           }
-          enChaine = !enChaine;
+          chaine = !chaine;
           courant += c;
           continue;
         }
-        if (c === ',' && !enChaine) {
+        if (c === ',' && !chaine) {
           valeurs.push(courant.trim());
           courant = '';
           continue;
@@ -419,6 +476,7 @@ class SavoirDB {
           source: lire(valeurs[5]) || 'sauvegarde'
         });
       }
+      pos = texte.indexOf(MARQUE, fin + 1);
     }
     return dansTransaction(
       this.db,
@@ -448,9 +506,13 @@ class SavoirDB {
   // dessus (indispensable sous Windows, ou SQLite garde un verrou).
   // Apres ecriture du fichier, appeler rouvrir().
   rouvrir() {
+    // Fermer REELLEMENT d'abord : sous Windows, le handle ouvert empeche de
+    // remplacer savoir.db. La version d'avant ne fermait rien (doc deja
+    // fausse) et n'etait appelee nulle part : autant l'implementer pour de
+    // vrai, idem si la base est deja fermee.
     if (estOuvert(this.db)) {
       try {
-        return this.total();
+        this.db.close();
       } catch (e) {}
     }
     this.db = ouvrirBase(this.fichier).db;

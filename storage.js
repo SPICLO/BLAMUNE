@@ -59,6 +59,11 @@ let derniereErreur = null;
 let derniereTaille = null;
 // Comment le bin a ete choisi (diagnostic dans /stats).
 let decouverte = null;
+// Le bin a-t-il deja ete LUE avec succes ? Si un demarrage tombe pendant
+// une panne JSONBin, l'etat local garde en memoire n'est que le reste
+// d'un disque neuf (1 compte admin sur Render). Un PUT au nom de ces
+// restes ecraserait comptes + historiques + memoires REELS du bin.
+let binLuAuMoinsUneFois = false;
 
 function enregistrerFabrique(fn) {
   fabriqueSauvegarde = fn;
@@ -264,6 +269,20 @@ async function sauvegarderTout() {
   try {
     const id = await binId();
     if (!id) return;
+    // Garde anti-ecrasement : tant qu'aucun chargement du bin n'a jamais
+    // reussi (demarrage pendant une panne JSONBin), l'etat en memoire peut
+    // n'etre qu'un reste ampute. On retente d'abord une lecture ; si elle
+    // echoue encore, on n'emet AUCUN PUT et on reprogramme comme un echec :
+    // la file reste vivante, et l'ecriture utilisateur suivante rearme.
+    if (!binLuAuMoinsUneFois) {
+      const lu = await chargerDuCloud();
+      if (!lu) {
+        derniereErreur = 'bin jamais charge avec succes : PUT ajourne';
+        echecSauvegarde += 1;
+        planifierSauvegarde(Math.min(SAVE_DELAY * echecSauvegarde * echecSauvegarde, 60000));
+        return;
+      }
+    }
     if (fabriqueSauvegarde && Date.now() - _snapDate > SNAP_MIN_INTERVAL) {
       try {
         const s = fabriqueSauvegarde();
@@ -319,6 +338,9 @@ async function chargerDuCloud() {
         rec
       );
       data.application = 'blamune';
+      // Lecture reussie : a partir de maintenant, l'etat en memoire
+      // PROVIENT du bin. Toute ecriture qui suivra porte du contenu vrai.
+      binLuAuMoinsUneFois = true;
       console.log(
         `[storage] Charge depuis le cloud: ${Object.keys(data.comptes || {}).length} comptes` +
           (data.sauvegarde ? `, sauvegarde du ${data.sauvegarde.date}` : '')
