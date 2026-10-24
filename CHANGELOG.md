@@ -30,7 +30,9 @@ versions antérieures sont visibles dans `git log`.
   invisible, vague non démarrée, usage du site inchangé). Un abonnement
   déclaré mort (404/410) est purgé automatiquement. Intégration
   complète par un faux service push local (config, abonnement, essai
-  chiffré, purge).
+  chiffré, purge). Un envoi refusé par le service push remonte désormais
+  son motif (champ `detail` de `/push/essai`) : le 400 du service se lit
+  dans la réponse au lieu de rester muet.
 
 - **Sprint E, étape 3 : l'état intérieur de BLAMUNE devient visible** —
   l'humeur commandée (« sois calme »), ce qu'elle a noté de l'utilisateur
