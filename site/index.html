@@ -192,114 +192,86 @@
               BLAMUNE
             </button>
           </div>
-          <button
-            id="btnRechercher"
-            title="Rechercher dans l'historique"
-            type="button"
-            style="
-              margin-left: 6px;
-              background: var(--surface);
-              border: 1px solid var(--bordure);
-              border-radius: 8px;
-              color: var(--texte-doux);
-              padding: 4px 10px;
-              font-size: 12px;
-              cursor: pointer;
-            "
-          >
-            Rechercher
-          </button>
-          <button
-            id="btnNotifications"
-            title="Recevoir les messages de BLAMUNE hors du site"
-            type="button"
-            style="
-              display: none;
-              margin-left: 6px;
-              background: var(--surface);
-              border: 1px solid var(--bordure);
-              border-radius: 8px;
-              color: var(--texte-doux);
-              padding: 4px 10px;
-              font-size: 12px;
-              cursor: pointer;
-            "
-          >
-            Notifications
-          </button>
-          <button
-            id="btnExport"
-            title="Exporter l'historique (fichier texte, il reste chez toi)"
-            type="button"
-            style="
-              margin-left: 6px;
-              background: var(--surface);
-              border: 1px solid var(--bordure);
-              border-radius: 8px;
-              color: var(--texte-doux);
-              padding: 4px 10px;
-              font-size: 12px;
-              cursor: pointer;
-            "
-          >
-            Export
-          </button>
-          <button
-            id="btnTheme"
-            title="Passer en mode clair"
-            type="button"
-            style="
-              margin-left: 6px;
-              background: var(--surface);
-              border: 1px solid var(--bordure);
-              border-radius: 8px;
-              color: var(--texte-doux);
-              padding: 4px 10px;
-              font-size: 12px;
-              cursor: pointer;
-            "
-          >
-            Clair
-          </button>
-          <button
-            id="btnDeconnexion"
-            title="Deconnexion"
-            type="button"
-            style="
-              display: none;
-              margin-left: 8px;
-              background: var(--surface);
-              border: 1px solid var(--bordure);
-              border-radius: 8px;
-              color: var(--texte-doux);
-              padding: 4px 10px;
-              font-size: 12px;
-              cursor: pointer;
-            "
-          >
-            Deconnexion
-          </button>
-          <!-- IA hors-ligne : mini modele WebGPU charge dans le navigateur du
-         visiteur. Reste invisible si le navigateur n'a pas WebGPU ; cachee
-         tant que pas auth ? Non : utile AVANT connexion (mode invite). -->
-          <button
-            id="btnIANav"
-            title="IA hors-ligne : charge un mini modele dans ton navigateur, pour discuter meme si le serveur est injoignable"
-            type="button"
-            style="display: none; font-size: 12px; cursor: pointer"
-            aria-pressed="false"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden="true"
-              style="width: 16px; height: 16px; vertical-align: -3px"
+          <!-- Menu secondaire : sur PC, une simple range de boutons dans le
+               header (display:contents). Sur telephone (< 600px), ces
+               memes boutons se replient dans un panneau deroulant ouvert
+               par le bouton "3 barres" a droite : le header ne deborde
+               plus sur un ecran de 360px. -->
+          <div id="menuMobile" class="menu-mobile">
+            <button
+              id="btnRechercher"
+              class="btn-petit"
+              title="Rechercher dans l'historique"
+              type="button"
             >
-              <path
-                d="M11 21h-1l1-7H7.5c-.88 0-.33-.75-.31-.78C8.48 10.94 10.42 7.54 13.01 3h1l-1 7h3.51c.4 0 .62.19.4.66C12.97 17.55 11 21 11 21z"
-              />
+              Rechercher
+            </button>
+            <button
+              id="btnNotifications"
+              class="btn-petit"
+              title="Recevoir les messages de BLAMUNE hors du site"
+              type="button"
+              style="display: none"
+            >
+              Notifications
+            </button>
+            <button
+              id="btnExport"
+              class="btn-petit"
+              title="Exporter l'historique (fichier texte, il reste chez toi)"
+              type="button"
+            >
+              Export
+            </button>
+            <button id="btnTheme" class="btn-petit" title="Passer en mode clair" type="button">
+              Clair
+            </button>
+            <button
+              id="btnDeconnexion"
+              class="btn-petit"
+              title="Deconnexion"
+              type="button"
+              style="display: none"
+            >
+              Deconnexion
+            </button>
+            <!-- IA hors-ligne : mini modele WebGPU charge dans le navigateur du
+               visiteur. Reste invisible si le navigateur n'a pas WebGPU ; cachee
+               tant que pas auth ? Non : utile AVANT connexion (mode invite). -->
+            <button
+              id="btnIANav"
+              class="btn-petit"
+              title="IA hors-ligne : charge un mini modele dans ton navigateur, pour discuter meme si le serveur est injoignable"
+              type="button"
+              style="display: none"
+              aria-pressed="false"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+                style="width: 16px; height: 16px; vertical-align: -3px"
+              >
+                <path
+                  d="M11 21h-1l1-7H7.5c-.88 0-.33-.75-.31-.78C8.48 10.94 10.42 7.54 13.01 3h1l-1 7h3.51c.4 0 .62.19.4.66C12.97 17.55 11 21 11 21z"
+                />
+              </svg>
+              <span id="btnIANavTexte">IA hors-ligne</span>
+            </button>
+          </div>
+          <!-- Bouton "3 barres" : neutre sur PC (display:none), il ouvre le
+               panneau du menu secondaire sur telephone. -->
+          <button
+            id="btnMenuMobile"
+            class="btn-menu-mobile"
+            title="Autres actions"
+            type="button"
+            aria-label="Autres actions"
+            aria-expanded="false"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z" />
             </svg>
-            <span id="btnIANavTexte">IA hors-ligne</span>
           </button>
         </div>
       </header>

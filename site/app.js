@@ -713,6 +713,7 @@ function initAuth() {
 
   initialiserRecherche();
   initialiserNotifications();
+  initialiserMenuMobile();
 
   // Position initiale de la pilule EGO / BLAMUNE
   setTimeout(function () {
@@ -1243,6 +1244,46 @@ async function lancerRecherche(q) {
     afficherFil(j.historique || []);
     if (note) note.textContent = j.total + ' correspondance' + (j.total <= 1 ? '' : 's');
   } catch (e) {}
+}
+
+// ---------------- MENU MOBILE (header, < 600px) ----------------
+// Sur telephone les boutons secondaires vivent dans le panneau
+// #menuMobile, ouvert par le bouton 3 barres. Ici : ouverture, fermeture
+// (clic sur une action, clic dehors, onglet redevient visible) et
+// l'etat actif du bouton. Sur PC le panneau est transparent (display:
+// contents) : rien ne se passe visiblement, aucun risque.
+function initialiserMenuMobile() {
+  var menu = document.getElementById('menuMobile');
+  var btnMenu = document.getElementById('btnMenuMobile');
+  if (!menu || !btnMenu) return;
+
+  function basculer(ouvrir) {
+    menu.classList.toggle('menu-ouvert', !!ouvrir);
+    btnMenu.classList.toggle('actif', !!ouvrir);
+    btnMenu.setAttribute('aria-expanded', ouvrir ? 'true' : 'false');
+  }
+  function estOuvert() {
+    return menu.classList.contains('menu-ouvert');
+  }
+
+  btnMenu.addEventListener('click', function (e) {
+    // On arrete la propagation : le clic dehors document fermerait
+    // aussitot le panneau qu'on vient d'ouvrir.
+    e.stopPropagation();
+    basculer(!estOuvert());
+  });
+
+  // Un clic sur une action referme le panneau : on a fait notre choix.
+  menu.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('button')) basculer(false);
+  });
+
+  // Un clic n'importe ou ailleurs referme aussi.
+  document.addEventListener('click', function (e) {
+    if (!estOuvert()) return;
+    if (menu.contains(e.target) || btnMenu.contains(e.target)) return;
+    basculer(false);
+  });
 }
 
 function initialiserRecherche() {
