@@ -55,17 +55,16 @@ export default [
         Headers: 'readonly',
         FormData: 'readonly',
         Blob: 'readonly',
-        // IA_NAV : global pose par site/ia-navigateur.js (script classique
+        // IA_Secours : global pose par site/ia-secours.js (script classique
         // charge avant app.js, voir index.html).
-        IA_NAV: 'readonly'
+        IA_Secours: 'readonly'
       }
     }
   },
   {
     // node_modules par defaut, plus :
-    //  - ia-webllm.mjs : bundle VENDU (tiers, jamais edite a la main) ;
     //  - deepproxy/ : projet externe clone (FreeDeepseekAPI-EN), avec ses
     //    propres regles et un .gitignore dedie.
-    ignores: ['node_modules/**', 'build/**', '*.min.js', 'site/ia-webllm.mjs', 'deepproxy/**']
+    ignores: ['node_modules/**', 'build/**', '*.min.js', 'deepproxy/**']
   }
 ];

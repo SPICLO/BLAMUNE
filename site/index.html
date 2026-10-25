@@ -235,29 +235,6 @@
             >
               Deconnexion
             </button>
-            <!-- IA hors-ligne : mini modele WebGPU charge dans le navigateur du
-               visiteur. Reste invisible si le navigateur n'a pas WebGPU ; cachee
-               tant que pas auth ? Non : utile AVANT connexion (mode invite). -->
-            <button
-              id="btnIANav"
-              class="btn-petit"
-              title="IA hors-ligne : charge un mini modele dans ton navigateur, pour discuter meme si le serveur est injoignable"
-              type="button"
-              style="display: none"
-              aria-pressed="false"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
-                style="width: 16px; height: 16px; vertical-align: -3px"
-              >
-                <path
-                  d="M11 21h-1l1-7H7.5c-.88 0-.33-.75-.31-.78C8.48 10.94 10.42 7.54 13.01 3h1l-1 7h3.51c.4 0 .62.19.4.66C12.97 17.55 11 21 11 21z"
-                />
-              </svg>
-              <span id="btnIANavTexte">IA hors-ligne</span>
-            </button>
           </div>
           <!-- Bouton "3 barres" : neutre sur PC (display:none), il ouvre le
                panneau du menu secondaire sur telephone. -->
@@ -392,7 +369,7 @@
       </footer>
     </div>
 
-    <script src="ia-navigateur.js"></script>
+    <script src="ia-secours.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

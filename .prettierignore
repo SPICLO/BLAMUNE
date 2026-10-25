@@ -38,9 +38,3 @@ logs/
 site/*.png
 site/*.ico
 site/logo.png
-
-# Bundle vendor genere par esbuild (WebLLM, IA hors-ligne navigateur) :
-# reformater un bundle machine gonfle le depot et masquerait toute mise a
-# jour reelle. Le fichier ne se modifie qu'en le regenerant depuis la
-# source upstream, jamais a la main.
-site/ia-webllm.mjs

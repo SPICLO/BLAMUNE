@@ -115,8 +115,8 @@ personne n'en devrait dépendre. Sur le serveur hébergé, la chaîne de repli e
 3. **Replis locaux** si toute l'IA en ligne échoue : chat bot local > savoir
    (mots-clés) > recherche vectorielle Qdrant (si active) > banque de replis > message technique.
 4. **Repli navigateur** (déjà en place) : si le serveur entier est saturé ou
-   en sommeil, la page tente Pollinations elle-même puis le petit modèle
-   WebGPU hors ligne — le visiteur reste toujours servi.
+   en sommeil, la page tente Pollinations elle-même (site/ia-secours.js,
+   sans clé) — le visiteur reste servi tant qu'il a internet.
 
 Pour ajouter d'autres fournisseurs cloud (Groq, Mistral, Pollinations...)
 comme filet supplémentaire, remplis `API_POOL` dans le dashboard au format

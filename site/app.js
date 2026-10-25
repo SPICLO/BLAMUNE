@@ -1479,7 +1479,7 @@ function desactiver(on) {
   if (mode2Btn) mode2Btn.disabled = on;
 }
 
-// Rebuild de l'eglise conversation pour l'IA hors-ligne : les bulles deja
+// Rebuild du fil de conversation pour l'IA de secours directe : les bulles deja
 // affichees dans le DOM font office d'historique (le serveur est justement
 // injoignable, /historique ne repondra pas). Les messages systeme/info
 // (.msg.systeme / .msg.info) et la bulle d'attente sont ignores.
@@ -1506,44 +1506,22 @@ function historiquePourIA() {
 
 // Palier EN LIGNE depuis la page : serveur BLAMUNE injoignable, mais
 // internet encore la → une IA libre sans cle est appelee directement par le
-// navigateur (gpt-oss-20b via text.pollinations.ai, quota 1 / 30 s par IP).
+// navigateur (gpt-oss via text.pollinations.ai, quota 1 / 30 s par IP).
 async function tenterIAEnLigne(surDelta) {
-  if (!window.IA_NAV || typeof IA_NAV.repondreEnLigne !== 'function') return { fait: false };
+  if (!window.IA_Secours || typeof IA_Secours.repondreEnLigne !== 'function')
+    return { fait: false };
   if (navigator.onLine === false) return { fait: false };
   if (imageChoisie) return { fait: false };
   var hist = historiquePourIA();
   if (hist.length === 0) return { fait: false };
   majStatut('pense', 'IA en ligne (repli direct)...');
   try {
-    await IA_NAV.repondreEnLigne(hist, surDelta);
+    await IA_Secours.repondreEnLigne(hist, surDelta);
     majStatut('horsligne', 'Serveur injoignable - IA directe');
     return { fait: true };
   } catch (e) {
     majStatut('horsligne', 'Serveur injoignable');
     return { fait: false, erreur: e };
-  }
-}
-
-// Repli IA hors-ligne : seul chemin pris quand le serveur ne repond pas ET
-// que le modele embarque est pret. surDelta(texteTotal) alimente la bulle du
-// bot (meme contrat que lireFlux). Retourne { fait:true } si une reponse
-// locale a ete produite directement dans le chat.
-async function tenterIAHorsLigne(surDelta) {
-  if (!window.IA_NAV) return { fait: false, prete: false };
-  var st = IA_NAV.etatCourant();
-  var prete = IA_NAV.moteurPret();
-  if (!prete) return { fait: false, prete: false, etat: st };
-  if (imageChoisie) return { fait: false, prete: true, etat: st }; // modele texte : pas d'image
-  var hist = historiquePourIA();
-  if (hist.length === 0) return { fait: false, prete: true, etat: st };
-  majStatut('pense', 'IA locale...');
-  try {
-    await IA_NAV.repondre(hist, surDelta);
-    majStatut('horsligne', 'IA locale (sans reseau)');
-    return { fait: true, prete: true, etat: st };
-  } catch (e) {
-    majStatut('horsligne', 'Serveur injoignable');
-    return { fait: false, prete: true, etat: st, erreur: e };
   }
 }
 
@@ -1926,10 +1904,9 @@ async function envoyer() {
       viderSiIntact();
       majStatut('horsligne', 'Connexion interrompue');
     } else {
-      // Serveur injoignable : cascade de replis cote navigateur.
-      // 1) une IA libre appelee DIRECTEMENT par la page (si internet),
-      // 2) sinon le modele WebGPU embarque (si charge),
-      // 3) sinon le message d'echec classique.
+      // Serveur injoignable : le seul palier restant est une IA libre
+      // appelee DIRECTEMENT par la page (si l'internet vit) ; sinon,
+      // message d'echec honnete, sans invention.
       var local = await tenterIAEnLigne(direct);
       if (local.fait) {
         var texteLocal = bulleBot ? (bulleBot.querySelector('.bulle') || {}).textContent || '' : '';
@@ -1939,37 +1916,14 @@ async function envoyer() {
         );
         lireVoix(texteLocal);
       } else {
-        var second = await tenterIAHorsLigne(direct);
-        if (second.fait) {
-          var texteWebgpu = bulleBot
-            ? (bulleBot.querySelector('.bulle') || {}).textContent || ''
-            : '';
-          bulleBot = null;
-          ajouterInfo(
-            'Reponse generee LOCALEMENT par ton navigateur (modele embarque, sans internet).'
-          );
-          lireVoix(texteWebgpu);
-        } else {
-          if (msgNode) msgNode.remove();
-          // Message remis dans le champ pour pouvoir le renvoyer — sauf si
-          // l'utilisateur a deja commence autre chose pendant l'attente.
-          if (z.value === texteEnvoye) z.value = m;
-          majStatut('horsligne', 'Serveur injoignable');
-          ajouterInfo('Envoi echoue : le serveur ne repond pas (timeout 120s). Reessaie.');
-          if (local.erreur && /30 s/i.test(local.erreur.message || '')) {
-            ajouterInfo(local.erreur.message + '.');
-          }
-          if (second.erreur) {
-            ajouterInfo(
-              'IA locale pour l instant indisponible : ' +
-                (second.erreur.message || 'erreur inconnue') +
-                '.'
-            );
-          } else if (window.IA_NAV && IA_NAV.webgpuDisponible() && !IA_NAV.moteurPret()) {
-            ajouterInfo(
-              'Astuce : le bouton "IA hors-ligne" charge un mini modele dans ton navigateur pour discuter meme sans internet.'
-            );
-          }
+        if (msgNode) msgNode.remove();
+        // Message remis dans le champ pour pouvoir le renvoyer — sauf si
+        // l'utilisateur a deja commence autre chose pendant l'attente.
+        if (z.value === texteEnvoye) z.value = m;
+        majStatut('horsligne', 'Serveur injoignable');
+        ajouterInfo('Envoi echoue : le serveur ne repond pas (timeout 120s). Reessaie.');
+        if (local.erreur && /30 s/i.test(local.erreur.message || '')) {
+          ajouterInfo(local.erreur.message + '.');
         }
       }
     }
@@ -2268,66 +2222,6 @@ function exporterHistorique() {
   var b = document.getElementById('btnExport');
   if (!b) return;
   b.addEventListener('click', exporterHistorique);
-})();
-
-// ---------------- IA HORS-LIGNE (bouton eclair) ----------------
-// Un seulrole d'action ici : telecharger/charger le modele. L'usage
-// automatique (serveur down) est dans envoyer() > catch > tenterIAHorsLigne.
-(function initBoutonIANav() {
-  var b = document.getElementById('btnIANav');
-  if (!b) return;
-  if (!window.IA_NAV || !IA_NAV.webgpuDisponible()) {
-    b.style.display = 'none';
-    return;
-  }
-  b.style.display = ''; // visible des maintenant : WebGPU present
-
-  var texte = document.getElementById('btnIANavTexte');
-  function surProgres(r) {
-    if (!texte) return;
-    var pct = 0;
-    try {
-      pct = Math.round((r.progress || 0) * 100);
-    } catch (e) {}
-    texte.textContent = pct > 0 ? 'IA ' + pct + '%' : 'IA...';
-  }
-
-  async function surClic() {
-    var st = IA_NAV.etatCourant();
-    if (st === 'telechargement' || st === 'en_cours') return; // deja parti
-    if (st === 'pret') {
-      afficherToastDeco(
-        'IA hors-ligne prete : elle prendra le relais si le serveur est injoignable.',
-        'ok'
-      );
-      return;
-    }
-    b.disabled = true;
-    var info = null;
-    try {
-      var dejaEnCache = await IA_NAV.enCache();
-      if (!dejaEnCache) {
-        info = ajouterInfo('Telechargement du modele IA hors-ligne (~450 Mo, une seule fois) : 0%');
-      }
-      surProgres({ progress: 0 });
-      await IA_NAV.activer(surProgres);
-      if (info) info.remove();
-      if (texte) texte.textContent = 'IA hors-ligne';
-      b.classList.add('actif');
-      b.setAttribute('aria-pressed', 'true');
-      afficherToastDeco('IA hors-ligne prete.', 'ok');
-    } catch (e) {
-      if (info) info.remove();
-      if (texte) texte.textContent = 'IA hors-ligne';
-      IA_NAV.desactiver().catch(function () {});
-      ajouterInfo(
-        'IA hors-ligne indisponible : ' + (e && e.message ? e.message : 'erreur inconnue') + '.'
-      );
-    } finally {
-      b.disabled = false;
-    }
-  }
-  b.addEventListener('click', surClic);
 })();
 
 window.addEventListener('load', async function () {

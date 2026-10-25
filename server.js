@@ -135,13 +135,15 @@ app.use((req, res, next) => {
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  // WebGPU (IA hors-ligne dans le navigateur) : WebAssembly a besoin de
-  // 'wasm-unsafe-eval' (tokenizer de WebLLM) ; les poids du modele et sa
-  // config sont telecharges depuis Hugging Face via connect-src. Tout le
-  // code, lui, reste servi depuis 'self' (ic-ememe) : aucun script externe.
+  // CSP serree : tout le code est servi depuis 'self' (ici-meme) ; le seul
+  // appel sortant legitime est le palier de secours direct vers
+  // text.pollinations.ai (site/ia-secours.js, sans cle ni script externe).
+  // Les domains Hugging Face et 'wasm-unsafe-eval' n'existaient que pour
+  // l'ancien IA hors-ligne WebLLM, retire : sans eux, toute injection du
+  // style "charger du code ou parler a l'etranger" est refusee par la page.
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://text.pollinations.ai https://huggingface.co https://*.huggingface.co https://*.hf.co; img-src 'self' data:"
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://text.pollinations.ai; img-src 'self' data:"
   );
   if (req.method === 'OPTIONS') return res.status(204).end();
   next();

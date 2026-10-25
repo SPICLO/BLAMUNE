@@ -431,14 +431,14 @@ function requeteBrute(port, chemin, entetes) {
       })(),
       'le gzip redecompresse l original exactement'
     );
-    // Le gros morceau : le bundle IA (6,6 Mo) doit partir en brotli.
-    const rBr = await requeteBrute(port, '/ia-webllm.mjs', {
+    // Le plus lourd des assets : app.js doit partir en brotli.
+    const rBr = await requeteBrute(port, '/app.js', {
       'Accept-Encoding': 'gzip, deflate, br'
     });
-    const tailleBrut = fs.statSync(path.join(RACINE, 'site', 'ia-webllm.mjs')).size;
+    const tailleBrut = fs.statSync(path.join(RACINE, 'site', 'app.js')).size;
     verifCompr(
       rBr.entetes['content-encoding'] === 'br',
-      'bundle IA part en brotli',
+      'app.js part en brotli',
       Math.round(tailleBrut / 1024) + ' Ko -> ' + Math.round(rBr.corps.length / 1024) + ' Ko'
     );
     verifCompr(rBr.corps.length < tailleBrut / 3, 'le brotli divise le poids par plus de 3');
