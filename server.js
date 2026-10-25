@@ -33,8 +33,21 @@ const { creerSavoir } = require('./lib/savoir');
 const { creerResume } = require('./lib/resume');
 // Chercheur web serveur (DuckDuckGo, sans cle) : donne des SOURCES a TOUT
 // le pool de modeles, au lieu de dependre du google_search de Gemini.
+// Cache des resultats (30 min par defaut, CACHE_RECHERCHE_MS) : plusieurs
+// visiteurs posant le meme sujet ne repercutent pas la meme facture.
 const { creerRechercheWeb } = require('./lib/recherche_web');
-const rechercheWeb = creerRechercheWeb();
+const rechercheWeb = creerRechercheWeb({
+  cacheMs: parseInt(process.env.CACHE_RECHERCHE_MS || '', 10) || 30 * 60 * 1000
+});
+
+// Gardiens anti-saturation :
+//  - concurrence : plafond d'appels IA simultanes + file d'attente FIFO
+//    (fail-open apres attente max : jamais un message perdu) ;
+//  - tension : comptage des 429 et drapeau "mode eco" (fenetre terminee).
+// Les deux se reglent par l'env (MAX_CONC / MAX_ATTENTE_MS / TENSION_*)
+// et exposent etat() pour /admin.
+const concurrence = require('./lib/concurrence');
+const tension = require('./lib/tension');
 
 const app = express();
 // Render passe un reverse proxy devant le serveur : sans cette ligne,
@@ -2109,6 +2122,13 @@ creerRoutesAdmin(app, {
   getPoolSante: () => pool.sante(),
   // Etat de l'index semantique Qdrant pour /health.
   getQdrantSante: savoir.qdrantSante,
+  // Gardiens anti-saturation (file de concurrence, tension/eco, cache
+  // recherche) : un seul getter qui recompte au coup par coup.
+  getGardiens: () => ({
+    concurrence: concurrence.etat(),
+    tension: tension.etat(),
+    cacheRecherche: rechercheWeb.etatCache()
+  }),
   connexionsActives,
   modeParUser,
   savoirDb,
@@ -2203,6 +2223,8 @@ creerRouteSend(app, {
   appelerGemini,
   rechercheWeb,
   savoirEnregistrer,
+  concurrence,
+  tension,
   nettoyerReponse,
   reponseSecours,
   contexteSavoir: savoir.contexteQuestion,

@@ -4,9 +4,60 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Ce journal démarre avec la mise à niveau « hygiène du dépôt » ci-dessous ; les
 versions antérieures sont visibles dans `git log`.
 
-## [Non publié] - 2026-10-25
+## [Non publié] - 2026-10-25 (gardiens anti-saturation)
 
 ### Ajouté
+
+- **Gardiens anti-saturation** — quatre couches qui rendent la montée
+  d'un pic indolore au lieu d'encaisser des 429 en rafale :
+  1. **File d'attente de concurrence** (`lib/concurrence.js`) : un
+     plafond d'appels IA simultanés (`MAX_CONC`, 3 par défaut) ; les
+     demandes en surplus patientent dans une file ordonnée (premier
+     arrivé, premier servi) — le visiteur ne voit rien de nouveau (sa
+     bulle d'écriture est déjà affichée) et le `:diag file=` du flux
+     SSE dit combien de temps il a attendu. Après `MAX_ATTENTE_MS`
+     (10 s), la requête part quand même (fail-open : on ne perd jamais
+     un message) et compte un « débordement ».
+  2. **Tension + mode éco** (`lib/tension.js`) : chaque 429 réel est
+     compté au goulot unique `marquerQuota()` (voie Gemini ET voie
+     pool). Dès `TENSION_SEUIL` (3) 429 en `TENSION_FENETRE_MS`
+     (5 min), le site passe en **mode éco** : recherche web auto
+     couchée, `/cherche` réduit aux extraits seuls (0 page lue),
+     tâches de fond (résumé, extraction, apprentissage) suspendues —
+     le pool ne sert plus que le chat. Sortie naturelle quand la
+     fenêtre se calme, avec un séjour minimum
+     (`TENSION_SEJOUR_MS`, 10 min) pour ne pas clignoter.
+  3. **Cache du chercheur web** (`CACHE_RECHERCHE_MS`, 30 min par
+     défaut, 300 sujets) : le même sujet demandé de près ou de loin
+     n'est cherché qu'une fois ; le 2e visiteur est servi sans
+     re-téléchargement ni tokens, avec l'heure de sa recherche
+     d'origine (pas de fausse fraîcheur). Un échec, lui, ne se cache
+     jamais.
+  4. **Compteurs visibles** : panneau
+     « Gardiens anti-saturation » dans `/admin` (appels en cours /
+     max, file, débordements du jour, 429 de la fenêtre et du jour,
+     état éco, cache) et champ `gardiens` dans `/health` pour les
+     sondes externes.
+- Rappel capacité : au delà du code, le levier qui AGRANDIT la
+  capacité reste l'ajout d'une clé dans l'`API_POOL` (dashboard
+  Render) ; chaque clé gratuite Groq ≈ +8-9 réponses/min.
+
+### Changé
+
+- `lib/routes/send.js` : acquiert une place de concurrence juste
+  autour de l'appel au modèle (mode 1 et mode 2), libérée avant les
+  replis locaux ; `:diag` enrichi (`file=`, `eco=`).
+- `lib/ia/gemini.js` : `marquerQuota()` nourrit la fenêtre de tension ;
+  `reporterTache()` jette les tâches de fond pendant l'éco (compteur
+  `tachesSuspendues`).
+- `lib/recherche_web.js` : `creerRechercheWeb({cacheMs, cacheMax,
+maintenant})` encapsule `rechercheWeb()` avec une mise en cache
+  honnête (aucun échec mémorisé, éviction FIFO, TTL 0 = désactivé).
+- `.env.example` : les 7 variables des gardiens documentées.
+- `tests/gardiens.test.js` : 7 tests (file FIFO, fail-open,
+  tension/éco avec hystérésis, cache hit/TTL/échec).
+
+## [Non publié] - 2026-10-25 (recherche en profondeur)
 
 - **Recherche en profondeur, serveur, sans clé** (`lib/recherche_web.js`) :
   DuckDuckGo cherche, les pages principales sont lues (extraits plafonnés),

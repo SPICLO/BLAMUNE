@@ -388,6 +388,56 @@ async function chargerDonnees() {
     if (elModele) elModele.textContent = md.actif || md.principal || '-';
     afficherAlertes(j);
 
+    // Gardiens anti-saturation (file de concurrence, tension 429 / eco,
+    // cache recherche) : lecture seule, aucune action ici.
+    var g = j.gardiens || {};
+    var gc = g.concurrence || {};
+    var gt = g.tension || {};
+    var gcr = g.cacheRecherche || {};
+    var elGardiens = document.getElementById('gardiensContenu');
+    if (elGardiens) {
+      elGardiens.replaceChildren();
+      var lignesG = [
+        'Appels IA en cours : ' +
+          (gc.enCours || 0) +
+          ' / ' +
+          (gc.max || '?') +
+          '   |   File d attente : ' +
+          (gc.file || 0) +
+          '   |   Debordements aujourd hui : ' +
+          (gc.debordementsJour || 0) +
+          ' (total ' +
+          (gc.debordements || 0) +
+          ')',
+        '429 quota : ' +
+          (gt.nb429Fenetre || 0) +
+          ' dans la fenetre de ' +
+          Math.round((gt.fenetreMs || 300000) / 60000) +
+          ' min' +
+          '   |   Aujourd hui : ' +
+          (gt.nb429Jour || 0) +
+          '   |   Eco ' +
+          (gt.eco ? 'ACTIF' : 'inactif') +
+          (gt.tachesSuspendues ? '   |   Taches de fond suspendues : ' + gt.tachesSuspendues : ''),
+        'Cache recherche : ' +
+          (gcr.entrees || 0) +
+          ' sujet(s) en memoire' +
+          (gcr.coupsCache || gcr.raterCache
+            ? '   |   Deja servis du cache : ' +
+              (gcr.coupsCache || 0) +
+              ' sur ' +
+              ((gcr.coupsCache || 0) + (gcr.raterCache || 0)) +
+              ' recherches'
+            : '')
+      ];
+      lignesG.forEach(function (texte) {
+        var p = document.createElement('p');
+        p.textContent = texte;
+        p.style.margin = '4px 0';
+        elGardiens.appendChild(p);
+      });
+    }
+
     // Utilisateurs en ligne
     var connexions = j.connexions || [];
     document.getElementById('statEnLigne').textContent = connexions.length;
