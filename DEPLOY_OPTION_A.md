@@ -118,6 +118,15 @@ personne n'en devrait dépendre. Sur le serveur hébergé, la chaîne de repli e
    en sommeil, la page tente Pollinations elle-même (site/ia-secours.js,
    sans clé) — le visiteur reste servi tant qu'il a internet.
 
+Recherche en profondeur (nouveau) : un chercheur **serveur** (DuckDuckGo,
+sans clé) ramène les sources et les transmet comme prompt à **tout le
+pool** (Gemini, Groq, Pollinations, Mistral...). Déclenchements : la
+commande `/cherche <sujet>` (4 pages lues, faits appris dans le savoir
+avec source et date) et le déclenchement auto discret sur question
+d'actualité (extraits seuls). Env vars : `RECHERCHE_WEB_AUTO=0` coupe le
+chercheur serveur ; `RECHERCHE_WEB=0` coupe l'outil `google_search` de
+Gemini (facturé).
+
 Pour ajouter d'autres fournisseurs cloud (Groq, Mistral, Pollinations...)
 comme filet supplémentaire, remplis `API_POOL` dans le dashboard au format
 `nom|url|cle|modele;nom2|url2|cle2|modele2`.

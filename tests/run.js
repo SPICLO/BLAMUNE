@@ -293,7 +293,13 @@ async function main() {
     PUSH_CHECK_MS: '3600000',
     // L'attente avant la seconde passe est bornee : la suite ne doit pas
     // dormir 60 s le temps que la fenetre de quota se recharge.
-    QUOTA_ATTENTE_MAX_MS: '1000'
+    QUOTA_ATTENTE_MAX_MS: '1000',
+    // Recherche web AUTO (chercheur serveur DuckDuckGo) coupee : sinon un
+    // message comme "c'est quoi l'actualite du jour ?" fait lire des
+    // sources au serveur, et le test 20 veut justement verifier LE CHEMIN
+    // google_search de Gemini (l'autre chemin ne peut pas etre teste de
+    // facon deterministe en CI : DuckDuckGo bannit les datacenters).
+    RECHERCHE_WEB_AUTO: '0'
   });
   const serveur = spawn(process.execPath, [path.join(RACINE, 'server.js')], {
     cwd: RACINE,

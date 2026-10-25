@@ -32,7 +32,14 @@ fournisseur compatible OpenAI) pour la conversation intelligente.
 - **Memoire** par utilisateur (nom, age, ville, gouts...) extraite par regex
   puis par le modele.
 - **Historique** persistant et **resume** automatique des longues conversations.
-- **Recherche web** (grounding) declenchee uniquement sur les questions d'actualite.
+- **Recherche en profondeur** : un chercheur **serveur** (DuckDuckGo, sans
+  cle) lit les resultats et les pages, injecte les sources dans le prompt —
+  **tout modele du pool peut alors parler du jour** (pas seulement Gemini) ;
+  commande **/cherche** (4 pages lues, faits rentrent dans le savoir avec
+  source et date) et declenchement auto discret sur question d'actualite
+  (extraits seuls). L'outil `google_search` de Gemini reste actif en filet
+  si le chercheur serveur n'a rien donne ; `RECHERCHE_WEB_AUTO=0` coupe le
+  chercheur serveur, `RECHERCHE_WEB=0` coupe l'outil Gemini.
 - **PWA** installable (service worker, mode hors ligne) et **admin** (stats,
   utilisateurs, logs, sauvegarde/restauration).
 - **Multi-fournisseur IA** : Gemini par defaut, ou tout endpoint compatible OpenAI.
@@ -181,6 +188,7 @@ raison pour laquelle `getComptes()` / `getStats()` existent.
 | `lib/savoir.js`             | Base de connaissances : SQLite, embeddings + Qdrant, banque de replis           | 641    |
 | `lib/auto_apprentissage.js` | Apprentissage immédiat du message (nom, âge, goûts, « retiens que... »)         | 501    |
 | `lib/recherche.js`          | Recherche d'historique (`?q=`) : sans accents, casse insensible, bornée         | 50     |
+| `lib/recherche_web.js`      | Chercheur web serveur : DuckDuckGo + lecture de pages, faits datés              | 420    |
 | `lib/push.js`               | Web Push : VAPID (RFC 8292) + chiffrement aes128gcm (RFC 8291), zéro dépendance | 333    |
 
 | Module de routes             | Couvre                                                                      | Lignes |

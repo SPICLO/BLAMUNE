@@ -31,6 +31,10 @@ const { creerCompression } = require('./lib/compression');
 const { creerServiceBot } = require('./lib/service_bot');
 const { creerSavoir } = require('./lib/savoir');
 const { creerResume } = require('./lib/resume');
+// Chercheur web serveur (DuckDuckGo, sans cle) : donne des SOURCES a TOUT
+// le pool de modeles, au lieu de dependre du google_search de Gemini.
+const { creerRechercheWeb } = require('./lib/recherche_web');
+const rechercheWeb = creerRechercheWeb();
 
 const app = express();
 // Render passe un reverse proxy devant le serveur : sans cette ligne,
@@ -2197,6 +2201,8 @@ creerRouteSend(app, {
   blocSysteme,
   intentionDeMessage,
   appelerGemini,
+  rechercheWeb,
+  savoirEnregistrer,
   nettoyerReponse,
   reponseSecours,
   contexteSavoir: savoir.contexteQuestion,

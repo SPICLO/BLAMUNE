@@ -4,6 +4,34 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Ce journal démarre avec la mise à niveau « hygiène du dépôt » ci-dessous ; les
 versions antérieures sont visibles dans `git log`.
 
+## [Non publié] - 2026-10-25
+
+### Ajouté
+
+- **Recherche en profondeur, serveur, sans clé** (`lib/recherche_web.js`) :
+  DuckDuckGo cherche, les pages principales sont lues (extraits plafonnés),
+  les sources sont injectées dans le prompt système — **tout modèle du
+  pool** (Groq, Pollinations, Mistral, Gemini...) peut maintenant parler
+  du jour, là où seul Gemini avait `google_search` (facturé). Deux
+  déclenchements : la commande **`/cherche <sujet>`** (5 sources, 4 pages
+  lues, et les 2 premiers faits entrent dans le savoir avec source et
+  date, catégorie `recherche-web`) et le déclenchement **auto** discret
+  sur question d'actualité en mode 2 (extraits seuls, refroidissement
+  45 s/config utilisateur, jamais si l'utilisateur parle de lui). Le
+  chercheur n'est pas si bête : garde-fous SSRF (`localhost`, plages
+  privées, metadata cloud, protocoles non http(s) refusés), lectures
+  bornées (300 Ko, 6 000 caractères, timeout 7 s), content-type vérifié,
+  un seul fait par site DDG. `RECHERCHE_WEB_AUTO=0` coupe le chercheur
+  serveur ; la clé existante `RECHERCHE_WEB` ne pilote plus que l'outil
+  Gemini. Gemini « avale » proprement : quand le chercheur serveur a
+  déjà rempli le prompt, `google_search` n'est pas invoqué (pas de
+  double recherche).
+
+### Changé
+
+- `site/app.js` : `/cherche` est routé au serveur (usage `/cherche <sujet>`
+  expliqué en info si vide) ; la liste `/aide` le documente.
+
 ## [Non publié] - 2026-10-21/23
 
 ### Ajouté

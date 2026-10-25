@@ -1660,7 +1660,7 @@ async function traiterCommande(m) {
   if (mot === '/aide' || mot === '/help') {
     if (z) z.value = '';
     ajouterSysteme(
-      'Commandes : /stats (ta vie avec BLAMUNE), /oublie (effacer la conversation, profil conserve), /aide (cette liste). Le bouton photo envoie une image.'
+      'Commandes : /cherche (BLAMUNE cherche sur le web et te repond avec ses sources), /stats (ta vie avec BLAMUNE), /oublie (effacer la conversation, profil conserve), /aide (cette liste). Le bouton photo envoie une image.'
     );
     return;
   }
@@ -1794,8 +1794,22 @@ async function envoyer() {
   // le clavier (l'ancienne version vidait le champ inconditionnellement).
   var texteEnvoye = z.value;
   if (m.charAt(0) === '/') {
-    traiterCommande(m);
-    return;
+    if (/^\/cherche\b/i.test(m)) {
+      var csuj = m.replace(/^\/cherche\b/i, '').trim();
+      if (!csuj) {
+        if (z) z.value = '';
+        ajouterInfo(
+          'Usage : /cherche ce-que-tu-cherches. BLAMUNE fait la recherche sur le web puis te repond avec ses sources.'
+        );
+        return;
+      }
+      // La commande part TELLE QUE : c'est le serveur qui recherche
+      // (DuckDuckGo sans cle) avant de repondre ; la suite du flux est
+      // le chemin normal de /send (bulle, flux SSE, historique...).
+    } else {
+      traiterCommande(m);
+      return;
+    }
   }
   if ((!m && !imageChoisie) || actionEnCours) return;
   actionEnCours = true;

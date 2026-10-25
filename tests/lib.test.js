@@ -225,6 +225,25 @@ test('config IA : valeurs par defaut sans env ni config.json', (t) => {
   assert.strictEqual(config.api_model, 'gemini-3.5-flash');
   assert.strictEqual(config.api_key, '');
   assert.strictEqual(config.recherche_web, true, 'la recherche web est activee par defaut');
+  assert.strictEqual(
+    config.recherche_web_auto,
+    true,
+    'le chercheur serveur DuckDuckGo est active par defaut'
+  );
+});
+
+test('config IA : les deux chemins de recherche sont couverts separement', (t) => {
+  const ferme1 = configDeTest(t, { env: { RECHERCHE_WEB: '0' } });
+  assert.strictEqual(ferme1.config.recherche_web, false, 'google_search (facture) coupe');
+  assert.strictEqual(
+    ferme1.config.recherche_web_auto,
+    true,
+    'le chercheur serveur (gratuit) reste actif'
+  );
+
+  const ferme2 = configDeTest(t, { env: { RECHERCHE_WEB_AUTO: '0' } });
+  assert.strictEqual(ferme2.config.recherche_web, true, 'google_search (facture) reste actif');
+  assert.strictEqual(ferme2.config.recherche_web_auto, false, 'chercheur serveur coupe');
 });
 
 test('config IA : l environnement prime sur config.json', (t) => {

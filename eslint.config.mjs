@@ -18,7 +18,12 @@ export default [
         clearTimeout: 'readonly',
         setInterval: 'readonly',
         clearInterval: 'readonly',
-        URL: 'readonly'
+        URL: 'readonly',
+        // Runtime Node >= 18 (deja requis pour le pool et push) : le
+        // chercheur web lib/recherche_web.js compte dessus.
+        fetch: 'readonly',
+        AbortController: 'readonly',
+        TextDecoder: 'readonly'
       }
     },
     rules: {
