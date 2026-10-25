@@ -106,6 +106,23 @@ test('sticky : le dernier membre qui a repondu revient en tete', () => {
   assert.strictEqual(r.ordre(T0)[0].nom, 'principal');
 });
 
+test('modeleOkConnu : le modele du membre repondant est memorise', () => {
+  const r = fabrique({ env: 'a|http://a/v1|k|groq-modele; b|http://b/v1||autrer' });
+  assert.strictEqual(r.modeleOkConnu(), '', 'rien au debut');
+  r.noteOk('b', T0);
+  // Ancien appel : le 2e argument etait jadis IGNORE (instant des tests) ;
+  // un nombre n est pas un nom de modele : rien memorise.
+  assert.strictEqual(r.modeleOkConnu(), '', 'un nombre n est pas un modele');
+  r.noteOk('b', 'openai/gpt-oss-120b');
+  assert.strictEqual(r.modeleOkConnu(), 'openai/gpt-oss-120b', 'modele memorise');
+  r.noteOk('a', 'groq-modele');
+  assert.strictEqual(r.modeleOkConnu(), 'groq-modele', 'le dernier gagne');
+  r.noteOk('b');
+  assert.strictEqual(r.modeleOkConnu(), 'groq-modele', 'noteOk sans modele ne rase pas la memoire');
+  r.noteOk('a', '   ');
+  assert.strictEqual(r.modeleOkConnu(), 'groq-modele', 'chaine vide/blanche refusee');
+});
+
 test('serveur mort (ECONNREFUSED/Timeout) : cooldown standard', () => {
   const r = fabrique({ env: 'a|http://a/v1|k|m' });
   r.noteEchec('a', { code: 'ECONNREFUSED' }, T0);

@@ -56,6 +56,12 @@ maintenant})` encapsule `rechercheWeb()` avec une mise en cache
 - `.env.example` : les 7 variables des gardiens documentées.
 - `tests/gardiens.test.js` : 7 tests (file FIFO, fail-open,
   tension/éco avec hystérésis, cache hit/TTL/échec).
+- Diag `modele=` sur la voie pool : `pool_ia` mémorise le modèle du
+  dernier membre vraiment répondu (`noteOk(nom, modele)`, getter
+  `modeleOkConnu()`) — `memoriserModeleOk` refuse honnêtement les noms
+  hors liste `API_MODEL(S)` (`openai/gpt-oss-120b`...), le :diag du
+  client retombe donc sur l'info du pool ; QA locale :
+  `diag modele=openai-fast`.
 
 ## [Non publié] - 2026-10-25 (recherche en profondeur)
 

@@ -2229,6 +2229,10 @@ creerRouteSend(app, {
   reponseSecours,
   contexteSavoir: savoir.contexteQuestion,
   dernierModeleOkConnu,
+  // Modele du dernier VERITABLE membre de pool ayant repondu (noms hors
+  // liste API_MODEL(S), que memoriserModeleOk refuse honnetement) : le
+  // :diag du client doit nommer qui a ecrit.
+  getPoolModeleOk: pool.modeleOkConnu,
   loggerErreur,
   rateSendIp: RATE_SEND_IP,
   rateSendUid: RATE_SEND_UID
