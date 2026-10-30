@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="120" height="120"
+     role="img" aria-label="BLAMUNE — la perle qui reflechit">
+  <!-- Version autonome (SMIL) : la perle parcourt le lien en 3,4 s.
+       A utiliser telle quelle dans une page : aucun CSS ni JS requis. -->
+  <defs>
+    <linearGradient id="gp" gradientUnits="userSpaceOnUse" x1="8" y1="8" x2="92" y2="92">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <g transform="rotate(-8 50 50)">
+    <path id="lien" d="M 50 50 C 40 33 17 33 17 50 C 17 67 40 67 50 50 C 60 33 83 33 83 50 C 83 67 60 67 50 50 Z"
+          fill="none" stroke="url(#gp)" stroke-width="9" stroke-linecap="round"/>
+    <circle r="6" fill="url(#gp)">
+      <animateMotion dur="3.4s" repeatCount="indefinite" rotate="0">
+        <mpath href="#lien"/>
+      </animateMotion>
+    </circle>
+  </g>
+</svg>

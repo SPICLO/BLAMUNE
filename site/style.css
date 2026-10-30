@@ -11,7 +11,7 @@
   --surface-2: rgb(var(--blanc) / 0.09);
   --bordure: rgb(var(--blanc) / 0.09);
   --texte: #e8eef7;
-  --texte-doux: #9fb3c8;
+  --texte-doux: #c7d2e0;
   --texte-faible: #6b7f97;
   --accent: #38bdf8;
   --accent-2: #22d3ee;
@@ -85,6 +85,22 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Lien d'évitement clavier (skip link) : accessible dès le premier Tab. */
+.skip-link {
+  position: absolute;
+  top: -1000px;
+  left: 0;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: #000;
+  font-weight: 700;
+  z-index: 9999;
+  transition: top 0.2s;
+}
+.skip-link:focus {
+  top: 10px;
+}
+
 html,
 body {
   height: 100%;
@@ -130,6 +146,7 @@ button {
   border: 0;
   cursor: pointer;
   background: none;
+  touch-action: manipulation;
 }
 
 button:focus-visible,
@@ -193,7 +210,7 @@ input:focus-visible {
   box-shadow:
     0 0 0 2px rgba(56, 189, 248, 0.25),
     0 4px 14px rgba(34, 211, 238, 0.35);
-  animation: avatarPulse 3s ease-in-out infinite;
+  animation: avatarPulse 3s ease-in-out infinite, logoFloat 4.5s ease-in-out infinite;
 }
 
 .avatar-bot img {
@@ -201,19 +218,25 @@ input:focus-visible {
   height: 100%;
   border-radius: 50%;
   object-fit: cover;
+  animation: logoSpin 18s linear infinite;
 }
 
-@keyframes avatarPulse {
+@keyframes logoFloat {
   0%,
   100% {
-    box-shadow:
-      0 0 0 2px rgba(56, 189, 248, 0.25),
-      0 4px 14px rgba(34, 211, 238, 0.35);
+    transform: translateY(0);
   }
   50% {
-    box-shadow:
-      0 0 0 4px rgba(56, 189, 248, 0.15),
-      0 4px 20px rgba(34, 211, 238, 0.5);
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes logoSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
 
@@ -619,19 +642,27 @@ input:focus-visible {
   display: block;
 }
 
-@keyframes avatarFloat {
+@keyframes logoGlow {
   0%,
   100% {
-    transform: translateY(0);
     box-shadow:
-      0 0 0 3px rgba(56, 189, 248, 0.25),
-      0 10px 30px rgba(34, 211, 238, 0.4);
+      0 0 0 4px rgba(56, 189, 248, 0.18),
+      0 10px 30px rgba(34, 211, 238, 0.35);
   }
   50% {
-    transform: translateY(-6px);
     box-shadow:
-      0 0 0 3px rgba(56, 189, 248, 0.3),
-      0 16px 40px rgba(34, 211, 238, 0.55);
+      0 0 0 6px rgba(56, 189, 248, 0.28),
+      0 14px 40px rgba(34, 211, 238, 0.55);
+  }
+}
+
+@keyframes logoPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
   }
 }
 
@@ -1122,7 +1153,7 @@ button:disabled {
   box-shadow:
     0 0 0 4px rgba(56, 189, 248, 0.18),
     0 10px 30px rgba(34, 211, 238, 0.35);
-  animation: avatarFloat 3s ease-in-out infinite;
+  animation: avatarFloat 3s ease-in-out infinite, logoGlow 4s ease-in-out infinite;
 }
 
 .auth-avatar img {
@@ -1133,6 +1164,7 @@ button:disabled {
   object-position: center;
   display: block;
   margin: 0 auto;
+  animation: logoPulse 6s ease-in-out infinite;
 }
 
 .auth-box h2 {
@@ -1711,7 +1743,8 @@ html.console .auth-box::before {
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
-  *::after {
+  *::after,
+  body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

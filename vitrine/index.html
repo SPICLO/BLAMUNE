@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BLAMUNE — Atelier</title>
+  <meta name="description" content="Atelier numérique BLAMUNE — projets édités un par un.">
+  <link rel="icon" href="assets/favicon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Jost:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <img src="assets/logo.png" alt="Logo BLAMUNE" class="logo">
+        <div class="brand-text">
+          <span class="brand-name">BLAMUNE</span>
+          <span class="brand-sub">Atelier numérique</span>
+        </div>
+      </div>
+      <p class="header-note">Une collection de projets édités un par un.</p>
+    </div>
+  </header>
+
+  <main>
+    <section class="projects">
+      <div class="container">
+        <div class="projects-header">
+          <h2 class="projects-title">Projets</h2>
+          <span class="projects-count" id="projects-count">0</span>
+        </div>
+        <div id="projects-grid" class="projects-grid" aria-live="polite"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>© <span id="year"></span> BLAMUNE</span>
+      <span class="footer-sep">·</span>
+      <span>Fait à la main, un projet à la fois.</span>
+    </div>
+  </footer>
+
+  <script src="projets.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

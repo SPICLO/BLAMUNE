@@ -2,8 +2,9 @@
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b1020" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#eef2f9" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1020" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="BLAMUNE" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -34,19 +35,33 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://blamune.onrender.com" />
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="BLAMUNE - Chat IA" />
-    <meta
-      name="twitter:description"
-      content="Ton ami IA. Discute, apprends, garde ton historique."
-    />
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="BLAMUNE - Chat IA" />
+  <meta
+    name="twitter:description"
+    content="Ton ami IA. Discute, apprends, garde ton historique."
+  />
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "BLAMUNE",
+      "applicationCategory": "SocialApplication",
+      "description": "Ton ami IA. Discute avec une intelligence artificielle, apprends-lui des choses et garde ton historique.",
+      "url": "https://blamune.onrender.com/",
+      "author": { "@type": "Organization", "name": "BLAMUNE" },
+      "keywords": "chat, IA, intelligence artificielle, assistant, conversation",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+    }
+  </script>
   </head>
   <body>
+    <a href="#chat" class="skip-link">Aller au contenu principal</a>
     <!-- ECRAN D'AUTHENTIFICATION -->
     <div id="ecranAuth">
       <div class="auth-box">
-        <div class="auth-avatar"><img src="logo.png" alt="BLAMUNE" /></div>
+        <div class="auth-avatar"><img src="logo-repos.svg" alt="BLAMUNE" /></div>
         <h2>Bienvenue sur BLAMUNE</h2>
         <p class="auth-sous">
           Connecte-toi pour garder ton historique et personnaliser ton experience.
@@ -142,7 +157,7 @@
     <div id="appContenu">
       <header id="tete">
         <div class="infos">
-          <div class="avatar avatar-bot" aria-hidden="true"><img src="logo.png" alt="" /></div>
+          <div class="avatar avatar-bot" aria-hidden="true"><img src="logo-repos.svg" alt="" /></div>
           <div class="titres">
             <h1>BLAMUNE</h1>
             <div class="statut" id="statut">
@@ -295,7 +310,7 @@
         </button>
       </div>
 
-      <main id="chat" aria-live="polite">
+      <main id="chat" aria-live="polite" aria-label="Conversation">
         <noscript
           ><p style="text-align: center; padding: 40px; color: #9fb3c8">
             JavaScript est requis pour utiliser BLAMUNE.
@@ -369,7 +384,7 @@
       </footer>
     </div>
 
-    <script src="ia-secours.js"></script>
-    <script src="app.js"></script>
+    <script defer src="ia-secours.js"></script>
+    <script defer src="app.js"></script>
   </body>
 </html>

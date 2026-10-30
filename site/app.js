@@ -853,7 +853,7 @@ function ajouterMessage(qui, texte, confiance, epoch) {
   avatar.className = 'avatar ' + (qui === 'bot' ? 'avatar-bot' : 'avatar-moi');
   if (qui === 'bot') {
     var logo = document.createElement('img');
-    logo.src = 'logo.png';
+    logo.src = 'logo-repos.svg';
     logo.alt = '';
     avatar.appendChild(logo);
   } else {
@@ -943,7 +943,7 @@ function attente(on) {
     var av = document.createElement('div');
     av.className = 'avatar avatar-bot';
     var logo = document.createElement('img');
-    logo.src = 'logo.png';
+    logo.src = 'logo-repos.svg';
     logo.alt = '';
     av.appendChild(logo);
     var corps = document.createElement('div');
@@ -1081,7 +1081,7 @@ function afficherAccueil() {
   var gros = document.createElement('div');
   gros.className = 'gros-avatar';
   var grosLogo = document.createElement('img');
-  grosLogo.src = 'logo.png';
+  grosLogo.src = 'logo-repos.svg';
   grosLogo.alt = 'BLAMUNE';
   gros.appendChild(grosLogo);
   var titre = document.createElement('h2');
@@ -1645,6 +1645,7 @@ function ajouterPhotoBubble(node, src) {
   if (!corps) return;
   var img = document.createElement('img');
   img.className = 'photo-envoyee';
+  img.loading = 'lazy';
   img.src = src;
   img.alt = 'Photo envoyee';
   var bulle = corps.querySelector('.bulle');

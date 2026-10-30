@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="BLAMUNE — le lien et sa perle">
+  <!-- Une perle au point de croisement : le souvenir garde au coeur du lien.
+       La forme reste un infini, mais elle a un centre de gravite. -->
+  <defs>
+    <linearGradient id="li5" gradientUnits="userSpaceOnUse" x1="8" y1="8" x2="92" y2="92">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <g transform="rotate(-8 50 50)">
+    <path d="M 50 50 C 40 33 17 33 17 50 C 17 67 40 67 50 50 C 60 33 83 33 83 50 C 83 67 60 67 50 50 Z"
+          fill="none" stroke="url(#li5)" stroke-width="9" stroke-linecap="round"/>
+    <circle cx="50" cy="50" r="6" fill="url(#li5)"/>
+  </g>
+</svg>
