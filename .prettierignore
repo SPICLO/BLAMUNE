@@ -38,3 +38,19 @@ logs/
 site/*.png
 site/*.ico
 site/logo.png
+
+# Dossiers non suivis pose a la racine (projets et configurateurs externes).
+OpenMontage/
+agent/
+.agents/
+.claude/
+.codex/
+
+# Outillage importe sous .github (skills impeccable) et bundles vendus.
+.github/skills/
+.github/agents/
+.github/hooks/
+*.umd.js
+
+# Généré par un verrou d'outils : le format EST le fichier.
+skills-lock.json

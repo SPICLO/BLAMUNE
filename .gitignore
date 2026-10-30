@@ -38,6 +38,24 @@ hors_ligne
 .protection_hash.json.bak_*
 savoir_nouvelles.txt
 
+# Outillage local d'agents IA et projets annexes pose a la racine :
+# meme esprit que .prettierignore et eslint.config.mjs (qui excluent
+# ces dossiers du formatage et du lint).
+# docs/ et PRODUCT.md restent versionnes pour le projet lui-meme.
+/.agents/
+/.claude/
+/.codex/
+/.impeccable/
+/.skill-archive/
+/.skills.json
+/.vscode/
+/agent/
+/skills-lock.json
+/OpenMontage/
+/.github/skills/
+/.github/agents/
+/.github/hooks/
+
 # Proxy DeepSeek web -> API OpenAI (projet externe, jamais versionne ici :
 # il contient deepseek-auth.json qui vaut les cookies du compte, et un
 # profil Chrome prive). Pour le recuperer : git clone
