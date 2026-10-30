@@ -4,6 +4,60 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Ce journal démarre avec la mise à niveau « hygiène du dépôt » ci-dessous ; les
 versions antérieures sont visibles dans `git log`.
 
+## [Non publié] - 2026-10-29 (gardiens anti-saturation plus frugaux)
+
+### Gardiens
+
+- **Mode éco : historique tronqué** : quand la tension s'arme (fenêtre de 429
+  saturée), l'historique envoyé aux modèles passe de 16 à 6 échanges
+  (`HISTO_ECO_MAX=6`, `nbEchanges()` dans `lib/ia/gemini.js`, consulté par
+  la voie Gemini directe ET la voie pool via `lib/ia/openai.js`). Le prompt
+  envoyé est LE quota dépensé : sous tension, chaque appel pèse beaucoup
+  moins lourd, sans requête supplémentaire.
+- **En-tête standard `Retry-After` lu sur les 429** des trois transports
+  (Gemini non-flux, Gemini flux, pool OpenAI) : la valeur réelle demandée
+  par le fournisseur est rattachée à l'erreur (`e.retryAfterMs`) et
+  `delaiIndique()` la priorise sur le parsing du message
+  (« please retry in 45.4s ») qui reste de secours. Attente exacte, plus
+  de dépendance à la formulation.
+
+### Documentation
+
+- `.env.example` : le calibrage de `MAX_CONC` est documenté selon la largeur
+  du pool (`API_POOL`) — un pool large supporte un plafond plus haut, la
+  capacité réelle de la boîte reste la largeur du pool plus les clés Gemini.
+
+## [Non publié] - 2026-10-28 (durcissement en-têtes, dépendance et vigie de dépôt)
+
+### Sécurité
+
+- **Correction de la dépendance vulnérable** `body-parser` (DoS via
+  octets résiduels après un corps compressé, advisory GHSA-27r3-jxmh-p828)
+  : `npm audit fix` fait passer 2.3.0 → 2.4.0 dans le lockfile, sans
+  changement majeur. `npm audit` repart à zéro vulnérabilité.
+- **CSP durcie dans `server.js`** : `frame-ancestors 'none'`
+  (double `X-Frame-Options: DENY` pour les navigateurs modernes),
+  `base-uri 'self'` et `form-action 'self'` ferment les injections qui
+  tenteraient de rediriger une soumission de formulaire ou une balise
+  `<base>`. Aucune refonte : le site est déjà auto-porté (`'self'`).
+- **Header `Permissions-Policy` ajouté** : `geolocation=(), camera=(),
+payment=()` interdits, `microphone=(self)` laissé ouvert explicitement —
+  la dictée vocale de `site/app.js` (`SpeechRecognition`) en dépend.
+  En-têtes vérifiés en runtime (`/admin/`), pas qu'en source.
+
+### Maintenance
+
+- **ESLint et Prettier rendus utilisables à nouveau localement** :
+  les dossiers posés à la racine sans être suivis par git (`OpenMontage/`,
+  `agent/`, `.agents/`, `.claude/`, `.codex/`) plus l'outillage importé de
+  `.github/skills/` sont passés dans le filet de la moulinette : 1 020 erreurs de lint et
+  1 336 écarts de format, tous étrangers au projet. Ils sont ignorés par
+  `eslint.config.mjs` et `.prettierignore` ; le motif `*.umd.js` rejoint
+  `*.min.js` (bundles vendus). `npm run lint` et `npm run format:check`
+  reviennent à zéro problème, et la CI garde son terrain propre
+  (elle ne vérifie que les fichiers suivis).
+- `verifier_deploiement.py` : verdict de sa passe longue « PRÊT À PUBLIER ».
+
 ## [Non publié] - 2026-10-25 (gardiens anti-saturation)
 
 ### Ajouté

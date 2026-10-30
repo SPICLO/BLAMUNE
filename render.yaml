@@ -37,15 +37,23 @@ services:
       - key: API_KEY
         sync: false
       - key: API_PROVIDER
-        value: gemini
+        value: groq
       - key: API_URL
-        value: https://generativelanguage.googleapis.com/v1beta
+        value: https://api.groq.com/openai/v1
       - key: API_MODEL
-        value: gemini-3.6-flash
-      # Modele de secours (essayes si le principal renvoie une erreur :
-      # quota sature, 429, indisponible...).
+        value: openai/gpt-oss-120b
+      # Modeles de secours (essayes si le principal renvoie une erreur :
+      # quota sature, 429, indisponible...). Catalogue Groq 2026.
       - key: API_MODELS
-        value: gemini-3.5-flash-lite
+        value: openai/gpt-oss-20b,qwen/qwen3.8-27b
+      # Repli Gemini : cles definies DANS LE DASHBOARD (API_KEYS,
+      # rotation automatique de la principale aux autres sur un 429).
+      - key: API_KEYS
+        sync: false
+      # Gardiens anti-saturation : plafond d'appels IA simultanes calibre
+      # sur la largeur du pool (4 membres + 2 cles Gemini en repli).
+      - key: MAX_CONC
+        value: '4'
       - key: API_MAX_TOKENS
         value: 512
       - key: API_TEMPERATURE

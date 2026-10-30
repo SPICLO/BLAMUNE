@@ -152,15 +152,26 @@ app.use((req, res, next) => {
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  // Fonctions puissantes interdites, sauf la dictée vocale (site/app.js
+  // écrite dans le champ par SpeechRecognition, qui dépend du micro) :
+  // geolocalisation et caméra n'ont aucun usage ici.
+  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=(self), payment=()');
   // CSP serree : tout le code est servi depuis 'self' (ici-meme) ; le seul
   // appel sortant legitime est le palier de secours direct vers
   // text.pollinations.ai (site/ia-secours.js, sans cle ni script externe).
   // Les domains Hugging Face et 'wasm-unsafe-eval' n'existaient que pour
   // l'ancien IA hors-ligne WebLLM, retire : sans eux, toute injection du
   // style "charger du code ou parler a l'etranger" est refusee par la page.
+  // frame-ancestors renforce X-Frame-Options (convertit en erreur dans les
+  // navigateurs modernes), base-uri et form-action ferment les messages
+  // qui tenteraient de rediriger une soumission ou une balise <base>.
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://text.pollinations.ai; img-src 'self' data:"
+    // 'unsafe-inline' sur style-src SEULEMENT : index.html pose 12 styles
+    // inline (style="display: none" des bascules d'affichage). Les retirer
+    // exigerait de les migrer en classes CSS — progression a part. script-src
+    // n'a JAMAIS d'unsafe-inline : le JS inline reste interdit.
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://text.pollinations.ai; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
   );
   if (req.method === 'OPTIONS') return res.status(204).end();
   next();
@@ -696,6 +707,7 @@ const {
   HISTO_API_MAX,
   HISTO_AFFICHAGE_MAX,
   limiterHisto,
+  nbEchanges,
   construireContenus,
   noterErreurGemini,
   optionsGemini,
@@ -708,6 +720,7 @@ const {
   erreurRetentable,
   tentable,
   delaiIndique,
+  retryApresDepuisEnTete,
   marquerQuota,
   instantDernierQuota,
   resteFenetreQuota,
@@ -734,6 +747,7 @@ iaOpenai = require('./lib/ia/openai').creerOpenai({
   requeter,
   limiterHisto,
   HISTO_API_MAX,
+  nbEchanges,
   marquerQuota,
   resoudreAlertes,
   memoriserModeleOk,
@@ -864,6 +878,9 @@ function modeleClassiqueBrut(modele, contents, sansReflexion, avecOutilsDemandes
           resolve(texteDepuisReponse(data));
         } catch (e) {
           if (res.statusCode !== 200) e.statusCode = res.statusCode;
+          // En-tete Retry-After (partage avec modeleEnFluxBrut et openAI) :
+          // lu a la source, delaiIndique() le preferera au parsing du texte.
+          e.retryAfterMs = retryApresDepuisEnTete(res.headers && res.headers['retry-after']);
           reject(e);
         }
       });
@@ -942,6 +959,9 @@ function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion, avecOutilsDe
           const refuse = refusChamp(res.statusCode, sansReflexion, avecOutils);
           const err = refuse || new Error('HTTP ' + res.statusCode + ' ' + data.substring(0, 200));
           if (!refuse) err.statusCode = res.statusCode;
+          // En-tete Retry-After : meme voie que modeleClassiqueBrut (non-flux),
+          // pour que delaiIndique() rende l'attente VRAIMENT demandee.
+          err.retryAfterMs = retryApresDepuisEnTete(res.headers && res.headers['retry-after']);
           echouer(err);
         });
         res.resume();
@@ -1081,7 +1101,7 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
         }
       : null;
   const needsFlux = typeof onDelta === 'function';
-  const contents = construireContenus(limiterHisto(histo, HISTO_API_MAX), imageParts);
+  const contents = construireContenus(limiterHisto(histo, nbEchanges()), imageParts);
   const modeles = ordreModeles();
   let derniereErreur = null;
 

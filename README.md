@@ -43,7 +43,10 @@ fournisseur compatible OpenAI) pour la conversation intelligente.
 - **Gardiens anti-saturation** : file d'attente de concurrence
   (`MAX_CONC`, fail-open apres attente max), comptage des 429 avec
   **mode eco** automatique (recherche coupee, taches de fond suspendues,
-  retour au calme avec anti-clignotement), cache des sujets deja
+  historique envoye au modele tronque a 6 echanges (`HISTO_ECO_MAX`),
+  retour au calme avec anti-clignotement), en-tete standard
+  `Retry-After` lu sur les 429 (attente exacte demandee par le
+  fournisseur), cache des sujets deja
   cherches (`CACHE_RECHERCHE_MS`). Le panneau `/admin` affiche la file,
   les 429, l'etat eco et le cache (section « Gardiens
   anti-saturation »). Agrandir la capacite reelle = ajouter une cle

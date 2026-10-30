@@ -130,6 +130,54 @@ test('tension : les notes vieillissent (fenetre 5 min), du jour re-arme', async 
   assert.strictEqual(e3.nb429Jour, 1, 'compteur du jour re-arme a minuit');
 });
 
+// ====================== RETRY-AFTER + HISTORIQUE ECO ======================
+
+const { creerGemini } = require('../lib/ia/gemini');
+const gemini = creerGemini({ getConfig: () => ({}), providerOpenAI: () => false });
+
+test('retryApresDepuisEnTete : secondes -> ms, absent/invalide -> 0, date -> temps restant', () => {
+  assert.strictEqual(gemini.retryApresDepuisEnTete('45.4'), 45400, 'second flottant');
+  assert.strictEqual(gemini.retryApresDepuisEnTete('60'), 60000, 'second entier');
+  assert.strictEqual(gemini.retryApresDepuisEnTete(''), 0, 'chaine vide : 0');
+  assert.strictEqual(gemini.retryApresDepuisEnTete(undefined), 0, 'absent : 0');
+  assert.strictEqual(gemini.retryApresDepuisEnTete(' pas-un-nombre '), 0, 'invalide : 0');
+  const ms = gemini.retryApresDepuisEnTete(new Date(Date.now() + 5000).toUTCString());
+  assert.ok(ms > 2500 && ms <= 5000, 'date HTTP ms restants (recu ' + ms + 'ms)');
+});
+
+test('delaiIndique : e.retryAfterMs prioritaire, texte du message en base de secours', () => {
+  assert.strictEqual(gemini.delaiIndique({ retryAfterMs: 9000 }), 9000, 'champ en-tete gagne');
+  assert.strictEqual(
+    gemini.delaiIndique({ message: 'Please retry in 45.411629042s' }),
+    45412,
+    'parsing texte conserve'
+  );
+  assert.strictEqual(
+    gemini.delaiIndique({ retryAfterMs: 9000, message: 'Please retry in 45.4s' }),
+    9000,
+    'en-tete prioritaire sur texte'
+  );
+  assert.strictEqual(gemini.delaiIndique(null), 0, 'pas de crash sans erreur');
+});
+
+test('historique eco : nbEchanges=16 hors tension, 6 sous tension, systeme conserve', () => {
+  const histo = [{ role: 'system', content: 'sys' }];
+  for (let i = 0; i < 20; i++)
+    histo.push({ role: i % 2 === 0 ? 'user' : 'assistant', content: 'm' + i });
+  tension.reinitialiser();
+  const hors = gemini.limiterHisto(histo, gemini.nbEchanges());
+  assert.strictEqual(hors.filter((h) => h.role !== 'system').length, 16, 'hors tension : 16');
+  // Arme l'eco (seuil : 3 x 429 dans la fenetre, horloge reelle).
+  tension.noter();
+  tension.noter();
+  tension.noter();
+  const eco = gemini.limiterHisto(histo, gemini.nbEchanges());
+  assert.strictEqual(eco.filter((h) => h.role !== 'system').length, 6, 'en eco : 6');
+  assert.strictEqual(eco[0].role, 'system', 'le message systeme reste en tete');
+  assert.strictEqual(eco[1].role, 'user', 'reprise sur un echange utilisateur');
+  tension.reinitialiser();
+});
+
 // ========================= CACHE DU CHERCHEUR =========================
 
 // Fixture DDG minimale (meme structure que tests/recherche_web.test.js) :

@@ -60,12 +60,18 @@ echo    VALEURS A COLLER DANS RENDER : service blamune
 echo    Environment -" Add environment variable
 echo ================================================================
 echo.
-echo --- OBLIGATOIRE ------------------------------------------------
+echo --- PRINCIPAL : cle Groq + replis Gemini (2 cles en rotation) --
 echo.
 echo   API_KEY =
-echo     !CLE_GEMINI!
-echo     ^(cle Gemini gratuite ; si elle est morte ou pas AIza...,
-echo      cree-en une sur aistudio.google.com/app/apikey^)
+echo     !CLE_DIRECTE!
+echo     ^(cle du FOURNISSEUR ACTIF (groq). Elle vient de la ligne
+echo      API_KEY du .env local. Pas une cle Gemini : celles-ci
+echo      vont dans API_KEYS juste en dessous^)
+echo.
+echo   API_KEYS =
+if defined TOUTES_CLES echo     !TOUTES_CLES!
+echo     ^(2 cles Gemini de repli, separees par une virgule ; rotation
+echo      automatique si le principal sature. Vide = pas de repli^)
 echo.
 echo   JSONBIN_API_KEY =
 call :afficher "!JSONBIN_CLE_VAL!"
