@@ -1,6 +1,7 @@
+# Site chat prive derriere authentification : rien a indexer.
+# Les robots qui parcourent chaque fichier sans cache brulent la bande
+# passante mensuelle (suspension Render au-dela de 5 Go sortis/mois).
+# La garde RATE_STATIQUE_GET limite en plus les clients qui ignores
+# ce fichier (429 a corps minuscule des 120/min/IP).
 User-agent: *
-Allow: /
-Disallow: /admin
-Disallow: /admin/*
-
-Sitemap: https://blamune.onrender.com/sitemap.xml
+Disallow: /
