@@ -58,6 +58,15 @@ fournisseur compatible OpenAI) pour la conversation intelligente.
   `/admin` affiche la file, les 429, l'etat eco et le cache (section
   « Gardiens anti-saturation »). Agrandir la capacite reelle = ajouter
   une cle posee dans l'`API_POOL` (voir Pool multi-fournisseur).
+- **Bande passante surveillee** (`lib/sortie.js`, champ `sortie` dans
+  `/health`) : octets sortants du jour par famille (`statique`, `api`,
+  `sse` — les flux comptent a part : suspect n.1 d'un debit continu),
+  la veille pour comparer, et le palmares des 5 chemins les plus
+  gourmands. Grade anti-boucle sur les fichiers servis
+  (`RATE_STATIQUE_GET=120` requetes/min/IP) : un robot ou un moniteur
+  qui retelécharge la page en boucle recoit un 429 a corps minuscule au
+  lieu des megaoctets. Apres la suspension du workspace Hobby (5 Go
+  sortants mensuels), le drain se lit des le lendemain.
 - **PWA** installable (service worker, mode hors ligne) et **admin** (stats,
   utilisateurs, logs, sauvegarde/restauration).
 - **Multi-fournisseur IA** : Gemini par defaut, ou tout endpoint compatible OpenAI.

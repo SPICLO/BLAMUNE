@@ -17,6 +17,7 @@ const { creerResume } = require('../lib/resume');
 const { creerConfigIA } = require('../lib/config_ia');
 const { demarrerKeepalive } = require('../lib/keepalive');
 const { creerCompression } = require('../lib/compression');
+const { creerCompteurSortie } = require('../lib/sortie');
 const zlib = require('node:zlib');
 const cryptoModule = require('node:crypto');
 
@@ -30,6 +31,84 @@ function dossierTmp(t) {
   });
   return d;
 }
+
+// ====================== COMPTEUR D'OCTETS SORTANTS ======================
+// Une fuite de bande passante (robot, moniteur, poller) doit se voir dans
+// /health avant la suspension du workspace Render. Ces tests jouent le
+// middleware avec de fausses reponses : aucune ressource reelle.
+
+test('compteur sortie : statique par somme, api par Content-Length, sse par entete', () => {
+  let instant = Date.parse('2026-10-31T10:00:00Z');
+  const v = creerCompteurSortie({ maintenant: () => instant });
+  const fausseReponse = (ctype, cl) => {
+    const { EventEmitter } = require('node:events');
+    const r = new EventEmitter();
+    r.getHeader = (k) => (k === 'content-type' ? ctype : k === 'content-length' ? cl : null);
+    const frags = [];
+    r.write = (c) => (frags.push(String(c || '')), true);
+    r.end = (c) => (frags.push(String(c || '')), r.emit('finish'), r);
+    // Le middleware remplace write/end pendant suiviReponse : apres le
+    // "greffon", envoyer() decale les fragments comme une vraie route.
+    r.envoyer = () => {
+      r.write('acc');
+      r.end('def');
+      return frags.join('');
+    };
+    return r;
+  };
+
+  // 1) Statique : sendFile n'annonce pas Content-Length -> somme des frags.
+  const r1 = fausseReponse('text/css');
+  v.middleware({ path: '/style.css' }, r1, () => {});
+  assert.strictEqual(r1.envoyer(), 'accdef', 'la route recoit ses fragments');
+  // 2) API : Content-Length definitif (JSON compresse) prioritaire.
+  const r2 = fausseReponse('application/json', 555);
+  v.middleware({ path: '/historique' }, r2, () => {});
+  r2.envoyer(); // la somme des frags est ignoree quand l'entete est la
+  // 3) SSE : le content-type l'emporte sur toute classification d'URL.
+  const r3 = fausseReponse('text/event-stream', null);
+  v.middleware({ path: '/send' }, r3, () => {});
+  r3.envoyer();
+
+  const e = v.etat();
+  assert.strictEqual(e.jour, '2026-10-31');
+  assert.strictEqual(e.statique, 6, 'statique : somme des 6 octets');
+  assert.strictEqual(e.api, 555, 'api : entete prioritaire sur les frags');
+  assert.strictEqual(e.sse, 6, 'sse : 6 octets comptes');
+  assert.strictEqual(e.total, 6 + 555 + 6);
+  assert.ok(
+    e.top.some((x) => x[0] === '/style.css'),
+    'palmares : /style.css present'
+  );
+  assert.strictEqual(e.hier, null, 'rien hier a ce stade');
+});
+
+test('compteur sortie : jour suivant, hier disponible, vieux jours purges', () => {
+  let instant = Date.parse('2026-10-30T10:00:00Z');
+  const v = creerCompteurSortie({ maintenant: () => instant });
+  const dire = (v, chemin) => {
+    const { EventEmitter } = require('node:events');
+    const r = new EventEmitter();
+    r.getHeader = () => null;
+    r.write = () => true;
+    r.end = () => r.emit('finish');
+    v.middleware({ path: chemin }, r, () => {});
+    r.write('requete');
+    r.end(); // leve le finish : le compteur note le path a ce moment
+  };
+
+  dire(v, '/a.js'); // jour 30
+  instant = Date.parse('2026-10-31T10:00:00Z');
+  dire(v, '/b.js'); // jour 31
+  let e = v.etat();
+  assert.strictEqual(e.jour, '2026-10-31');
+  assert.strictEqual(e.statique, 7, 'fragment "requete" = 7 octets (fichier .js -> statique)');
+  assert.strictEqual(e.hier && e.hier.total, 7, 'hier : la veille est visible');
+  instant = Date.parse('2026-11-03T10:00:00Z'); // trois jours plus tard
+  dire(v, '/c.js');
+  e = v.etat();
+  assert.strictEqual(e.hier, null, 'la veille du 2 novembre n avait rien');
+});
 
 // ============================ RATE LIMIT ============================
 

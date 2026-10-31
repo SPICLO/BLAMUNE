@@ -4,6 +4,35 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Ce journal démarre avec la mise à niveau « hygiène du dépôt » ci-dessous ; les
 versions antérieures sont visibles dans `git log`.
 
+## [Non publié] - 2026-10-31 (bande passante mesurée, avant la panne)
+
+Le workspace Render Hobby a été **suspendu** : 5 Go de bande passante
+sortante mensuelle épuisés — sans que le site n'ait reçu énormément de
+visites (actifs légers, gzip et cache/ETag déjà en place). Le drain réel
+est donc ailleurs (robot, moniteur externe qui retélécharge tout, boucle
+d'un client). Mesure avant réparation.
+
+### Gardiens
+
+- **Compteur d'octets sortants** (`lib/sortie.js`, exposé par `/health`
+  sous `sortie`) : octets du jour par famille — `statique`, `api`, `sse`
+  (les flux `text/event-stream` comptent à part : c'est le suspect n°1
+  d'un debit continu) —, la veille pour comparer, et le **palmarès des
+  5 chemins les plus gourmands du jour**. Mesure exacte quand
+  `Content-Length` est défini (JSON compressé) ; somme des fragments
+  sinon (sur-estimation honnête, jamais une découverte tardive).
+- **Grade anti-boucle sur les fichiers servis** (`lib/routes/statique.js`,
+  `RATE_STATIQUE_GET=120/min/IP`, borne partagée sur tous les fichiers) :
+  un robot ou un moniteur sans cache qui retélécharge la page en boucle
+  est arrêté par un 429 à corps minuscule (quelques octets), pas par des
+  mégaoctets. Un vrai navigateur charge ~12 fichiers par page : dix
+  rechargements complets à la minute restent possibles.
+
+### Documentation
+
+- `.env.example` : `RATE_STATIQUE_GET` documenté.
+- Plan du constat : `docs/superpowers/plans/2026-10-31-bande-passante.md`.
+
 ## [Non publié] - 2026-10-30 (diète de tokens : la saturation réduite à la source)
 
 ### Gardiens

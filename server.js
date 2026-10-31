@@ -28,6 +28,7 @@ const { creerGemini, estQuota } = require('./lib/ia/gemini');
 const { creerPoolIA } = require('./lib/pool_ia');
 const { demarrerKeepalive } = require('./lib/keepalive');
 const { creerCompression } = require('./lib/compression');
+const { creerCompteurSortie } = require('./lib/sortie');
 const { creerServiceBot } = require('./lib/service_bot');
 const { creerSavoir } = require('./lib/savoir');
 const { creerResume } = require('./lib/resume');
@@ -182,6 +183,13 @@ app.use((req, res, next) => {
 // (gardes-fous detailles dans lib/compression.js). Place APRES le bloc
 // ci-dessus, qui decide deja quelles reponses portent un Cache-Control.
 app.use(creerCompression({ logger: loggerErreur }));
+
+// Compteur d'octets sortants (apres le bloc des Cache-Control statiques et
+// la compression : il mesure AUSSI PRES POSSIBLE ce qui part au client).
+// Expose par /health (gardiens.sortie) : l'offre Hobby plafonne a 5 Go
+// sortis/mois, une fuite doit se voir avant la suspension du workspace.
+const compteurSortie = creerCompteurSortie();
+app.use(compteurSortie.middleware);
 
 // ==================== CONFIG ====================
 // Fournisseur, liste de modeles et rotation : implementation dans
@@ -2165,6 +2173,9 @@ creerRoutesAdmin(app, {
     tension: tension.etat(),
     cacheRecherche: rechercheWeb.etatCache()
   }),
+  // Bande passante sortante (octets du jour par famille, top chemins) :
+  // exposee telle quelle par /health sous le champ `sortie`.
+  getSortie: () => compteurSortie.etat(),
   connexionsActives,
   modeParUser,
   savoirDb,
@@ -2383,7 +2394,14 @@ if (push.actif && PUSH_CHECK_MS > 0) {
 // implementation dans lib/routes/statique.js.
 creerRoutesStatique(app, {
   siteDir: path.join(RACINE, 'site'),
-  adminDir: path.join(RACINE, 'admin')
+  adminDir: path.join(RACINE, 'admin'),
+  // Grade anti-boucle : un robot ou un moniteur externe qui reteléchargerait
+  // les memes fichiers minute apres minute brulerait la bande passante du
+  // mois en quelques jours. Un vrai navigateur charge ~12 fichiers par page :
+  // 120/min/IP laisse 10 chargements complets par minute, largement.
+  checkRateLimit,
+  getIp,
+  limiteStatiqueGet: parseInt(process.env.RATE_STATIQUE_GET || '120', 10)
 });
 
 // ==================== START ====================
