@@ -231,6 +231,20 @@ input:focus-visible {
   }
 }
 
+@keyframes avatarPulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(56, 189, 248, 0.25),
+      0 4px 14px rgba(34, 211, 238, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(56, 189, 248, 0.4),
+      0 6px 20px rgba(34, 211, 238, 0.55);
+  }
+}
+
 @keyframes logoSpin {
   0% {
     transform: rotate(0deg);
@@ -653,6 +667,16 @@ input:focus-visible {
     box-shadow:
       0 0 0 6px rgba(56, 189, 248, 0.28),
       0 14px 40px rgba(34, 211, 238, 0.55);
+  }
+}
+
+@keyframes avatarFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
   }
 }
 
