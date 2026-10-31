@@ -1,5 +1,5 @@
 // BLAMUNE Service Worker - offline cache + notifications push
-const CACHE = 'blamune-v14';
+const CACHE = 'blamune-v15';
 const ASSETS = [
   '/',
   '/index.html',
@@ -96,8 +96,8 @@ self.addEventListener('push', (e) => {
   e.waitUntil(
     self.registration.showNotification(contenu.titre || 'BLAMUNE', {
       body: contenu.corps || 'BLAMUNE a quelque chose a te dire.',
-      // icon-192 (192 px de vrai) et non logo.png (2000 x 2000 reels) : un
-      // logo 16 fois trop grand est decode a CHAQUE notification ; le badge,
+      // icon-192 (192 px de vrai) et non logo.png (512 x 512 reels) : moins
+      // de pixels a decoder a CHAQUE notification ; le badge, lui, ne garde
       // lui, ne garde que la silhouette alpha.
       icon: '/icon-192.png',
       badge: '/icon-192.png',
