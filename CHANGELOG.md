@@ -14,6 +14,21 @@ d'un client). Mesure avant réparation.
 
 ### Gardiens
 
+- **Plafond d'octets par IP et par jour** (`lib/garde_fichiers.js`,
+  `STATIQUE_MAX_JOUR_IP=60 Mo` par défaut, mur branché sur les fichiers
+  servis) : une limite **en requêtes** ne protège pas un quota — un
+  client qui répète un fichier à la fréquence légale (120/min sur une
+  page de 30 Ko compressée = 2,4 Go/jour) brûle quand même la bande
+  passante. Le mur est **en octets** : 60 Mo/jour ≈ 800 chargements de
+  page pour un humain, quelques ordres de grandeur sous un robot. Au
+  plafond : 429 à corps minuscule jusqu'à minuit UTC. État public dans
+  `/health` (`gardeFichiers` : nombre d'IP surveillées — **jamais de
+  liste d'IP**, vie privée préservée).
+- **Limite par (IP + chemin)** ajoutée sur les fichiers servis
+  (`limiteFichierGet=30/min` en interne, sous la fenêtre
+  `RATE_STATIQUE_GET=120/min/IP`) : un robot qui martèle **un seul**
+  fichier (typiquement `/`) est coupé beaucoup plus tôt qu'avec la
+  seule fenêtre globale.
 - **Compteur d'octets sortants** (`lib/sortie.js`, exposé par `/health`
   sous `sortie`) : octets du jour par famille — `statique`, `api`, `sse`
   (les flux `text/event-stream` comptent à part : c'est le suspect n°1

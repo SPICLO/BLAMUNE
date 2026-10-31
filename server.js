@@ -29,6 +29,7 @@ const { creerPoolIA } = require('./lib/pool_ia');
 const { demarrerKeepalive } = require('./lib/keepalive');
 const { creerCompression } = require('./lib/compression');
 const { creerCompteurSortie } = require('./lib/sortie');
+const { creerGardeFichiers } = require('./lib/garde_fichiers');
 const { creerServiceBot } = require('./lib/service_bot');
 const { creerSavoir } = require('./lib/savoir');
 const { creerResume } = require('./lib/resume');
@@ -190,6 +191,13 @@ app.use(creerCompression({ logger: loggerErreur }));
 // sortis/mois, une fuite doit se voir avant la suspension du workspace.
 const compteurSortie = creerCompteurSortie();
 app.use(compteurSortie.middleware);
+
+// Plafond d'octets servis par IP et par jour (defaut 60 Mo : ~800 pages
+// pour un humain, quelques ordres de grandeur sous un robot). Protege le
+// quota de bande passante du mois ; expose par /health (gardeFichiers).
+const gardeFichiers = creerGardeFichiers({
+  plafondOctets: parseInt(process.env.STATIQUE_MAX_JOUR_IP || '62914560', 10)
+});
 
 // ==================== CONFIG ====================
 // Fournisseur, liste de modeles et rotation : implementation dans
@@ -2176,6 +2184,9 @@ creerRoutesAdmin(app, {
   // Bande passante sortante (octets du jour par famille, top chemins) :
   // exposee telle quelle par /health sous le champ `sortie`.
   getSortie: () => compteurSortie.etat(),
+  // Plafond d'octets par IP/jour sur les fichiers servis : etat public
+  // (jamais de liste d'IP, seulement le nombre d'IP surveillees).
+  getGardeFichiers: () => gardeFichiers.etat(),
   connexionsActives,
   modeParUser,
   savoirDb,
@@ -2401,7 +2412,9 @@ creerRoutesStatique(app, {
   // 120/min/IP laisse 10 chargements complets par minute, largement.
   checkRateLimit,
   getIp,
-  limiteStatiqueGet: parseInt(process.env.RATE_STATIQUE_GET || '120', 10)
+  limiteStatiqueGet: parseInt(process.env.RATE_STATIQUE_GET || '120', 10),
+  // Et le vrai mur : en OCTETS par IP et par jour (60 Mo par defaut).
+  gardeFichiers
 });
 
 // ==================== START ====================

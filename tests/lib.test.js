@@ -18,6 +18,7 @@ const { creerConfigIA } = require('../lib/config_ia');
 const { demarrerKeepalive } = require('../lib/keepalive');
 const { creerCompression } = require('../lib/compression');
 const { creerCompteurSortie } = require('../lib/sortie');
+const { creerGardeFichiers } = require('../lib/garde_fichiers');
 const zlib = require('node:zlib');
 const cryptoModule = require('node:crypto');
 
@@ -108,6 +109,46 @@ test('compteur sortie : jour suivant, hier disponible, vieux jours purges', () =
   dire(v, '/c.js');
   e = v.etat();
   assert.strictEqual(e.hier, null, 'la veille du 2 novembre n avait rien');
+});
+
+// ====================== PLAFOND D'OCTETS PAR IP/JOUR ======================
+// Un client qui repete un fichier legalement peut tout de meme tirer des
+// gigaoctets. Ces tests verifient le plafond en octets du garde.
+
+test('garde fichiers : plafond en octets par IP, reset au changement de jour', () => {
+  let instant = Date.parse('2026-11-01T10:00:00Z');
+  const g = creerGardeFichiers({ plafondOctets: 100, maintenant: () => instant, maxIps: 10 });
+  assert.strictEqual(g.peutServir('1.2.3.4').refuse, false, 'servable au debut');
+  g.noter('1.2.3.4', 60);
+  assert.strictEqual(g.peutServir('1.2.3.4').refuse, false, '60 octets < 100');
+  g.noter('1.2.3.4', 50);
+  assert.strictEqual(g.peutServir('1.2.3.4').refuse, true, '110 >= 100 : refuse');
+  // Une autre IP n'a pas consomme : elle passe.
+  assert.strictEqual(g.peutServir('5.6.7.8').refuse, false, 'les IP sont independantes');
+  // Jour suivant : tout repart de zero.
+  instant = Date.parse('2026-11-02T10:00:00Z');
+  assert.strictEqual(g.peutServir('1.2.3.4').refuse, false, 'nouveau jour : servable');
+  // Et l'etat public ne montre jamais une IP.
+  const e = g.etat();
+  assert.strictEqual(e.plafondOctets, 100);
+  assert.ok(JSON.stringify(e).indexOf('1.2.3.4') < 0, 'aucune IP dans l etat public');
+});
+
+test('garde fichiers : la Map ne depasse jamais maxIps (eviction du plus petit)', () => {
+  let instant = Date.parse('2026-11-01T10:00:00Z');
+  const g = creerGardeFichiers({ plafondOctets: 10, maintenant: () => instant, maxIps: 3 });
+  g.noter('a1', 5);
+  g.noter('a2', 5);
+  g.noter('a3', 9); // le plus gros consommateur reste sous le plafond ? non...
+  g.noter('a4', 1); // 4e IP : une des petites part
+  g.noter('a5', 1); // 5e IP
+  const v = g.peutServir('a3');
+  assert.strictEqual(v.refuse, false, 'a3 (9 octets, jour courant) toujours suivi');
+  // Le jour passe, tout se vide : les noves reentrent sans friction.
+  instant = Date.parse('2026-11-02T10:00:00Z');
+  for (let i = 0; i < 6; i++) g.noter('n' + i, 1);
+  assert.strictEqual(g.peutServir('n5').refuse, false, 'jour nouveau : personne ne plafonne');
+  assert.ok(g.etat().ips <= 3, 'maxIps respecte apres eviction');
 });
 
 // ============================ RATE LIMIT ============================
