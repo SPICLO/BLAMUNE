@@ -4,6 +4,45 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Ce journal démarre avec la mise à niveau « hygiène du dépôt » ci-dessous ; les
 versions antérieures sont visibles dans `git log`.
 
+## [Non publié] - 2026-10-30 (diète de tokens : la saturation réduite à la source)
+
+### Gardiens
+
+- **Prompt système cachable** : la persona (stable) ouvre le prompt ; la
+  date/heure, la durée de l'échange et la photo reçue sont déplacées à la
+  FIN de `blocSysteme()` (`server.js`). Premier texte inchangé à la virgule
+  près = préfixe mis en cache par les fournisseurs (Groq, OpenAI,
+  Anthropic) : **les tokens cachés ne comptent pas dans les plafonds
+  RPM/TPM** (doc Groq : « Cached tokens do not count »). L'état interieur
+  (`texteHumeur`, ex `getPromptBLAMUNE(humeur)`) suit d'abord la persona :
+  un changement d'humeur casse le cache à sa ligne, jamais la persona
+  elle-même.
+- **Fenêtre d'historique 16 → 10** (`HISTO_API_MAX`, `lib/ia/gemini.js`) :
+  avec le plafond ~8 K tokens/min de Groq, la fenêtre à 16 échanges
+  dégorgeait la minute en un ou deux échanges denses. Les échanges plus
+  anciens restent portés par le résumé persistant (`lib/resume.js`, un
+  bloc de 10 replié dès que le seuil est atteint). Le mode éco reste à 6.
+- **Extraction conditionnée aux vrais indices** (`indiceMemoire` dans
+  `lib/memoire.js`, porte dans `lib/routes/send.js`) : les messages sans
+  indice de mémoire (« ok », « grave », une question sur la météo…) ne
+  partent plus en appel d'extraction ; les petits free tiers du fond du
+  pool servent du vrai. La liste de motifs est volontairement généreuse
+  (identité, âge, lieu, famille, goûts, activités, études, santé, animaux,
+  « retiens », mini-présentations finissant par « c'est … ») : mieux vaut
+  une extraction qui répond `{}` qu'un fait manqué.
+
+### Documentation
+
+- Plan d'analyse et de chantier :
+  `docs/superpowers/plans/2026-10-30-diete-tokens-cache-extraction.md`.
+- Constat d'audit : plafonds Groq 30 RPM / ~1 000 req/j / ~8 K tokens/min
+  sur l'offre de base (les limites exactes de chaque organisation sont
+  sur `console.groq.com/settings/limits`) ; par ailleurs le résumé de
+  conversation était DÉJÀ seuillé à 10 échanges (`RESUME_SEUIL`,
+  `lib/resume.js`) et les tâches de fond DÉJÀ routées hors du principal
+  (`questionModele()` → `membreFond()`) : les deux chantiers initialement
+  prévus se sont donc réduits à la diète de tokens ci-dessus.
+
 ## [Non publié] - 2026-10-29 (gardiens anti-saturation plus frugaux)
 
 ### Gardiens

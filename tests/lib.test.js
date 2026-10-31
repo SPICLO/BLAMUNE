@@ -11,7 +11,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { checkRateLimit, checkUserRateLimit, purger } = require('../lib/rate_limit');
-const { creerMemoire } = require('../lib/memoire');
+const { creerMemoire, indiceMemoire } = require('../lib/memoire');
 const { creerHistorique } = require('../lib/historique');
 const { creerResume } = require('../lib/resume');
 const { creerConfigIA } = require('../lib/config_ia');
@@ -112,6 +112,36 @@ test('memoire : motsFavoris reste une liste a travers un aller-retour', (t) => {
   const mem = lireMemoire('u_abc123');
   assert.deepStrictEqual(mem.motsFavoris, ['chat', 'nuit']);
   assert.strictEqual(mem.nom, 'Theo');
+});
+
+test('memoire : indiceMemoire laisse passer la memo, ferme le bavardage', () => {
+  // L'apostrophe ou son absence : les claviers mobiles l'avalent parfois.
+  const positifs = [
+    'Je m appelle Ben et j habite a Setif',
+    "je m'appelle Theo",
+    'retiens que je bosse a la mine',
+    'ma mere fait un tour a tlemcen demain',
+    "j'ai 25 ans",
+    'mon chien a eu des chiots',
+    "j'adore la mac do, c'est grave",
+    'je fais du basket le samedi',
+    "j'ai eu mon permis",
+    'je suis malade depuis la semaine',
+    "au fait je crois que je ne t'ai pas dit, c'est Maeva",
+    'c est Theo'
+  ];
+  const negatifs = [
+    'ok',
+    'ca va et toi',
+    'grave mdr',
+    'raconte moi une blague',
+    'pourquoi le ciel est bleu',
+    'quelle heure il est',
+    'tu penses quoi de la coupe du monde'
+  ];
+  for (const m of positifs) assert.strictEqual(indiceMemoire(m), true, 'devait passer : ' + m);
+  for (const m of negatifs)
+    assert.strictEqual(indiceMemoire(m), false, 'ne devait pas passer : ' + m);
 });
 
 test('memoire : un ancien fichier a 9 lignes reste lisible', (t) => {

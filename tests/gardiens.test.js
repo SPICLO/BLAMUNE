@@ -160,13 +160,13 @@ test('delaiIndique : e.retryAfterMs prioritaire, texte du message en base de sec
   assert.strictEqual(gemini.delaiIndique(null), 0, 'pas de crash sans erreur');
 });
 
-test('historique eco : nbEchanges=16 hors tension, 6 sous tension, systeme conserve', () => {
+test('historique eco : nbEchanges=10 hors tension, 6 sous tension, systeme conserve', () => {
   const histo = [{ role: 'system', content: 'sys' }];
   for (let i = 0; i < 20; i++)
     histo.push({ role: i % 2 === 0 ? 'user' : 'assistant', content: 'm' + i });
   tension.reinitialiser();
   const hors = gemini.limiterHisto(histo, gemini.nbEchanges());
-  assert.strictEqual(hors.filter((h) => h.role !== 'system').length, 16, 'hors tension : 16');
+  assert.strictEqual(hors.filter((h) => h.role !== 'system').length, 10, 'hors tension : 10');
   // Arme l'eco (seuil : 3 x 429 dans la fenetre, horloge reelle).
   tension.noter();
   tension.noter();

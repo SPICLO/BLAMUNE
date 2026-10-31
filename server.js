@@ -17,7 +17,7 @@ const {
   purger: purgerRateLimits
 } = require('./lib/rate_limit');
 const { creerHistorique } = require('./lib/historique');
-const { creerMemoire } = require('./lib/memoire');
+const { creerMemoire, indiceMemoire } = require('./lib/memoire');
 const { creerConfigIA } = require('./lib/config_ia');
 const { creerRoutesCompte } = require('./lib/routes/compte');
 const { creerRoutesAdmin } = require('./lib/routes/admin');
@@ -1351,24 +1351,26 @@ function contexteHeureEGO() {
   return `\n\nNous sommes ${jour} ${maintenant.getDate()}/${maintenant.getMonth() + 1}/${maintenant.getFullYear()}, il est ${heure}h${minutes}.`;
 }
 
-function getPromptBLAMUNE(humeur) {
-  const humeurMap = {
-    joyeux:
-      "Tu es en pleine forme, tu ris facilement, tu es ultra positif et enthousiaste. Tout t'amuse.",
-    calme:
-      'Tu es zen, posÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©, tu parles doucement. Tu es reflectif et paisible.',
-    fatigue: 'Tu es mou, tu t\'ennuies un peu, tu reponds mollement. "bof", "j\'ai la flemme".',
-    energique: 'Tu es en pleine puissance, tu parles vite, tu es motive. Tout est possible.',
-    triste:
-      'Tu es un peu down, mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©lancolique. Tu parles moins, tu es plus sentimental.',
-    blagueur: 'Tu es un farceur, tu fais des jeux de mots, des vannes, tu rigoles tout le temps.'
-  };
-  const humeurText =
-    humeur && humeurMap[humeur]
-      ? '\n\nTON ETAT INTERIEUR : ' +
-        humeurMap[humeur] +
-        " C'est ce que TU ressens en ce moment, vis-le a ta facon. L'humeur de l'utilisateur peut etre differente de la tienne."
-      : '';
+// ==================== PERSONA BLAMUNE (STABLE) ====================
+// La persona de BLAMUNE, SANS l'etat interieur : ce bloc est le premier
+// texte du prompt systeme et n'y change JAMAIS une virgule. C'est un
+// choix pour le prompt-cache des fournisseurs (Groq, OpenAI,
+// Anthropic) : les tokens de prefixe identique d'une requete a l'autre
+// sont servis depuis le cache et NE COMPTE PAS dans les plafonds
+// RPM/TPM (doc Groq : "Cached tokens do not count"). L'etat interieur
+// (texteHumeur, ci-dessous) suit la persona dans blocSysteme ; la ligne
+// "il est donne plus bas" de la persona reste exacte.
+const HUMEUR_MAP = {
+  joyeux:
+    "Tu es en pleine forme, tu ris facilement, tu es ultra positif et enthousiaste. Tout t'amuse.",
+  calme: 'Tu es zen, posé, tu parles doucement. Tu es reflectif et paisible.',
+  fatigue: 'Tu es mou, tu t\'ennuies un peu, tu reponds mollement. "bof", "j\'ai la flemme".',
+  energique: 'Tu es en pleine puissance, tu parles vite, tu es motive. Tout est possible.',
+  triste: 'Tu es un peu down, mélancolique. Tu parles moins, tu es plus sentimental.',
+  blagueur: 'Tu es un farceur, tu fais des jeux de mots, des vannes, tu rigoles tout le temps.'
+};
+
+function getPromptBLAMUNE() {
   return `LANGUES : tu comprends l'anglais et toutes les autres langues. Si la personne ecrit dans une autre langue, reponds dans SA langue, au meme ton et avec la meme personnalite ; sinon reponds en francais. Reponds en 1 ou 3 phrases MAXIMUM.
 Si tu ne sais pas, dis "Je sais pas". Ne invente jamais un fait reel que tu ne connais pas.
 Quand une recherche web accompagne ta reponse, utilise ses resultats (actualite, dates recentes) ; sans elle, assume que tu ne connais pas ce qui se passe aujourd'hui.
@@ -1406,7 +1408,7 @@ Tu poses des questions pour decouvrir qui est la personne.
 Tu es amical, curieux, un peu etourdi mais toujours gentil.
 Emojis avec moderation. Francais courant : 'ouais', 'cool', 'interessant', 'dis-moi encore'.
 Tu es BLAMUNE, pas un robot. Jamais "en tant qu'intelligence artificielle".
-Tu connais l'heure et la date en temps reel. Utilise-le quand c'est naturel (ex: 'il est tard', 'bonjour', 'bonne nuit', 'c'est weekend').${humeurText}`;
+Tu connais l'heure et la date en temps reel. Utilise-le quand c'est naturel (ex: 'il est tard', 'bonjour', 'bonne nuit', 'c'est weekend').`;
 }
 
 // ==================== LECTURE D'INTENTION DU MESSAGE ====================
@@ -1475,17 +1477,10 @@ function blocSysteme(o) {
   else if (heure >= 12 && heure < 18) momentJournee = "d'aprem";
   else if (heure >= 18) momentJournee = 'de soir';
 
-  let t = getPromptBLAMUNE(memoire.humeur);
-  t += `\n\nCONTEXTE TEMPS REEL : Nous sommes ${jour} ${maintenant.getDate()}/${maintenant.getMonth() + 1}/${maintenant.getFullYear()}, il est ${heure}h${minutes} (${momentJournee}).`;
-
-  // La conversation dure : BLAMUNE sait depuis quand ils parlent.
-  if (o.debutSession) {
-    const ecoule = Math.floor((Date.now() - o.debutSession) / 60000);
-    if (ecoule >= 1) {
-      t += `\nDUREE DE LA DISCUSSION : Ca fait ${ecoule} min que vous echangez (debut ${new Date(o.debutSession).getHours()}h${String(new Date(o.debutSession).getMinutes()).padStart(2, '0')}).`;
-      if (ecoule >= 45) t += ' Le temps est passe vite, tu peux le remarquer.';
-    }
-  }
+  let t = getPromptBLAMUNE();
+  // L'etat interieur suit D'ABORD la persona : si l'humeur change, elle
+  // casse le apres la persona, jamais la persona elle-meme.
+  t += texteHumeur(memoire.humeur);
 
   const profilParts = [];
   if (memoire.nom) profilParts.push(`Il s'appelle ${memoire.nom}.`);
@@ -1537,12 +1532,6 @@ function blocSysteme(o) {
   t += blocSouvenirsAnniversaires(etat, maintenant);
   t += blocRituel(etat, maintenant);
 
-  // Photo recue avec CE message : le modele la voit (inline_data), la ligne
-  // ci-dessous lui dit d'en faire quelque chose au lieu de l'ignorer.
-  if (o.image)
-    t +=
-      "\n\nIMAGE RECUE : il vient de t'envoyer une photo avec ce message. Regarde-la et reagis naturellement (decris ce que tu vois si ca a du sens).";
-
   // Anniversaire : connu, datÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©, on le prepare plutot que de le rater.
   if (memoire.anniversaire) {
     const j = joursAvantAnniversaire(memoire.anniversaire);
@@ -1561,7 +1550,7 @@ function blocSysteme(o) {
     }
   }
 
-  // Resume de ce qui s'est passe avant la fenetre des 16 derniers echanges.
+  // Resume de ce qui s'est passe avant la fenetre des 10 derniers echanges.
   if (o.resume) {
     t += '\n\nCE QUE VOUS AVIEZ DIT AVANT (resume de vos echanges plus anciens) :\n' + o.resume;
   }
@@ -1585,6 +1574,24 @@ function blocSysteme(o) {
       '.';
     t += " Reviens-y naturellement si l'occasion s'y prete, sans les lister tous d'un coup.";
   }
+  // TEMPS REEL en fin de system prompt : seule cette zone tourne minute
+  // a minute. Tout ce qui precede est stable (persona, etat, profil,
+  // resume, souvenirs...) : le cache des fournisseurs garde le prefixe,
+  // et ses tokens ne comptent pas dans les plafonds RPM/TPM.
+  t += `\n\nCONTEXTE TEMPS REEL : Nous sommes ${jour} ${maintenant.getDate()}/${maintenant.getMonth() + 1}/${maintenant.getFullYear()}, il est ${heure}h${minutes} (${momentJournee}).`;
+  // La conversation dure : BLAMUNE sait depuis quand ils parlent.
+  if (o.debutSession) {
+    const ecoule = Math.floor((Date.now() - o.debutSession) / 60000);
+    if (ecoule >= 1) {
+      t += `\nDUREE DE LA DISCUSSION : Ca fait ${ecoule} min que vous echangez (debut ${new Date(o.debutSession).getHours()}h${String(new Date(o.debutSession).getMinutes()).padStart(2, '0')}).`;
+      if (ecoule >= 45) t += ' Le temps est passe vite, tu peux le remarquer.';
+    }
+  }
+  // Photo recue avec CE message : le modele la voit (inline_data), la ligne
+  // ci-dessous lui dit d'en faire quelque chose au lieu de l'ignorer.
+  if (o.image)
+    t +=
+      "\n\nIMAGE RECUE : il vient de t'envoyer une photo avec ce message. Regarde-la et reagis naturellement (decris ce que tu vois si ca a du sens).";
 
   // Lecture d'intention du message qui arrive : place en tout dernier, juste
   // avant le message lui-meme, pour que la bonne reponse parte dans le bon sens.
@@ -1606,6 +1613,15 @@ function joursAvantAnniversaire(valeur) {
   let cible = new Date(now.getFullYear(), mois, jour);
   if (cible < aujourdhui) cible = new Date(now.getFullYear() + 1, mois, jour);
   return Math.round((cible - aujourdhui) / 86400000);
+}
+
+function texteHumeur(humeur) {
+  if (!humeur || !HUMEUR_MAP[humeur]) return '';
+  return (
+    '\n\nTON ETAT INTERIEUR : ' +
+    HUMEUR_MAP[humeur] +
+    " C'est ce que TU ressens en ce moment, vis-le a ta facon. L'humeur de l'utilisateur peut etre differente de la tienne."
+  );
 }
 
 // ==================== RITUELS ET JALONS DE LA RELATION ====================
@@ -2230,6 +2246,7 @@ creerRouteSend(app, {
   avecHistorique,
   sauvegarderHistorique,
   autoApprentissage,
+  indiceMemoire,
   lireMemoire,
   lireEtat,
   sauvegarderEtat,

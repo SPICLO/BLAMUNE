@@ -47,10 +47,17 @@ fournisseur compatible OpenAI) pour la conversation intelligente.
   retour au calme avec anti-clignotement), en-tete standard
   `Retry-After` lu sur les 429 (attente exacte demandee par le
   fournisseur), cache des sujets deja
-  cherches (`CACHE_RECHERCHE_MS`). Le panneau `/admin` affiche la file,
-  les 429, l'etat eco et le cache (section « Gardiens
-  anti-saturation »). Agrandir la capacite reelle = ajouter une cle
-  posee dans l'`API_POOL` (voir Pool multi-fournisseur).
+  cherches (`CACHE_RECHERCHE_MS`). **Diete de tokens** : prompt systeme
+  ordonne pour le prompt-cache des fournisseurs (persona stable en
+  tete, date/heure en fin : les tokens caches ne comptent pas dans les
+  plafonds RPM/TPM), historique hors-eco ramene a 10 echanges
+  (`HISTO_API_MAX`), extraction conditionnee aux vrais indices de
+  memoire (`indiceMemoire`, `lib/memoire.js`) et resume seuille a 10
+  echanges non couverts (`RESUME_SEUIL`). Taches de fond → fond du pool
+  (`questionModele` → `membreFond`, jamais le principal). Le panneau
+  `/admin` affiche la file, les 429, l'etat eco et le cache (section
+  « Gardiens anti-saturation »). Agrandir la capacite reelle = ajouter
+  une cle posee dans l'`API_POOL` (voir Pool multi-fournisseur).
 - **PWA** installable (service worker, mode hors ligne) et **admin** (stats,
   utilisateurs, logs, sauvegarde/restauration).
 - **Multi-fournisseur IA** : Gemini par defaut, ou tout endpoint compatible OpenAI.
