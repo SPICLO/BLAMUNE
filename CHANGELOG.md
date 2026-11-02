@@ -39,6 +39,11 @@ aussi pour déclencher le déploiement raté.
   copies locales des fichiers remplacés au premier retour des visiteurs.
 - **`blamune-site/logo.svg` supprimé** : copie identique de
   `logo-perle.svg`, zéro référence dans tout le dépôt.
+- **Fonds des porte-logos passés du dégradé cyan au noir** (`avatar-bot`,
+  `gros-avatar`, `auth-avatar` dans la console ; `brand-avatar`,
+  `preview-avatar` dans la vitrine) : la perle est du même cyan que le
+  dégradé, elle n'y se voyait pas. Les halos cyan sont conservés pour
+  découper les disques du fond.
 
 ## [Non publié] - 2026-10-31 (bande passante mesurée, avant la panne)
 
