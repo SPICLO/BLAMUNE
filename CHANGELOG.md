@@ -4,6 +4,42 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Ce journal démarre avec la mise à niveau « hygiène du dépôt » ci-dessous ; les
 versions antérieures sont visibles dans `git log`.
 
+## [Non publié] - 2026-11-01 (identite : la perle partout, icone comprise)
+
+Reprise du chantier `69c01e0` (« Vitrines + logos perle et animations IA ») :
+les logos des pages pointaient vers la perle depuis ce commit, mais les
+icônes système et deux keyframes manquaient. Les commits `73f870d` et
+`90e6643` avaient été poussés pendant la suspension du workspace : aucun
+déploiement n'était parti, le Resume ne rattrape pas. Ce commit existe
+aussi pour déclencher le déploiement raté.
+
+### Identité
+
+- **Icônes régénérées depuis `logo-perle.svg`** (site/ et blamune-site/) :
+  `icon-192.png` (192 px, aussi `purpose: maskable` — marque à 92 %),
+  `icon-512.png` (512 px), `apple-touch-icon.png` (180 px) et
+  `favicon.ico` (32 px, PNG embarqué validé `00 00 01 00`). Avant :
+  l'ancien logo (cercle, poing, BMN + serpent) restait sur les icônes
+  système, en contradiction avec la perle affichée sur les pages.
+- **`logo.png` redevenu un vrai PNG** (512 px perle) sur `site/`,
+  `blamune-site/` ET `vitrine/assets/` (ce dernier s'affiche dans la
+  vitrine, l. 18) : le fichier était du texte SVG nommé `.png`.
+
+### Animations
+
+- **`avatarPulse`** (halo cyan pulsé sur `.avatar-bot`) et **`avatarFloat`**
+  (flottement 6 px sur `.auth-avatar`) définies dans `site/style.css` :
+  utilisées mais inconnues du navigateur, elles couraient à vide.
+- **`cascadeIn`** (jamais utilisée) retirée. Bilan : 30 keyframes, aucune
+  utilisée sans définition.
+
+### Infrastructure
+
+- **Cache du service worker `blamune-v15`** (v13 précédent) : purge les
+  copies locales des fichiers remplacés au premier retour des visiteurs.
+- **`blamune-site/logo.svg` supprimé** : copie identique de
+  `logo-perle.svg`, zéro référence dans tout le dépôt.
+
 ## [Non publié] - 2026-10-31 (bande passante mesurée, avant la panne)
 
 Le workspace Render Hobby a été **suspendu** : 5 Go de bande passante
