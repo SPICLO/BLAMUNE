@@ -4,6 +4,23 @@ Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Ce journal démarre avec la mise à niveau « hygiène du dépôt » ci-dessous ; les
 versions antérieures sont visibles dans `git log`.
 
+## [Non publié] - 2026-11-04 (purge automatique des invites apres 48 h)
+
+### Nouveau
+
+- **Les comptes d'invitation vivent 48 h** (décision du propriétaire :
+  depuis la création, sans report sur activité — un invité qui veut
+  rester crée un compte). À l'échéance, une ronde horaire
+  (`lib/purge_invites.js`, testée unitairement) supprime : le dossier
+  `users/<uid>/` (mémoire, historiques, état), la copie cloud JSONBin
+  (`storage.supprimerTout`), les traces RAM du serveur, et le jeton de
+  l'invite — remplacé par une **pierre tombale** dans `invites.json` :
+  sans elle, le uid purgé redevenait réutilisable sans jeton par le
+  chemin de migration des vieilles invitations. Réglages :
+  `INVITE_VIE_MS` (48 h) et `PURGE_INVITES_MS` (ronde : 1 h, `0` = off).
+- Variables documentées dans `.env.example` ; spec dans
+  `docs/superpowers/specs/2026-11-04-purge-invites-48h-design.md`.
+
 ## [Non publié] - 2026-11-01 (identite : la perle partout, icone comprise)
 
 Reprise du chantier `69c01e0` (« Vitrines + logos perle et animations IA ») :

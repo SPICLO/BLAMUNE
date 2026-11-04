@@ -32,6 +32,7 @@ const { creerCompteurSortie } = require('./lib/sortie');
 const { creerGardeFichiers } = require('./lib/garde_fichiers');
 const { creerServiceBot } = require('./lib/service_bot');
 const { creerSavoir } = require('./lib/savoir');
+const { creerPurgeInvites } = require('./lib/purge_invites');
 const { creerResume } = require('./lib/resume');
 // Chercheur web serveur (DuckDuckGo, sans cle) : donne des SOURCES a TOUT
 // le pool de modeles, au lieu de dependre du google_search de Gemini.
@@ -419,8 +420,14 @@ function extraireAuth(req) {
   if (uid && !FORMAT_UID.test(uid)) return { uid: '', ego: '' };
   if (uid && !uid.startsWith('inv_') && !ego) return { uid: '', ego: '' };
   // Jeton invite : un uid invite avec enregistrement n'est accepte QUE
-  // muni de son jeton (possession du uid ne suffit plus).
+  // muni de son jeton (possession du uid ne suffit plus). Une invite
+  // PURGEE (lib/purge_invites.js) porte une pierre tombale { s } : elle
+  // est refusee pour toujours, jeton ou pas — sinon, privée de son
+  // enregistrement, le uid reprendrait le chemin "Pas d'enregistrement"
+  // des vieilles invitations et redeviendrait sans jeton.
   if (uid && uid.startsWith('inv_')) {
+    const pierre = invitesJeton[uid];
+    if (pierre && pierre.s) return { uid: '', ego: '' };
     const enregistrement = lireJetonInvite(uid);
     if (enregistrement) {
       const jeton = req.headers['x-jeton'] || req.body?.jeton || req.query?.jeton || '';
@@ -453,12 +460,17 @@ let invitesJeton = chargerInvites();
 
 function ecrireInvites() {
   try {
-    // Oubli des invites inactives depuis plus de 30 jours.
+    // Oubli des jetons d'invites inactives depuis plus de 30 jours.
+    // Les PIERRES TOMBALES (e.s — invites purgees) ne sont jamais
+    // oubliees : sans elles, le uid purge redeviendrait un chemin
+    // utilisable sans jeton (voir extraireAuth).
     const seuil = Date.now() - 30 * 86400000;
     const propre = {};
     for (const u of Object.keys(invitesJeton)) {
       const e = invitesJeton[u];
-      if (e && e.h && e.c >= seuil) propre[u] = e;
+      if (!e) continue;
+      if (e.s) propre[u] = e;
+      else if (e.h && e.c >= seuil) propre[u] = e;
     }
     invitesJeton = propre;
     fs.writeFileSync(FICHIER_INVITES, JSON.stringify(propre), 'utf8');
@@ -2606,6 +2618,30 @@ setInterval(() => {
     }
   }
 }, 300000);
+
+// ==================== PURGE DES INVITES (48 h) ====================
+// Les comptes d'invitation vivent 48 h depuis leur creation (decision du
+// 2026-11-04, docs/superpowers/specs/2026-11-04-purge-invites-48h-design.md)
+// : dossier disque, cloud, RAM, et le jeton devient une pierre tombale.
+// En test, la ronde ne tourne pas : le comportement est teste dans
+// tests/purge_invites.test.js avec des fixtures vieux de deux jours.
+const vieInviteMs = Number(process.env.INVITE_VIE_MS || 2 * 86400000); // 48 h = 2 jours
+const intervallePurgeMs = Number(process.env.PURGE_INVITES_MS || 3600000);
+const purgeInvites = creerPurgeInvites({
+  usersDir: USERS_DIR,
+  lireJetonsInvites: () => invitesJeton,
+  marquerInviteSupprimee: (uid) => {
+    invitesJeton[uid] = { s: Date.now() };
+    ecrireInvites();
+  },
+  supprimerToutCloud: (uid) => storage.supprimerTout(uid),
+  purgerRamUtilisateur,
+  connexionsActives,
+  loggerErreur,
+  vieInviteMs,
+  intervalleMs: intervallePurgeMs
+});
+if (process.env.NODE_ENV !== 'test') purgeInvites.demarrer();
 
 // deploy: 2026-09-04 17:24
 

@@ -75,6 +75,12 @@ fournisseur compatible OpenAI) pour la conversation intelligente.
   l'ecran. **Etat interieur visible** : humeur de BLAMUNE, ce qu'elle a note
   de toi, promesses en cours. **Notifications push** (Web Push, VAPID,
   zero dependance) quand BLAMUNE ose ecrire en ton absence.
+- **Invites ephemeres** : un compte d'invitation (`POST /invite`) vit 48 h
+  depuis sa creation (`INVITE_VIE_MS`), puis son espace — dossier
+  `users/<uid>/`, memoire et historiques du cloud, jeton — est purge
+  automatiquement par une ronde horaire (`PURGE_INVITES_MS`) et son uid
+  est refuse pour toujours (pierre tombale). Un invite qui veut rester
+  cree un compte.
 
 ## Architecture
 
