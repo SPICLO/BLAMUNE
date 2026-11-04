@@ -1,15 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="BLAMUNE — le lien et sa perle">
-  <!-- Une perle au point de croisement : le souvenir garde au coeur du lien.
-       La forme reste un infini, mais elle a un centre de gravite. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="BLAMUNE — la perle de souvenirs">
   <defs>
-    <linearGradient id="li5" gradientUnits="userSpaceOnUse" x1="8" y1="8" x2="92" y2="92">
-      <stop offset="0" stop-color="#38bdf8"/>
-      <stop offset="1" stop-color="#22d3ee"/>
-    </linearGradient>
+    <radialGradient id="one-corps" cx="34%" cy="28%" r="78%">
+      <stop offset="0" stop-color="#ffffff" />
+      <stop offset="0.55" stop-color="#e6f6ff" />
+      <stop offset="1" stop-color="#9fd4f2" />
+    </radialGradient>
+    <radialGradient id="one-halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="rgba(226, 244, 255, 0.18)" />
+      <stop offset="0.6" stop-color="rgba(139, 124, 246, 0.1)" />
+      <stop offset="1" stop-color="rgba(243, 213, 163, 0)" />
+    </radialGradient>
   </defs>
-  <g transform="rotate(-8 50 50)">
-    <path d="M 50 50 C 40 33 17 33 17 50 C 17 67 40 67 50 50 C 60 33 83 33 83 50 C 83 67 60 67 50 50 Z"
-          fill="none" stroke="url(#li5)" stroke-width="9" stroke-linecap="round"/>
-    <circle cx="50" cy="50" r="6" fill="url(#li5)"/>
-  </g>
+  <circle cx="60" cy="62" r="58" fill="url(#one-halo)" />
+  <ellipse cx="60" cy="62" rx="46" ry="15" fill="none" stroke="#f3d5a3" stroke-width="1.6" opacity="0.4" transform="rotate(-16 60 62)" />
+  <circle cx="60" cy="62" r="26" fill="url(#one-corps)" />
+  <circle cx="51" cy="53" r="6.5" fill="#ffffff" opacity="0.9" />
+  <circle cx="88" cy="42" r="2.6" fill="#e2f4ff" />
+  <circle cx="30" cy="76" r="2.2" fill="#f3d5a3" />
+  <circle cx="72" cy="96" r="1.9" fill="#e2f4ff" />
+  <circle cx="90" cy="88" r="1.6" fill="#bfe3ff" />
 </svg>
