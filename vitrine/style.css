@@ -25,7 +25,12 @@ body {
 }
 
 body {
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   background: radial-gradient(circle at top, #151515, var(--bg));
   color: var(--text-primary);
   line-height: 1.6;
@@ -76,7 +81,7 @@ img {
 }
 
 .brand-name {
-  font-family: "Jost", "Inter", sans-serif;
+  font-family: 'Jost', 'Inter', sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.5rem;
   font-weight: 600;
@@ -109,7 +114,7 @@ img {
 
 .projects-title {
   margin: 0;
-  font-family: "Jost", "Inter", sans-serif;
+  font-family: 'Jost', 'Inter', sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.4rem;
   font-size: clamp(0.9rem, 1.6vw, 1rem);
@@ -140,11 +145,13 @@ img {
   text-decoration: none;
   color: inherit;
   overflow: hidden;
-  transition: border-color var(--transition), transform var(--transition);
+  transition:
+    border-color var(--transition),
+    transform var(--transition);
 }
 
 .project-card::after {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.04), transparent 55%);
@@ -156,12 +163,12 @@ img {
   transform: translateY(-4px);
 }
 
-.project-card[aria-disabled="true"] {
+.project-card[aria-disabled='true'] {
   pointer-events: none;
   opacity: 0.8;
 }
 
-.project-card[aria-disabled="true"]:hover {
+.project-card[aria-disabled='true']:hover {
   transform: none;
   border-color: var(--border);
 }
@@ -186,7 +193,7 @@ img {
 }
 
 .card-number {
-  font-family: "Jost", "Inter", sans-serif;
+  font-family: 'Jost', 'Inter', sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.4rem;
   font-size: clamp(0.8rem, 1vw, 0.9rem);
@@ -207,7 +214,7 @@ img {
 }
 
 .card-status::before {
-  content: "";
+  content: '';
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -243,7 +250,7 @@ img {
 
 .card-title {
   margin: 0;
-  font-family: "Jost", "Inter", sans-serif;
+  font-family: 'Jost', 'Inter', sans-serif;
   font-size: clamp(2rem, 8vw, 5rem);
   letter-spacing: -0.02em;
   text-transform: uppercase;
@@ -308,7 +315,7 @@ img {
 }
 
 .card-cta-arrow::after {
-  content: "";
+  content: '';
   position: absolute;
   right: 0;
   top: 50%;

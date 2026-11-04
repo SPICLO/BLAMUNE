@@ -19,36 +19,36 @@
 
 const PROJETS = [
   {
-    numero: "Nº 01",
-    nom: "BLAMUNE",
-    accroche: "Ton ami IA. Discute, apprends-lui des choses, garde ton historique.",
-    statut: "en ligne",
-    lien: "../blamune-site/index.html",
-    technique: ["Node.js 22", "C++14", "PWA", "SQLite", "Web Push"],
+    numero: 'Nº 01',
+    nom: 'BLAMUNE',
+    accroche: 'Ton ami IA. Discute, apprends-lui des choses, garde ton historique.',
+    statut: 'en ligne',
+    lien: '../blamune-site/index.html',
+    technique: ['Node.js 22', 'C++14', 'PWA', 'SQLite', 'Web Push'],
     note:
-      "Un compagnon de conversation entièrement en français, qui apprend ton nom, ta ville " +
+      'Un compagnon de conversation entièrement en français, qui apprend ton nom, ta ville ' +
       "et tes goûts, et s'en souvient d'une session à l'autre. Deux modes de discussion, " +
-      "une mémoire par utilisateur, une recherche web en profondeur et un bot local en C++ " +
-      "qui répond même sans clé API ni réseau. Installable depuis le navigateur comme une app.",
+      'une mémoire par utilisateur, une recherche web en profondeur et un bot local en C++ ' +
+      'qui répond même sans clé API ni réseau. Installable depuis le navigateur comme une app.'
   },
   {
-    numero: "Nº 02",
-    nom: "Projet à venir",
+    numero: 'Nº 02',
+    nom: 'Projet à venir',
     accroche: "Le prochain chantier de l'atelier.",
-    statut: "a-venir",
+    statut: 'a-venir',
     lien: null,
     technique: [],
     note:
-      "Réservé pour le prochain projet du studio. Remplace ces lignes dans projets.js : " +
-      "nom, accroche, statut et lien — la vitrine le publie toute seule.",
+      'Réservé pour le prochain projet du studio. Remplace ces lignes dans projets.js : ' +
+      'nom, accroche, statut et lien — la vitrine le publie toute seule.'
   },
   {
-    numero: "Nº 03",
-    nom: "Projet à venir",
-    accroche: "Une place est gardée.",
-    statut: "a-venir",
+    numero: 'Nº 03',
+    nom: 'Projet à venir',
+    accroche: 'Une place est gardée.',
+    statut: 'a-venir',
     lien: null,
     technique: [],
-    note: "Troisième édition à paraître.",
-  },
+    note: 'Troisième édition à paraître.'
+  }
 ];

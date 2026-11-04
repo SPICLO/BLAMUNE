@@ -210,7 +210,9 @@ input:focus-visible {
   box-shadow:
     0 0 0 2px rgba(56, 189, 248, 0.25),
     0 4px 14px rgba(34, 211, 238, 0.35);
-  animation: avatarPulse 3s ease-in-out infinite, logoFloat 4.5s ease-in-out infinite;
+  animation:
+    avatarPulse 3s ease-in-out infinite,
+    logoFloat 4.5s ease-in-out infinite;
 }
 
 .avatar-bot img {
@@ -1177,7 +1179,9 @@ button:disabled {
   box-shadow:
     0 0 0 4px rgba(56, 189, 248, 0.18),
     0 10px 30px rgba(34, 211, 238, 0.35);
-  animation: avatarFloat 3s ease-in-out infinite, logoGlow 4s ease-in-out infinite;
+  animation:
+    avatarFloat 3s ease-in-out infinite,
+    logoGlow 4s ease-in-out infinite;
 }
 
 .auth-avatar img {
