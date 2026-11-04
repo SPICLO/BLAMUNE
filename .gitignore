@@ -62,6 +62,12 @@ savoir_nouvelles.txt
 # https://github.com/atharvotech/FreeDeepseekAPI-EN.git deepproxy
 deepproxy/
 
+# Dossier de rendu video Remotion (projet autonome avec son node_modules,
+# ~1 Go) et sorties de rendu : projets annexes poses a la racine, jamais
+# versions ici (meme esprit qu'OpenMontage/, cf. eslint.config.mjs).
+motion-design/
+videos/
+
 # Cache disque des vecteurs d'embedding (regenere au premier boot, voir
 # le bloc CACHE DISQUE dans server.js) ; ~12 Mo, jamais utile au depot.
 cache_embeddings.json

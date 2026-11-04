@@ -41,6 +41,8 @@ site/logo.png
 
 # Dossiers non suivis pose a la racine (projets et configurateurs externes).
 OpenMontage/
+motion-design/
+videos/
 agent/
 .agents/
 .claude/
