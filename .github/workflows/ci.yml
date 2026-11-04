@@ -58,6 +58,11 @@ jobs:
       - name: 'Routes : aucune route ombriquee'
         run: node tests/routes_smoke.test.js
 
+      # Cycle de vie d'une invite duree 48 h comprimee a 1 s : le VRAI
+      # server.js doit purger (dossier, cloud, jeton+tombstone, refus).
+      - name: 'Purge des invites (e2e temps comprime)'
+        run: node tests/e2e_purge.test.js
+
       - name: Tests du service bot (Python)
         run: python tests/bot_service.test.py
 
