@@ -109,7 +109,10 @@ function requete(port, chemin, methode, corps, headers) {
 }
 
 async function attendreServeur(port, essais) {
-  for (let i = 0; i < (essais || 60); i++) {
+  // 120 x 250 ms = 30 s : le premier demarrage construit la base SQLite,
+  // l'index Qdrant et le cache d'embeddings ; sur un disque paresseux
+  // (OneDrive), 15 s n'ont pas suffit et la suite a echoue sans raison.
+  for (let i = 0; i < (essais || 120); i++) {
     try {
       const r = await requete(port, '/ping', 'GET');
       if (r.status === 200) return true;

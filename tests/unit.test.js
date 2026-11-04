@@ -32,7 +32,9 @@ test('manifest.json : PWA complete (id, scope, lang, icones 192 et 512)', () => 
 test('manifest.json : chaque icone declaree existe sur le disque', () => {
   const m = JSON.parse(lire('site/manifest.json'));
   for (const icone of m.icons) {
-    const f = path.join(RACINE, 'site', icone.src);
+    // Les src peuvent porter un cache-buster (« icon-512.png?v=16 ») : le
+    // fichier sur disque, c'est la partie avant le « ? ».
+    const f = path.join(RACINE, 'site', icone.src.split('?')[0]);
     assert.ok(fs.existsSync(f), 'icone absente : ' + icone.src);
   }
 });

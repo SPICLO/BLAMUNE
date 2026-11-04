@@ -98,7 +98,7 @@ self.addEventListener('push', (e) => {
       body: contenu.corps || 'BLAMUNE a quelque chose a te dire.',
       // icon-192 (192 px de vrai) et non logo.png (512 x 512 reels) : moins
       // de pixels a decoder a CHAQUE notification ; le badge, lui, ne garde
-      // lui, ne garde que la silhouette alpha.
+      // que la silhouette alpha.
       icon: '/icon-192.png',
       badge: '/icon-192.png',
       tag: 'blamune',

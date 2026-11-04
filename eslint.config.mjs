@@ -44,6 +44,8 @@ export default [
         document: 'readonly',
         navigator: 'readonly',
         localStorage: 'readonly',
+        // site/, admin/, blamune-site/ : animations d'apparition au scroll
+        IntersectionObserver: 'readonly',
         fetch: 'readonly',
         self: 'readonly',
         caches: 'readonly',
@@ -116,6 +118,8 @@ export default [
       '*.umd.js',
       'deepproxy/**',
       'OpenMontage/**',
+      'motion-design/**',
+      'videos/**',
       'agent/**',
       '.agents/**',
       '.claude/**',
