@@ -34,6 +34,8 @@ const { creerServiceBot } = require('./lib/service_bot');
 const { creerSavoir } = require('./lib/savoir');
 const { creerPurgeInvites } = require('./lib/purge_invites');
 const { creerResume } = require('./lib/resume');
+// Comparaison de secrets (jeton, ego) en temps constant : voir lib/timing.js.
+const { egaleTimingSafe } = require('./lib/timing');
 // Chercheur web serveur (DuckDuckGo, sans cle) : donne des SOURCES a TOUT
 // le pool de modeles, au lieu de dependre du google_search de Gemini.
 // Cache des resultats (30 min par defaut, CACHE_RECHERCHE_MS) : plusieurs
@@ -60,6 +62,9 @@ const app = express();
 // req.ip est l'adresse REELLE du client ; les tests locaux (pas de
 // proxy) gardent 127.0.0.1.
 app.set('trust proxy', 1);
+// Ne pas annoncer la stack au monde : l'en-tete x-powered-by: Express
+// aide un attaquant a cible des CVE connues d'une version donnee.
+app.disable('x-powered-by');
 const PORT = process.env.PORT || 8080;
 // Repertoire des donnees. Surchargeable par l'environnement pour lancer des
 // tests sans jamais toucher aux vraies donnees (users/, comptes.json...).
@@ -404,7 +409,8 @@ function extraireAuth(req) {
   if (ego) {
     const maintenant = Date.now();
     for (const cle of Object.keys(comptes)) {
-      if (comptes[cle].ego === ego) {
+      // egaleTimingSafe au lieu de === : mesure temporelle impossible.
+      if (comptes[cle].ego && egaleTimingSafe(comptes[cle].ego, ego)) {
         if (comptes[cle].tokenCree) {
           const age = (maintenant - new Date(comptes[cle].tokenCree).getTime()) / 3600000;
           if (age > 24) return { uid: '', ego: '' };
@@ -431,7 +437,8 @@ function extraireAuth(req) {
     const enregistrement = lireJetonInvite(uid);
     if (enregistrement) {
       const jeton = req.headers['x-jeton'] || req.body?.jeton || req.query?.jeton || '';
-      if (!jeton || hashJeton(jeton) !== enregistrement.h) return { uid: '', ego: '' };
+      if (!jeton || !egaleTimingSafe(hashJeton(jeton), enregistrement.h))
+        return { uid: '', ego: '' };
     }
     // Pas d'enregistrement : invite creee avant les jetons, on laisse passer
     // (migration sans deconnexion ; le client l'echange au chargement).

@@ -37,6 +37,8 @@ hors_ligne
 *.bak_*
 .protection_hash.json.bak_*
 savoir_nouvelles.txt
+# Ce script local affiche les cles Render en clair : jamais versionne.
+afficher_cles_render.bat
 
 # Outillage local d'agents IA et projets annexes pose a la racine :
 # meme esprit que .prettierignore et eslint.config.mjs (qui excluent
