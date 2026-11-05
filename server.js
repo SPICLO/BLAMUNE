@@ -38,6 +38,9 @@ const { creerResume } = require('./lib/resume');
 const { egaleTimingSafe } = require('./lib/timing');
 // Plafond global des messages /send par heure (toutes IP confondues).
 const plafondGlobal = require('./lib/plafond_global');
+// Cache de reponses du small talk : question simple deja servie = zero
+// appel IA (lib/cache_reponses.js).
+const cacheReponses = require('./lib/cache_reponses');
 // Chercheur web serveur (DuckDuckGo, sans cle) : donne des SOURCES a TOUT
 // le pool de modeles, au lieu de dependre du google_search de Gemini.
 // Cache des resultats (30 min par defaut, CACHE_RECHERCHE_MS) : plusieurs
@@ -2202,7 +2205,8 @@ creerRoutesAdmin(app, {
     concurrence: concurrence.etat(),
     tension: tension.etat(),
     cacheRecherche: rechercheWeb.etatCache(),
-    plafondGlobal: plafondGlobal.etat()
+    plafondGlobal: plafondGlobal.etat(),
+    cacheReponses: cacheReponses.etat()
   }),
   // Bande passante sortante (octets du jour par famille, top chemins) :
   // exposee telle quelle par /health sous le champ `sortie`.
@@ -2318,7 +2322,8 @@ creerRouteSend(app, {
   loggerErreur,
   rateSendIp: RATE_SEND_IP,
   rateSendUid: RATE_SEND_UID,
-  plafondGlobal
+  plafondGlobal,
+  cacheReponses
 });
 // History
 // Consultation cote utilisateur : implementation dans

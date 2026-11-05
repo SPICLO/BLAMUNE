@@ -395,6 +395,7 @@ async function chargerDonnees() {
     var gt = g.tension || {};
     var gcr = g.cacheRecherche || {};
     var gpg = g.plafondGlobal || {};
+    var gpt = g.cacheReponses || {};
     var elGardiens = document.getElementById('gardiensContenu');
     if (elGardiens) {
       elGardiens.replaceChildren();
@@ -419,6 +420,7 @@ async function chargerDonnees() {
           (gt.nb429Jour || 0) +
           '   |   Eco ' +
           (gt.eco ? 'ACTIF' : 'inactif') +
+          (gt.preemptif ? '(PREEMPTIF)' : '') +
           (gt.tachesSuspendues ? '   |   Taches de fond suspendues : ' + gt.tachesSuspendues : ''),
         'Cache recherche : ' +
           (gcr.entrees || 0) +
@@ -441,6 +443,16 @@ async function chargerDonnees() {
               ' (total ' +
               (gpg.refus || 0) +
               ')'
+            : ''),
+        'Cache reponses (small talk sans appel IA) : ' +
+          (gpt.entrees || 0) +
+          ' entree(s)' +
+          (gpt.coups || gpt.rater
+            ? '   |   Servies sans modele : ' +
+              (gpt.coups || 0) +
+              ' / ' +
+              ((gpt.coups || 0) + (gpt.rater || 0)) +
+              ' messages'
             : '')
       ];
       lignesG.forEach(function (texte) {

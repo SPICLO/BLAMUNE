@@ -56,3 +56,4 @@ agent/
 
 # Généré par un verrou d'outils : le format EST le fichier.
 skills-lock.json
+.obsidian/

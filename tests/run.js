@@ -289,6 +289,15 @@ async function main() {
     // Regroupement des extractions (8 s en prod) : desactive pour que chaque
     // message soit extrait immediatement comme avant, sans rallonger la suite.
     EXTRACT_PAUSE_MS: '0',
+    // Throttle des taches de fond (prod : resume 10 min, extraction 3 min) :
+    // leve dans la suite, qui envoie des messages rapproches et verifie que
+    // CHAQUE extraction part bien.
+    TACHE_RESUME_MIN_MS: '0',
+    TACHE_EXTRACTION_MIN_MS: '0',
+    // Cache de reponses desactive dans la suite : plusieurs verifications
+    // renvoient la MEME question simple ("quel est mon nom ?") et doivent
+    // chacune prouver le chemin modele (et son extraction/son etat).
+    CACHE_REPONSES_MS: '0',
     // Web Push actif dans le test (cles generees ci-dessus) ; vague
     // d'arriere-plan reportee a une heure : jamais declenchee ici.
     VAPID_PRIVATE_KEY: cleVapidPrivee,

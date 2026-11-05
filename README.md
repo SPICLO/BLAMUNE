@@ -46,7 +46,9 @@ fournisseur compatible OpenAI) pour la conversation intelligente.
   dans le champ), comptage des 429 avec
   **mode eco** automatique (recherche coupee, taches de fond suspendues,
   historique envoye au modele tronque a 6 echanges (`HISTO_ECO_MAX`),
-  retour au calme avec anti-clignotement), en-tete standard
+  retour au calme avec anti-clignotement) — et **PREEMPTIF** : la pression
+  locale (file chargee, debordements recents) l'arme avant meme le premier
+  429 du fournisseur (`TENSION_PREEMPT_FILE/DEB/SEJOUR_MS`), en-tete standard
   `Retry-After` lu sur les 429 (attente exacte demandee par le
   fournisseur), cache des sujets deja
   cherches (`CACHE_RECHERCHE_MS`). **Diete de tokens** : prompt systeme
@@ -56,10 +58,18 @@ fournisseur compatible OpenAI) pour la conversation intelligente.
   (`HISTO_API_MAX`), extraction conditionnee aux vrais indices de
   memoire (`indiceMemoire`, `lib/memoire.js`) et resume seuille a 10
   echanges non couverts (`RESUME_SEUIL`). Taches de fond → fond du pool
-  (`questionModele` → `membreFond`, jamais le principal). Le panneau
-  `/admin` affiche la file, les 429, l'etat eco et le cache (section
-  « Gardiens anti-saturation »). Agrandir la capacite reelle = ajouter
-  une cle posee dans l'`API_POOL` (voir Pool multi-fournisseur).
+  (`questionModele` → `membreFond`, jamais le principal) et **throttle
+  par utilisateur** : resume et extraction ne partent plus a chaque tour
+  d'une conversation dense (`TACHE_RESUME_MIN_MS` 10 min,
+  `TACHE_EXTRACTION_MIN_MS` 3 min). **Cache de reponses** (`lib/cache_reponses.js`)
+  : le small talk deja servil recemment ne recoit plus d'appel IA —
+  cle normalisee (casse/accents/ponctuation), TTL 45 min
+  (`CACHE_REPONSES_MS`), jamais une reponse qui nomme le visiteur, ni une
+  question avec photo, commande, indice de memoire ou bloc web. Le panneau
+  `/admin` affiche la file, les 429, l'etat eco (et le pre-emptif), le
+  plafond global et les caches (section « Gardiens anti-saturation »).
+  Agrandir la capacite reelle = ajouter une cle posee dans l'`API_POOL`
+  (voir Pool multi-fournisseur).
 - **Bande passante surveillee** (`lib/sortie.js`, champ `sortie` dans
   `/health`) : octets sortants du jour par famille (`statique`, `api`,
   `sse` — les flux comptent a part : suspect n.1 d'un debit continu),
@@ -341,6 +351,13 @@ Voir `.env.example` (commentaires complets). Principales :
 - `MAX_CONC`, `MAX_ATTENTE_MS`, `MAX_FILE` — plafond d'appels IA simultanes
   et file d'attente (refus net au-dela)
 - `TENSION_FENETRE_MS`, `TENSION_SEUIL`, `TENSION_SEJOUR_MS` — mode eco sur 429
+- `TENSION_PREEMPT_FILE`, `TENSION_PREEMPT_DEB`, `TENSION_PREEMPT_SEJOUR_MS` —
+  eco pre-empt arme par la pression locale (defaut file 30, 3 debordements
+  en fenetre 10 min, sejour 90 s)
+- `TACHE_RESUME_MIN_MS`, `TACHE_EXTRACTION_MIN_MS` — throttle des taches
+  de fond par utilisateur (defaut 10 min / 3 min)
+- `CACHE_REPONSES_MS`, `CACHE_REPONSES_MOTS`, `CACHE_REPONSES_MAX` —
+  cache de reponses du small talk (defaut 45 min, 12 mots, 200 entrees)
 - `SEND_MAX_HEURE_TOUT` — plafond global des messages /send par heure
   (toutes IP confondues, defaut 720) : ceinture finale face a une attaque
   repartie qui respecterait chaque quota individuel

@@ -111,3 +111,6 @@ enrichir_lot*.txt
 # copie dans l'image avec COPY : le retirer du depot ferait echouer
 # "docker compose build".
 
+
+# Config locale d'Obsidian (notes bureau) : jamais versionne ni formate
+.obsidian/

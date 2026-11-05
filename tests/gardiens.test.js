@@ -159,6 +159,84 @@ test('tension : declenchement au seuil, eco tenu jusqu au calme + sejour min', a
   assert.strictEqual(tension.enTension(t0 + 11 * 60 * 1000 + 4), true);
 });
 
+test('tension : eco PREEMPTIF s arme sur la pression locale (sans attendre un 429)', async () => {
+  tension.reinitialiser();
+  concurrence.reinitialiser();
+  assert.strictEqual(tension.enTension(), false, 'calme total : pas de tension');
+  // Pression locale : file qui grossit (35 demandeurs, pas de fail-open
+  // avant longtemps). Pas UN SEUL 429 : l'eco doit s'armer quand meme.
+  concurrence.configurer({ max: 1, attenteMs: 60000, maxFile: 200 });
+  const p1 = await concurrence.demanderPlace();
+  const enAttente = [];
+  for (let i = 0; i < 35; i++) enAttente.push(concurrence.demanderPlace());
+  await attendre(20);
+  assert.ok(concurrence.etat().file >= 30, 'file surchargee en place');
+  assert.strictEqual(tension.enTension(), true, 'eco PREEMPTIF sur file chargee');
+  assert.strictEqual(tension.etat().preemptif, true, 'preemptif visible pour /admin');
+  // Debordement seul (etait le 2e signal) : fenetre des debords.
+  assert.strictEqual(concurrence.etat().debordementsFenetre, 0, 'aucun debordement encore');
+  // Retour au calme : la file se vide, le sejour PREEMPTIF tient 90 s
+  // (anti-clignotement), puis retombe.
+  p1.liberrer();
+  for (const promesse of enAttente) {
+    const pl = await promesse;
+    pl.liberrer();
+  }
+  assert.strictEqual(concurrence.filePleine(), false, 'file videe');
+  assert.strictEqual(tension.enTension(), true, 'sejour pre-emptif tient apres le calme');
+  tension.reinitialiser();
+  concurrence.reinitialiser();
+  assert.strictEqual(tension.enTension(), false, 'tout ok apres remise a zero');
+});
+
+// ====================== CACHE DE REPONSES ======================
+
+const cache = require('../lib/cache_reponses');
+
+test('cache reponses : hit sans modele, non-cacheables exclus, reponse nommee jamais cachee', () => {
+  cache.reinitialiser();
+  const opts = { indiceMemoire: (m) => /mon nom|je m'appelle/i.test(m) };
+  // Meme question, casse/ponctuation differentes : meme cle.
+  const k1 = cache.cle('2', 'Ca va ?', opts);
+  const k2 = cache.cle('2', '  ca va ?', opts);
+  const k3 = cache.cle('2', 'CA VA !!!', opts);
+  assert.ok(k1 && k1 === k2 && k2 === k3, 'variantes egales : une seule cle');
+  // Non-cacheables :
+  assert.strictEqual(cache.cle('2', '(photo)', { imageParts: {} }), null, 'photo refusee');
+  assert.strictEqual(cache.cle('2', '/cherche meteo', opts), null, 'commande refusee');
+  assert.strictEqual(
+    cache.cle('2', "je m'appelle Maeva", opts),
+    null,
+    'indice memoire : reponse personnelle'
+  );
+  assert.strictEqual(
+    cache.cle('2', 'ca va', { rechercheBloc: 'SOURCES...' }),
+    null,
+    'bloc web : pas de cache'
+  );
+  const long = 'mot '.repeat(20).trim();
+  assert.strictEqual(cache.cle('2', long, opts), null, 'message trop long : vraie conversation');
+  // Hit et miss :
+  const reponse = 'Ca va super, merci ! Et toi ?';
+  assert.strictEqual(cache.repondre(k1), null, 'pas encore en cache');
+  assert.ok(cache.retenir(k1, reponse), 'retention acceptee');
+  assert.strictEqual(cache.repondre(k1), reponse, '2e visite : servie du cache');
+  const e = cache.etat();
+  assert.strictEqual(e.coups, 1, 'un hit');
+  assert.ok(e.entrees >= 1, 'une entree');
+  // Une reponse qui nomme le pseudo ne se partage jamais :
+  assert.strictEqual(
+    cache.retenir(k1, 'Salut Maeva, moi c est BLAMUNE !', { pseudo: 'Maeva' }),
+    false,
+    'reponse personnalisee : pas de cache'
+  );
+  // Trop courte ou vide : pas de retention.
+  assert.strictEqual(cache.retenir(k1, 'ok'), false, 'trop courte : pas de cache');
+  assert.strictEqual(cache.retenir(k1, ''), false, 'vide : pas de cache');
+  cache.reinitialiser();
+  assert.strictEqual(cache.etat().entrees, 0, 'zero apres remise a zero');
+});
+
 test('tension : les notes vieillissent (fenetre 5 min), du jour re-arme', async () => {
   tension.reinitialiser();
   const t0 = 2_000_000;
