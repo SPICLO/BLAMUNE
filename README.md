@@ -41,7 +41,9 @@ fournisseur compatible OpenAI) pour la conversation intelligente.
   si le chercheur serveur n'a rien donne ; `RECHERCHE_WEB_AUTO=0` coupe le
   chercheur serveur, `RECHERCHE_WEB=0` coupe l'outil Gemini.
 - **Gardiens anti-saturation** : file d'attente de concurrence
-  (`MAX_CONC`, fail-open apres attente max), comptage des 429 avec
+  (`MAX_CONC`, fail-open apres attente max, **refus a l'admission quand
+  la file depasse `MAX_FILE`** — un 429 honnete en replacant le message
+  dans le champ), comptage des 429 avec
   **mode eco** automatique (recherche coupee, taches de fond suspendues,
   historique envoye au modele tronque a 6 echanges (`HISTO_ECO_MAX`),
   retour au calme avec anti-clignotement), en-tete standard
@@ -336,8 +338,12 @@ Voir `.env.example` (commentaires complets). Principales :
 - `API_PROVIDER`, `API_KEY`, `API_MODEL`, `API_MODELS`, `API_URL`, `API_MAX_TOKENS`, `API_TEMPERATURE`
 - `MEMOIRE_EXTRACTION`, `RECHERCHE_WEB`, `EXTRACT_PAUSE_MS`, `RECHERCHE_WEB_AUTO`
 - `CACHE_RECHERCHE_MS` — cache du chercheur web (defaut 30 min, 0 = desactive)
-- `MAX_CONC`, `MAX_ATTENTE_MS` — plafond d'appels IA simultanes et file
+- `MAX_CONC`, `MAX_ATTENTE_MS`, `MAX_FILE` — plafond d'appels IA simultanes
+  et file d'attente (refus net au-dela)
 - `TENSION_FENETRE_MS`, `TENSION_SEUIL`, `TENSION_SEJOUR_MS` — mode eco sur 429
+- `SEND_MAX_HEURE_TOUT` — plafond global des messages /send par heure
+  (toutes IP confondues, defaut 720) : ceinture finale face a une attaque
+  repartie qui respecterait chaque quota individuel
 - `RATE_SEND_IP`, `RATE_SEND_UID`, `QUOTA_ATTENTE_MAX_MS`, `QUOTA_ATTENTE_MSG_MS`
 - `ADMIN_PSEUDO`, `ADMIN_UID`
 - `JSONBIN_API_KEY`, `JSONBIN_BIN_ID`, `JSONBIN_API_URL`, `JSONBIN_SNAP_MIN_MS`

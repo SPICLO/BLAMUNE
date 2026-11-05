@@ -1,14 +1,15 @@
 // Tests unitaires des gardiens anti-saturation : concurrence (file),
-// tension (429 + eco) et cache du chercheur web.
+// tension (429 + eco), plafond global /send et cache du chercheur web.
 //   node --test tests/gardiens.test.js
 //
-// 100 % hors reseau : les deux premiers gardiens ne touchent que des etats
-// memoire, le troisieme remplace le fetch global par un aiguillage local.
+// 100 % hors reseau : les gardiens d'etat ne touchent que de la memoire,
+// le rechercheur remplace le fetch global par un aiguillage local.
 const test = require('node:test');
 const assert = require('node:assert');
 
 const concurrence = require('../lib/concurrence');
 const tension = require('../lib/tension');
+const plafondGlobal = require('../lib/plafond_global');
 const recherche = require('../lib/recherche_web');
 
 // Attente reelle (timers Node) : les tests de file laissent le vrai
@@ -83,6 +84,54 @@ test('concurrence : liberrer idempotent, etat honnete', async () => {
   p2.liberrer();
   const e = concurrence.etat();
   assert.strictEqual(e.enCours, 0, 'pas de place fantome residuelle');
+});
+
+test('concurrence : filePleine refuse net a l admission (plafond MAX_FILE)', async () => {
+  concurrence.reinitialiser();
+  concurrence.configurer({ max: 1, attenteMs: 5000, maxFile: 2 });
+  assert.strictEqual(concurrence.filePleine(), false, 'file vide au depart');
+  const p1 = await concurrence.demanderPlace(); // occupe la seule place
+  const p2 = concurrence.demanderPlace();
+  const p3 = concurrence.demanderPlace(); // file : 2 demandeurs (maxFile)
+  await attendre(30);
+  assert.strictEqual(concurrence.etat().file, 2, '2 en file');
+  assert.strictEqual(concurrence.filePleine(), true, 'file pleine : admission refusee');
+  assert.strictEqual(concurrence.etat().maxFile, 2, 'plafond expose a /admin');
+  // Un demandeur de plus attendrait le fail-open : la route ne lui envoie
+  // JAMAIS (429 des filePleine). Ici on verifie la borne, pas le routeur.
+  p1.liberrer();
+  const place2 = await p2;
+  place2.liberrer();
+  const place3 = await p3;
+  place3.liberrer();
+  assert.strictEqual(concurrence.filePleine(), false, 'des places liberees : admission reouverte');
+});
+
+// ====================== PLAFOND GLOBAL /SEND ======================
+
+test('plafond global : fenetre glissante d une heure, refus au-dela du max', () => {
+  plafondGlobal.reinitialiser();
+  plafondGlobal.configurer({ max: 3 });
+  const t0 = Date.now();
+  // Trois messages passent, la fenetre est pleine au 4e.
+  assert.ok(plafondGlobal.tenterPlace(t0), '1er message accepte');
+  assert.ok(plafondGlobal.tenterPlace(t0 + 1), '2e message accepte');
+  assert.ok(plafondGlobal.tenterPlace(t0 + 2), '3e message accepte');
+  assert.strictEqual(plafondGlobal.tenterPlace(t0 + 3), false, '4e refuse (fenetre pleine)');
+  const e = plafondGlobal.etat();
+  assert.strictEqual(e.dansFenetre, 3, 'trois messages comptes dans la fenetre');
+  assert.strictEqual(e.refusJour, 1, 'le refus est compte du jour');
+  assert.strictEqual(e.refus, 1, 'le refus est compte au total');
+  // Une heure et 3 secondes plus tard, la fenetre est balayee : de
+  // nouveau accepte (une heure pile laisse la note a la frontiere).
+  assert.ok(plafondGlobal.tenterPlace(t0 + 60 * 60 * 1000 + 3000), 'fenetre balayee : re-accepte');
+  const e2 = plafondGlobal.etat();
+  assert.strictEqual(e2.dansFenetre, 1, 'les vieilles notes sont sorties');
+  // Nouveau jour UTC : compteur du jour re-arme.
+  const lendemain = t0 + 24 * 60 * 60 * 1000;
+  assert.ok(plafondGlobal.tenterPlace(lendemain), 'lendemain accepte');
+  assert.strictEqual(plafondGlobal.etat().refusJour, 0, 'refus du jour re-arme a minuit');
+  plafondGlobal.reinitialiser();
 });
 
 // ============================== TENSION ==============================

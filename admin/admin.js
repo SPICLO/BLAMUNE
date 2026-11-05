@@ -394,6 +394,7 @@ async function chargerDonnees() {
     var gc = g.concurrence || {};
     var gt = g.tension || {};
     var gcr = g.cacheRecherche || {};
+    var gpg = g.plafondGlobal || {};
     var elGardiens = document.getElementById('gardiensContenu');
     if (elGardiens) {
       elGardiens.replaceChildren();
@@ -428,6 +429,18 @@ async function chargerDonnees() {
               ' sur ' +
               ((gcr.coupsCache || 0) + (gcr.raterCache || 0)) +
               ' recherches'
+            : ''),
+        'Plafond global /h : ' +
+          (gpg.dansFenetre || 0) +
+          ' / ' +
+          (gpg.maxHeure || '?') +
+          ' messages' +
+          (gpg.refusJour || gpg.refus
+            ? '   |   Refus aujourd hui : ' +
+              (gpg.refusJour || 0) +
+              ' (total ' +
+              (gpg.refus || 0) +
+              ')'
             : '')
       ];
       lignesG.forEach(function (texte) {

@@ -36,6 +36,8 @@ const { creerPurgeInvites } = require('./lib/purge_invites');
 const { creerResume } = require('./lib/resume');
 // Comparaison de secrets (jeton, ego) en temps constant : voir lib/timing.js.
 const { egaleTimingSafe } = require('./lib/timing');
+// Plafond global des messages /send par heure (toutes IP confondues).
+const plafondGlobal = require('./lib/plafond_global');
 // Chercheur web serveur (DuckDuckGo, sans cle) : donne des SOURCES a TOUT
 // le pool de modeles, au lieu de dependre du google_search de Gemini.
 // Cache des resultats (30 min par defaut, CACHE_RECHERCHE_MS) : plusieurs
@@ -2194,11 +2196,13 @@ creerRoutesAdmin(app, {
   // Etat de l'index semantique Qdrant pour /health.
   getQdrantSante: savoir.qdrantSante,
   // Gardiens anti-saturation (file de concurrence, tension/eco, cache
-  // recherche) : un seul getter qui recompte au coup par coup.
+  // recherche, plafond global /send) : un seul getter qui recompte au coup
+  // par coup.
   getGardiens: () => ({
     concurrence: concurrence.etat(),
     tension: tension.etat(),
-    cacheRecherche: rechercheWeb.etatCache()
+    cacheRecherche: rechercheWeb.etatCache(),
+    plafondGlobal: plafondGlobal.etat()
   }),
   // Bande passante sortante (octets du jour par famille, top chemins) :
   // exposee telle quelle par /health sous le champ `sortie`.
@@ -2313,7 +2317,8 @@ creerRouteSend(app, {
   getPoolModeleOk: pool.modeleOkConnu,
   loggerErreur,
   rateSendIp: RATE_SEND_IP,
-  rateSendUid: RATE_SEND_UID
+  rateSendUid: RATE_SEND_UID,
+  plafondGlobal
 });
 // History
 // Consultation cote utilisateur : implementation dans
