@@ -111,6 +111,17 @@ check("aucune cle API commitee", not trouve)
 gitign = open(".gitignore", encoding="utf-8").read()
 for f in ["config.json", "comptes.json", "users/", ".blamune_session", "bot.exe", ".env"]:
     check(f"{f} ignore par git", f in gitign)
+# L'entree dans .gitignore ne suffit pas : un fichier AJOUTE avant d'etre
+# ignore reste suivi pour toujours (git ne surveille pas les ignores
+# retroactivement). Le seul controle fiable est l'index : si .env apparait
+# dans git ls-files, ses secrets partent au prochain push, .gitignore ou
+# pas. Un test runtime (node tests/) ne peut pas le voir : il ne contient
+# ni .env ni ses cles par construction du depot.
+check(".env n'est PAS suivi par git (l'ignore ne suffit pas)",
+      ".env" not in SUIVIS,
+      "s'il est suivi : git rm --cached .env puis commit")
+for f in ["comptes.json", "config.json", "bot.exe", "savoir.db"]:
+    check(f"{f} n'est PAS suivi par git", f not in SUIVIS)
 
 # Donnees d'un poste de travail : memoire.txt/profil.txt racine ne servent
 # qu'au repli hors ligne (le bot les recree), et les brouillons enrichir_lot*

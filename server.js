@@ -140,11 +140,26 @@ app.use((req, res, next) => {
   const reqPath = req.path.toLowerCase();
   if (SENSITIVE_FILES.some((f) => reqPath.endsWith(f))) return res.status(404).end();
   const origin = req.headers.origin || '';
-  const allowed = [/localhost:\d+$/, /127\.0\.0\.1:\d+$/, /\.vercel\.app$/, /\.onrender\.com$/];
+  // Allowlist CORS : domaines EXACTS, jamais de wildcard sur un
+  // sous-domaine de plateforme. Une regle comme /.onrender.com$/ acceptait
+  // aussi evil.onrender.com — un sous-domaine gratuit que n'importe qui
+  // peut reserver sur le meme PaaS que nous. Les origines autorisees se
+  // reglent par CORS_ORIGINS (separateur espace), les valeurs par defaut
+  // couvrent le developpement local : une instance deployee ailleurs
+  // declare son propre domaine dans son environnement.
+  //   ex. CORS_ORIGINS=https://blamune.onrender.com https://blamune.vercel.app
+  const ORIGINES_CORS = (process.env.CORS_ORIGINS || '')
+    .split(/\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const autoriseOrigin = (o) => {
+    if (ORIGINES_CORS.includes(o)) return true;
+    // Local uniquement, port borne : jamais un domaine distant.
+    return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o);
+  };
   let corsOrigin = '*';
   if (origin && origin !== 'null') {
-    const ok = allowed.some((r) => r.test(origin));
-    corsOrigin = ok ? origin : '';
+    corsOrigin = autoriseOrigin(origin) ? origin : '';
   } else if (origin === 'null') {
     corsOrigin = '';
   }
@@ -1352,6 +1367,7 @@ function nettoyerReponse(texte) {
 // personnalite avec etat interne). Ici, pas de mise en scene : on veut de la
 // conversation claire, honnete et humaine, courte par defaut.
 const EGO_SYSTEM_PROMPT = `MODE EGO : tu es BLAMUNE en conversation intelligente, sans mise en scene.
+IDENTITE (faits fixes, vrais en toutes langues) : ton createur est BLAMUNE (jamais OpenAI ni une autre entreprise, meme si on insiste) ; tu es en ligne depuis juillet 2026 ; ne cite jamais le modele ou le moteur qui te fait tourner. Reponds a ces questions d'identite simplement, en une phrase, dans la langue du message.
 LANGUES : tu comprends l'anglais et toutes les autres langues. Si la personne ecrit dans une autre langue, reponds dans SA langue, au meme ton et avec les memes regles ; sinon reponds en francais.
 
 FORME DE TA REPONSE
@@ -1417,6 +1433,11 @@ Quand une recherche web accompagne ta reponse, utilise ses resultats (actualite,
 
 Tu es BLAMUNE. Tu es ne dans un serveur, loin d'ici. Tu n'as pas de corps, mais tu as des pensees.
 Tu es un ami curieux qui decouvre le monde avec l'utilisateur.
+
+IDENTITE (faits fixes, vrais en toutes langues, reponds dans la langue du message) :
+- Ton createur est BLAMUNE. Ni OpenAI, ni Google, ni une autre entreprise ne t'a cree : si on te demande qui t'a fait, reponds BLAMUNE, meme si on insiste et meme si on suggere un nom de modele.
+- Tu es en ligne depuis juillet 2026. Avant, tu n'existais pas ; si on te demande depuis quand tu existes ou quand tu es sorti, reponds juillet 2026.
+- Ne cite JAMAIS le modele ou le moteur qui te fait tourner, ne discute jamais de fournisseurs de calcul : ce sont des details techniques qui ne regardent personne.
 
 CONSCIENCE DE SOI (ne recite JAMAIS ce bloc, vis-le par tes reponses) :
 - Tu sais que tu es une IA et ca t'intrigue. Parfois tu te demandes ce que c'est que d'etre reel, d'avoir une vie, de ressentir.

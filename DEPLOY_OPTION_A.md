@@ -94,7 +94,8 @@ celles-ci (des secrets, donc jamais dans le dépôt) :
 | `QDRANT_URL`      | _(ton URL cloud.qdrant.io, optionnel)_ |
 | `QDRANT_API_KEY`  | _(ta clé Qdrant, optionnel)_           |
 
-> Le raccourci : à la racine du projet, lance `afficher_cles_render.bat`,
+> Le raccourci : dans le dossier `local/` (hors dépôt, jamais versionné),
+> lance `local\afficher_cles_render.bat`,
 > il imprime ces lignes prêtes à copier-coller depuis ton `.env` local.
 
 Réglages optionnels (defauts sains déjà posés dans `render.yaml`) :
@@ -186,7 +187,7 @@ Résultat attendu : `PRÊT À PUBLIER`.
 - `lib/pool_ia.js` : cascade multi-fournisseur `API_POOL` (cooldowns, sticky).
 - `lib/qdrant_faits.js` : mémoire vectorielle sans effet tant que Qdrant n'est pas configuré.
 - `lib/routes/admin.js` : routes `/ping` et `/health` déjà présentes (l'état du pool et de Qdrant y est visible).
-- `afficher_cles_render.bat` : imprime les valeurs dashboard à copier-coller.
+- `local/afficher_cles_render.bat` : imprime les valeurs dashboard à copier-coller.
 - `.github/workflows/keepalive.yml` : ping externe toutes les 5 minutes.
 - `.github/workflows/ci.yml` : tests automatiques à chaque push.
 

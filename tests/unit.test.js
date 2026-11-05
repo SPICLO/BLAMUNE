@@ -72,9 +72,42 @@ test('configuration locale : .env est pris en compte dans server.js', () => {
 
 test('.gitignore ignore les sorties volumineuses et les secrets', () => {
   const gi = lire('.gitignore');
-  for (const f of ['themes.txt', 'themes_manquants.txt', 'node_modules/', 'config.json']) {
+  for (const f of [
+    'themes.txt',
+    'themes_manquants.txt',
+    'node_modules/',
+    'config.json',
+    'local/'
+  ]) {
     assert.ok(gi.includes(f), '.gitignore doit contenir : ' + f);
   }
+});
+
+test('.env et les secrets ne sont PAS suivis par git', () => {
+  // L'entree dans .gitignore ne suffit pas : un fichier ajoute avant
+  // d'etre ignore reste suivi pour toujours. Seul l'index fait foi.
+  const { execSync } = require('child_process');
+  const suivis = execSync('git ls-files', { cwd: RACINE, encoding: 'utf8' }).split(/\r?\n/);
+  for (const f of ['.env', 'comptes.json', 'config.json', 'bot.exe', 'savoir.db']) {
+    assert.ok(!suivis.includes(f), f + ' ne doit jamais etre suivi par git');
+  }
+});
+
+test('CORS : domaines exacts, jamais de wildcard de plateforme', () => {
+  // Historique : /.onrender.com$/ acceptait aussi evil.onrender.com —
+  // un sous-domaine gratuit reservable par n'importe qui sur le meme
+  // PaaS. La allowlist doit rester du domaine exact (+ local), reglable
+  // par CORS_ORIGINS.
+  const srv = lire('server.js');
+  assert.ok(srv.includes('CORS_ORIGINS'), 'CORS_ORIGINS doit piloter la allowlist');
+  assert.ok(
+    !/\\\.vercel\\\.app\$/.test(srv) && !/\\\.onrender\\\.com\$/.test(srv),
+    'les wildcards de plateforme (.vercel.app, .onrender.com) ont ete retires'
+  );
+  assert.ok(
+    /localhost\|127/.test(srv) || /\(localhost\|127/.test(srv),
+    'local reste autorise pour le developpement'
+  );
 });
 
 test('fichiers cles du depot presents', () => {

@@ -114,3 +114,5 @@ enrichir_lot*.txt
 
 # Config locale d'Obsidian (notes bureau) : jamais versionne ni formate
 .obsidian/
+local/
+health_live.json

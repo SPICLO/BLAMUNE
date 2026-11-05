@@ -69,8 +69,8 @@ services:
       #   - pollinations : sans aucun compte, modele libre GPT-OSS 20B
       #     (quotite anonyme : ~1 reponse / 30 s par IP de sortie).
       # A coller DANS LE DASHBOARD (rendable sync:false : il contient une
-      # cle). Le raccourci : afficher_cles_render.bat imprime cette ligne
-      # prete a copier depuis le .env local.
+      # cle). Le raccourci : local/afficher_cles_render.bat imprime cette
+      # ligne prete a copier depuis le .env local (dossier hors depot).
       - key: API_POOL
         sync: false
       - key: API_POOL_COOLDOWN_MS
