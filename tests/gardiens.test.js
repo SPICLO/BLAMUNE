@@ -201,6 +201,14 @@ test('cache reponses : hit sans modele, non-cacheables exclus, reponse nommee ja
   const k2 = cache.cle('2', '  ca va ?', opts);
   const k3 = cache.cle('2', 'CA VA !!!', opts);
   assert.ok(k1 && k1 === k2 && k2 === k3, 'variantes egales : une seule cle');
+  // Reponse a une question du bot : le contexte fait partie de la cle.
+  // Deux "oui" repondant a deux questions differentes ne se partagent pas.
+  const ouiA = cache.cle('2', 'oui', { avant: 'Tu veux entendre une blague ?' });
+  const ouiB = cache.cle('2', 'oui', { avant: 'On apprend ton sport prefere ?' });
+  const ouiA2 = cache.cle('2', 'OUI !!!', { avant: 'tu veux entendre une blague' });
+  assert.ok(ouiA && ouiB, 'reponses cacheables');
+  assert.notStrictEqual(ouiA, ouiB, 'un "oui" par question : cles distinctes');
+  assert.strictEqual(ouiA, ouiA2, 'meme question : meme cle (casse et ponctuation egales)');
   // Non-cacheables :
   assert.strictEqual(cache.cle('2', '(photo)', { imageParts: {} }), null, 'photo refusee');
   assert.strictEqual(cache.cle('2', '/cherche meteo', opts), null, 'commande refusee');
