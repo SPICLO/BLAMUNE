@@ -169,6 +169,19 @@ class SavoirDB {
     return this._prep.count.get().n;
   }
 
+  // Supprime l'entree d'une cle (normalisee a l'interieur). Retourne vrai
+  // si une ligne a reellement disparu. Utilise par le nettoyage admin :
+  // jamais par l'apprentissage automatique (celui-ci corrige, il n'oublie
+  // pas — la distinction fait partie de la regle de propriete documentee
+  // sous synchroniserFichier).
+  supprimer(cle) {
+    const norm = sansAccents(cle);
+    if (!norm) return false;
+    const r = this.db.prepare('DELETE FROM savoir WHERE cle_norm = ?').run(norm);
+    // node:sqlite renvoie {changes} ; better-sqlite3 aussi.
+    return (r && r.changes) > 0;
+  }
+
   // Remplace la reponse d'une cle, ou cree l'entree si elle n'existe pas.
   // `categorie` : nombre, ou null pour "non classe".
   mettre(cle, reponse, categorie, source) {

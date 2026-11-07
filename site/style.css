@@ -550,6 +550,72 @@ input:focus-visible {
   user-select: none;
 }
 
+/* ==================== VOIX (▶ lire) ==================== */
+/* Bouton de lecture discrete, meme famille visuelle que les avis : il
+   apparait franchement au survol de la bulle, se garde visible apres
+   le clic (⏹ stop pendant la lecture). */
+.btn-lire {
+  background: transparent;
+  border: none;
+  color: var(--texte-faible);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.btn-lire:hover {
+  opacity: 1;
+  background: var(--surface);
+}
+
+/* ==================== AVIS (👍/👎) ==================== */
+/* Deux mini-boutons discrets sous chaque bulle du bot. Discret au repos
+   (gris clair, presque fondus avec l'heure), un peu plus present au
+   survol, et marque apres le vote : le bouton choisi garde sa couleur,
+   les deux deviennent non cliquables (une bulle = un vote). */
+.avis {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 0 4px;
+}
+.btn-avis {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+  opacity: 0.35;
+  filter: grayscale(1);
+  transition:
+    opacity 0.15s ease,
+    filter 0.15s ease,
+    background 0.15s ease;
+}
+.avis:hover .btn-avis,
+.avis:focus-within .btn-avis {
+  opacity: 0.8;
+  filter: none;
+}
+.btn-avis:hover {
+  background: var(--surface);
+}
+.avis.vote .btn-avis {
+  opacity: 0.2;
+  cursor: default;
+  pointer-events: none;
+  filter: grayscale(1);
+}
+.avis.vote .btn-avis.choisi {
+  opacity: 0.95;
+  filter: none;
+  cursor: default;
+}
+
 /* Message systeme (separateur) */
 .msg.systeme {
   justify-content: center;

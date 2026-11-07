@@ -134,6 +134,26 @@ function authHeaders() {
   return h;
 }
 
+// ==================== AVIS (👍/👎) ====================
+// Dernier message de l'utilisateur : rattache a chaque bulle du bot pour
+// que le vote rappelle LE couple question/reponse (la boussole lit le
+// pire couple, pas une reponse orpheline).
+var dernierMessageMoi = '';
+
+function envoyerAvis(avis, msg, reponse) {
+  var ah = authHeaders();
+  fetch('/avis', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-EGO': ah['X-EGO'] || '',
+      'X-UID': ah['X-UID'] || '',
+      'X-Jeton': ah['X-Jeton'] || ''
+    },
+    body: JSON.stringify({ avis: avis, msg: msg || '', reponse: reponse || '' })
+  }).catch(function () {});
+}
+
 // Migration des invites creees avant les jetons : elles n'ont que leur uid.
 // Une fois par chargement, on l'envoie au serveur qui rend un jeton ; a partir
 // de la, le uid seul n'est plus accepte. Echec silencieux (hors ligne) :
@@ -891,6 +911,85 @@ function ajouterMessage(qui, texte, confiance, epoch) {
   heure.className = 'heure';
   heure.textContent = heureDepuis(epoch);
   corps.appendChild(heure);
+
+  // ==================== VOIX (▶ lire) ====================
+  // Web Speech API : le navigateur lit la reponse a voix haute. Aucune
+  // cle, aucun serveur ; depend du moteur vocal de la machine (present
+  // partout, mobiles inclus). La lecture est coupee si la bulle repart
+  // (langue : celle du navigateur ; l'arabe et le francais passent sur
+  // la plupart des moteurs modernes).
+  if (qui === 'bot' && window.speechSynthesis) {
+    var lire = document.createElement('button');
+    lire.type = 'button';
+    lire.className = 'btn-lire';
+    lire.setAttribute('aria-label', 'Lire a voix haute');
+    lire.textContent = '▶ lire';
+    var estEnLecture = false;
+    lire.addEventListener('click', function () {
+      var synth = window.speechSynthesis;
+      if (!synth) return;
+      if (estEnLecture) {
+        synth.cancel();
+        estEnLecture = false;
+        lire.textContent = '▶ lire';
+        return;
+      }
+      // Fragmentchercheur : streaming = la bulle change en cours de route.
+      // On lit ce qui est affiche AU CLIC ; complet ou pas, ca reste naturel.
+      var u = new SpeechSynthesisUtterance(String(texte));
+      u.lang = document.documentElement.lang || 'fr-FR';
+      u.onend = u.onerror = function () {
+        estEnLecture = false;
+        lire.textContent = '▶ lire';
+      };
+      estEnLecture = true;
+      lire.textContent = '⏹ stop';
+      synth.cancel();
+      synth.speak(u);
+    });
+    // Dans .corps, apres l'heure.
+    var voix = document.createElement('div');
+    voix.className = 'voix';
+    voix.appendChild(lire);
+    corps.appendChild(voix);
+  }
+
+  // ==================== AVIS (👍/👎) ====================
+  // Un vote par bulle du bot : la boussole produit. Stocke cote serveur
+  // (avis.json), relu dans le panneau admin. Reserve aux comptes connects
+  // (le vote est rattache a l'uid pour l'anti-spam ; un invite n'a pas
+  // d'uid stable). Une bulle deja votee n'est pas revotable.
+  if (qui === 'bot' && estAuth()) {
+    var avis = document.createElement('div');
+    avis.className = 'avis';
+    var texteVote = texte;
+    var msgVote = dernierMessageMoi;
+    var btnOk = document.createElement('button');
+    btnOk.type = 'button';
+    btnOk.className = 'btn-avis';
+    btnOk.setAttribute('aria-label', 'Bonne reponse');
+    btnOk.textContent = '👍';
+    var btnKo = document.createElement('button');
+    btnKo.type = 'button';
+    btnKo.className = 'btn-avis';
+    btnKo.setAttribute('aria-label', 'Reponse a retravailler');
+    btnKo.textContent = '👎';
+    btnOk.addEventListener('click', function () {
+      if (avis.classList.contains('vote')) return;
+      avis.classList.add('vote');
+      btnOk.classList.add('choisi');
+      envoyerAvis('up', msgVote, texteVote);
+    });
+    btnKo.addEventListener('click', function () {
+      if (avis.classList.contains('vote')) return;
+      avis.classList.add('vote');
+      btnKo.classList.add('choisi');
+      envoyerAvis('down', msgVote, texteVote);
+    });
+    avis.appendChild(btnOk);
+    avis.appendChild(btnKo);
+    corps.appendChild(avis);
+  }
 
   if (qui === 'moi') {
     d.appendChild(corps);
@@ -1816,6 +1915,7 @@ async function envoyer() {
   actionEnCours = true;
   desactiver(true);
   majStatut('pense');
+  dernierMessageMoi = m || '';
   var msgNode = ajouterMessage('moi', m || '');
   if (imageChoisie) ajouterPhotoBubble(msgNode, imageChoisie);
   attente(true);

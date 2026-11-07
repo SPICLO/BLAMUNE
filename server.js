@@ -21,6 +21,7 @@ const { creerMemoire, indiceMemoire } = require('./lib/memoire');
 const { creerConfigIA } = require('./lib/config_ia');
 const { creerRoutesCompte } = require('./lib/routes/compte');
 const { creerRoutesAdmin } = require('./lib/routes/admin');
+const { creerRouteAvis } = require('./lib/routes/avis');
 const { creerRoutesConsultation } = require('./lib/routes/consultation');
 const { creerRoutesStatique } = require('./lib/routes/statique');
 const { creerRouteSend } = require('./lib/routes/send');
@@ -536,12 +537,16 @@ const FICHIERS_RACINE = [
   'savoir.txt',
   'vocabulaire.txt',
   'replis.txt',
-  'stats.json'
+  'stats.json',
+  // Avis de sante des reponses (👍/👎) et rapport d'auto-test d'identite :
+  // petits, mais on n'y renonce pas au moment du restore.
+  'avis.json',
+  'tests_identite.json'
 ];
 const CLE_SAVOIR_SQL = 'savoir.sql';
 // config.json (cle API) et logs/ ne quittent jamais le serveur.
 const CHEMIN_SAUVEGARDE =
-  /^(comptes\.json|invites\.json|savoir\.sql|savoir\.txt|vocabulaire\.txt|replis\.txt|stats\.json|users\/[A-Za-z0-9_\-]{1,64}\/[A-Za-z0-9_.\-]{1,64})$/;
+  /^(comptes\.json|invites\.json|savoir\.sql|savoir\.txt|vocabulaire\.txt|replis\.txt|stats\.json|avis\.json|tests_identite\.json|users\/[A-Za-z0-9_\-]{1,64}\/[A-Za-z0-9_.\-]{1,64})$/;
 const TAILLE_MAX_FICHIER = 2 * 1024 * 1024;
 const TAILLE_MAX_TOTALE = 40 * 1024 * 1024;
 
@@ -836,6 +841,9 @@ const savoir = creerSavoir({
 const savoirDb = savoir.savoirDb;
 const sansAccentsDB = savoir.sansAccentsDB;
 const savoirEnregistrer = savoir.savoirEnregistrer;
+// Nettoyage admin : lecture paginee + suppression (base + secours + Qdrant).
+const savoirSupprimer = savoir.savoirSupprimer;
+const savoirListe = savoir.savoirListe;
 const reponseSecours = savoir.reponseSecours;
 const exporterSavoir = savoir.exporterSavoir;
 const chargerSavoirSecours = savoir.chargerSavoirSecours; // Tous les modeles en meme temps (vu en live a 22h10) : la cascade rend la
@@ -1317,11 +1325,15 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
 // principal ne sont jamais sollicites ; sans reponse, la tache passe a
 // l'eau (best effort : resume.js et l'extraction retenteront naturellement
 // au tour suivant). Pas de pool : comportement historique intact.
+// questaModele : consigne = string OU tableau de messages deja forme
+// [{ role, content }] (utilise par l'auto-test d'identite, qui envoie son
+// propre systeme). Une string reste le cas principal.
 async function questionModele(consigne) {
+  const messages = Array.isArray(consigne) ? consigne : [{ role: 'user', content: consigne }];
   const fond = pool.membreFond();
   if (fond) {
     try {
-      return await iaOpenai.openAIRequete(fond, [{ role: 'user', content: consigne }], null);
+      return await iaOpenai.openAIRequete(fond, messages, null);
       // PAS de noteOk : la reponse du fond ne doit pas rendre ce membre
       // sticky (prioritaire) pour le CHAT.
     } catch (e) {
@@ -1333,11 +1345,12 @@ async function questionModele(consigne) {
     throw new Error('Pool IA : aucun fournisseur de fond disponible');
   }
   if (providerOpenAI()) {
-    return iaOpenai.openAIRequete(modeleActif(), [{ role: 'user', content: consigne }], null);
+    return iaOpenai.openAIRequete(modeleActif(), messages, null);
   }
+  // Cascade Gemini : une array OpenAI est convertie en parts de texte.
   return modeleClassique(
     modeleActif(),
-    [{ role: 'user', parts: [{ text: consigne }] }],
+    messages.map((m) => ({ role: m.role, parts: [{ text: m.content }] })),
     { n: 1 },
     true
   );
@@ -2200,6 +2213,19 @@ async function extraireFileExtraction(uid) {
 
 // ==================== ROUTES ====================
 
+// Avis des visiteurs sur les reponses (👍/👎) : implementation dans
+// lib/routes/avis.js. Rattache a l'uid pour l'anti-spam, stocke dans
+// avis.json, relu par /admin/avis.
+creerRouteAvis(app, {
+  racine: RACINE,
+  extraireAuth,
+  getIp,
+  checkRateLimit,
+  getStats: () => stats,
+  loggerErreur,
+  storage
+});
+
 // Diagnostic et administration : implementation dans lib/routes/admin.js.
 // isAdminUid y reste prive : toutes les routes admin sont dans ce module,
 // donc le serveur n a plus a arbitrer qui a le droit.
@@ -2249,6 +2275,15 @@ creerRoutesAdmin(app, {
   appliquerSauvegarde,
   loggerErreur,
   sauvegarderComptes,
+  // Nettoyage admin du savoir (lecture/correction/oubli) : le choke
+  // point d'ecriture est celui de l'apprentissage, pas un doublon.
+  savoirEnregistrer,
+  savoirSupprimer,
+  savoirListe,
+  // Rapport de l'auto-test d'identite quotidien. L'auto-test est construit
+  // plus bas (apres push) : getter paresseux, juge a l'appel, pas a la
+  // declaration.
+  getTestIdentite: () => autotestIdentite.etat(),
   // Suppression d'un compte : extraction minutee, historiques API,
   // mode prefere, presence (fichiers et cloud traites dans la route).
   purgerRamUtilisateur,
@@ -2417,6 +2452,45 @@ const push = creerPush({
 });
 
 creerRoutesPush(app, { push, extraireAuth, checkRateLimit, loggerErreur });
+
+// ==================== AUTO-TEST D'IDENTITE QUOTIDIEN ====================
+// Implementation dans lib/autotest_identite.js. Le test SE POSE chaque jour
+// les questions d'identite dans 4 langues ; si une reponse desole, log
+// d'erreur + notification push a l'admin (via le meme push que le site).
+// Premiere passe : 5 min apres le boot (le pool a le temps de demarrer,
+// et un deploiement casse est rappele dans les 5 minutes). Ensuite : 24 h.
+const { creerAutoTestIdentite } = require('./lib/autotest_identite');
+const autotestIdentite = creerAutoTestIdentite({
+  racine: RACINE,
+  // Le fond du pool, pas un fournisseur privilegie : le test verifie ce
+  // que les VISITEURS recoivent, et ils sont servis par le fond.
+  questionModeleFond: (messages) => questionModele(messages),
+  promptBLAMUNE: () => getPromptBLAMUNE(),
+  loggerErreur,
+  // Notification a l'admin : meme infra que le push, cible = compte dont
+  // le pseudo est le pseudo admin (ADMIN_PSEUDO, defaut "admin").
+  envoyerAAdmin: async (texte) => {
+    try {
+      if (!push.actif) return; // actif : booleen de la fabrique push
+      const pseudoAdmin = String(process.env.ADMIN_PSEUDO || 'admin').toLowerCase();
+      const uidAdmin = Object.keys(comptes || {}).find(
+        (u) => String((comptes[u] || {}).pseudo || '').toLowerCase() === pseudoAdmin
+      );
+      if (uidAdmin) await push.envoyer(uidAdmin, texte);
+    } catch (e) {
+      loggerErreur('identite-auto', 'push: ' + (e && e.message));
+    }
+  }
+});
+function lancerAutoTestIdentite() {
+  // reportertache : le test ne JAMAIS bloquer ni faire tomber le serveur.
+  Promise.resolve()
+    .then(() => autotestIdentite.lancer())
+    .catch((e) => loggerErreur('identite-auto', e && e.message));
+}
+setTimeout(lancerAutoTestIdentite, 5 * 60 * 1000).unref?.();
+setInterval(lancerAutoTestIdentite, 24 * 60 * 60 * 1000).unref?.();
+const getTestIdentite = () => autotestIdentite.etat();
 
 // La vague d'arriere-plan (toutes les PUSH_CHECK_MS) : pour chaque
 // utilisateur INJOIGNABLE (dernier contact plus vieux que
