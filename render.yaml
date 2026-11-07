@@ -91,9 +91,10 @@ services:
       # Extraction des faits par le modele (0 = regex seules).
       - key: MEMOIRE_EXTRACTION
         value: 1
-      # Recherche web (0 = desactivee pour economiser les appels IA en free).
+      # Recherche web : ON (pool elargi = marge de quota ; RECHERCHE_WEB_AUTO
+      # reste ON par defaut : chercheur serveur DuckDuckGo sans cle).
       - key: RECHERCHE_WEB
-        value: 0
+        value: 1
       # ---------- Memoire vectorielle du savoir (Qdrant, activable) ----------
       # Retrouve un fait du savoir.db meme si la question emploie d'autres
       # mots. La liaison Qdrant elle-meme se definit DANS LE DASHBOARD
