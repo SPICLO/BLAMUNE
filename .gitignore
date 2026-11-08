@@ -123,3 +123,11 @@ enrichir_lot*.txt
 .obsidian/
 local/
 health_live.json
+
+# Zone numériquement synchronisée (bureau, base Obsidian, canvas) : des notes
+# personnelles, pas du code. Les voir signalées à chaque `git status` faisait
+# oublier les vrais changements ; les projets annexes (OpenMontage/,
+# motion-design/) sont déjà hors dépôt pour la même raison.
+2026-11-05.md
+Sans titre.base
+Sans titre.canvas

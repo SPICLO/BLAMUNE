@@ -322,6 +322,11 @@ async function main() {
     // 11e. Le plafond lui-meme doit donc etre porte plus haut ici, sinon on
     // ne teste plus les bornes de contenu mais le throttle.
     SAVOIR_RATE_UID: '1000',
+    // Correctif A : la suite cree une poignee d'invitations (et plusieurs
+    // recettes de re-inscription) en quelques secondes. Les plafonds de
+    // production (10/min/IP) restent ceux du code, pas ceux de la suite.
+    INVITE_RATE_IP: '1000',
+    INVITE_RATE_JETON_IP: '1000',
     // Regroupement des extractions (8 s en prod) : desactive pour que chaque
     // message soit extrait immediatement comme avant, sans rallonger la suite.
     EXTRACT_PAUSE_MS: '0',
@@ -405,46 +410,82 @@ async function main() {
     assert.strictEqual(sansJetonHisto.status, 401, 'historique refuse sans jeton');
     ok.push('jeton invite: uid seul et mauvais jeton refuses');
 
-    // 1ter. Migration sans deconnexion : une invite d'avant les jetons n'a
-    //       aucun enregistrement, elle continue au uid seul, puis le client
-    //       l'echange contre un jeton et la striction s'applique.
+    // 1ter. CORRECTIF A : le repli « pas d'enregistrement » a disparu. Un uid
+    //       invente, ou dont le jeton a ete oublie par la chasse des 30
+    //       jours, n'a plus AUCUN acces — meme si son dossier existe. La
+    //       seule reprise passe par le nonce rendu par /invite, valable
+    //       10 min et un seul usage.
     const uidLegacy = 'inv_' + crypto.randomBytes(12).toString('hex');
+    // Simule un dossier existant (cas reel : invite revenue apres l'oubli).
+    fs.mkdirSync(path.join(dataDir, 'users', uidLegacy), { recursive: true });
     const leg1 = await requete(PORT_APP, '/send', 'POST', 'msg=bonjour&mode=2', {
       'X-UID': uidLegacy
     });
     assert.strictEqual(
       leg1.status,
-      200,
-      'invite legacy acceptee (aucun enregistrement): HTTP ' + leg1.status
+      401,
+      'invite sans enregistrement refusee meme avec un dossier: HTTP ' + leg1.status
     );
     const ech = await requete(PORT_APP, '/invite/jeton', 'POST', 'uid=' + uidLegacy);
-    assert.strictEqual(
-      ech.status,
-      200,
-      'echange legacy: HTTP ' + ech.status + ' ' + ech.texte.substring(0, 120)
+    assert.strictEqual(ech.status, 401, 'echange sans preuve refuse: HTTP ' + ech.status);
+    const echJetonFaux = await requete(PORT_APP, '/invite/jeton', 'POST', 'uid=' + uidLegacy, {
+      'X-Jeton': 'f'.repeat(64)
+    });
+    assert.strictEqual(echJetonFaux.status, 401, 'echange avec un jeton invente refuse');
+    // Recette legitime : /invite en rend un, au demandeur.
+    const invNonce = await requete(PORT_APP, '/invite', 'POST', '');
+    assert(
+      invNonce.json && /^[0-9a-f]{48}$/.test(invNonce.json.nonce || ''),
+      'nonce rendu par /invite: ' + String(invNonce.texte).substring(0, 120)
     );
-    assert(/^[0-9a-f]{64}$/.test((ech.json && ech.json.jeton) || ''), 'jeton rendu par l echange');
-    const leg2 = await requete(PORT_APP, '/send', 'POST', 'msg=toujours+la&mode=2', {
-      'X-UID': uidLegacy
+    const noncePerdu = await requete(PORT_APP, '/invite/jeton', 'POST', 'uid=' + uidLegacy, {
+      'X-Invite-Nonce': invNonce.json.nonce
     });
     assert.strictEqual(
-      leg2.status,
+      noncePerdu.status,
       401,
-      'apres echange, le uid seul ne suffit plus: HTTP ' + leg2.status
+      'nonce valable, mais pas pour CET uid: HTTP ' + noncePerdu.status
     );
-    const leg3 = await requete(PORT_APP, '/send', 'POST', 'msg=avec+jeton&mode=2', {
-      'X-UID': uidLegacy,
-      'X-Jeton': ech.json.jeton
+    const echNonce = await requete(
+      PORT_APP,
+      '/invite/jeton',
+      'POST',
+      'uid=' + invNonce.json.uid + '&nonce=' + invNonce.json.nonce
+    );
+    assert.strictEqual(
+      echNonce.status,
+      200,
+      're-inscription avec nonce: HTTP ' +
+        echNonce.status +
+        ' ' +
+        String(echNonce.texte).substring(0, 120)
+    );
+    assert(
+      /^[0-9a-f]{64}$/.test((echNonce.json && echNonce.json.jeton) || ''),
+      'jeton rendu avec nonce'
+    );
+    const echNonceRejoue = await requete(
+      PORT_APP,
+      '/invite/jeton',
+      'POST',
+      'uid=' + invNonce.json.uid + '&nonce=' + invNonce.json.nonce
+    );
+    assert.strictEqual(echNonceRejoue.status, 401, 'nonce a usage unique : rejeu refuse');
+    const leg2 = await requete(PORT_APP, '/send', 'POST', 'msg=toujours+la&mode=2', {
+      'X-UID': invNonce.json.uid
     });
-    assert.strictEqual(leg3.status, 200, 'uid + jeton accepte apres echange');
-    const ech2 = await requete(PORT_APP, '/invite/jeton', 'POST', 'uid=' + uidLegacy);
-    assert.strictEqual(ech2.status, 401, 'second echange sans jeton refuse');
-    const ech3 = await requete(PORT_APP, '/invite/jeton', 'POST', 'uid=' + uidLegacy, {
-      'X-Jeton': ech.json.jeton
+    assert.strictEqual(leg2.status, 401, 'le uid seul ne suffit toujours pas');
+    const leg3 = await requete(PORT_APP, '/send', 'POST', 'msg=avec+jeton&mode=2', {
+      'X-UID': invNonce.json.uid,
+      'X-Jeton': echNonce.json.jeton
+    });
+    assert.strictEqual(leg3.status, 200, 'uid + jeton accepte apres re-inscription');
+    const ech3 = await requete(PORT_APP, '/invite/jeton', 'POST', 'uid=' + invNonce.json.uid, {
+      'X-Jeton': echNonce.json.jeton
     });
     assert.strictEqual(ech3.status, 200, 'rotation possible quand on connait le jeton');
     assert(
-      ech3.json && ech3.json.jeton && ech3.json.jeton !== ech.json.jeton,
+      ech3.json && ech3.json.jeton && ech3.json.jeton !== echNonce.json.jeton,
       'nouveau jeton different'
     );
     const echInconnu = await requete(
@@ -454,7 +495,7 @@ async function main() {
       'uid=inv_' + crypto.randomBytes(12).toString('hex')
     );
     assert.strictEqual(echInconnu.status, 401, 'echange refuse pour un uid inconnu du serveur');
-    ok.push('jeton invite: migration legacy puis striction');
+    ok.push('invite sans jeton refusee (correctif A) puis re-inscription par nonce');
 
     // 2. Premier message : prompt de personnalite + contexte temps reel
     const m1 = await envoyer("je m'appelle Theo");
@@ -1762,6 +1803,20 @@ async function main() {
     //     d'une cle neuve et on repasse par la validation admin.
     const invSav = await requete(PORT_APP, '/invite', 'POST', '');
     assert(invSav.json && invSav.json.ok, 'invite savoir: ok');
+    const uidSansEnregistrement = 'inv_' + crypto.randomBytes(12).toString('hex');
+    fs.mkdirSync(path.join(dataDir, 'users', uidSansEnregistrement), { recursive: true });
+    const savSansEnreg = await requete(
+      PORT_APP,
+      '/savoir',
+      'POST',
+      'cle=kangourou+de+test&reponse=il+saute+tres+haut',
+      { 'X-UID': uidSansEnregistrement }
+    );
+    assert.strictEqual(
+      savSansEnreg.status,
+      401,
+      'savoir refuse pour une invite sans enregistrement (correctif A): ' + savSansEnreg.status
+    );
     const hSav = { 'X-UID': invSav.json.uid, 'X-Jeton': invSav.json.jeton };
     const savSansAuth = await requete(
       PORT_APP,

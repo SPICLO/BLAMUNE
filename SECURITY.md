@@ -23,22 +23,23 @@ utilisateurs, déni de service par requête.
 
 ## Ce qui protège l'application
 
-| Mesure                                                   | Où                                                                 |
-| -------------------------------------------------------- | ------------------------------------------------------------------ |
-| Mots de passe en scrypt + sel aléatoire                  | `hashMdpScrypt`, migration automatique des anciens hachages sha256 |
-| **Aucun mot de passe dans le dépôt**                     | `ADMIN_MDP`, sinon génération aléatoire                            |
-| Verrouillage après 5 échecs de connexion (15 min)        | route `/login`                                                     |
-| Jeton secret par invite (256 bits, stocké **haché**)     | `lib/routes/compte.js`                                             |
-| Un uid d'invite seul ne suffit plus : le jeton est exigé | `extraireAuth`                                                     |
-| Limititation de débit par IP, par clé et par utilisateur | `lib/rate_limit.js`                                                |
-| Rôle admin par `ADMIN_PSEUDO` / `ADMIN_UID`              | `isAdminUid`                                                       |
-| En-têtes CSP, X-Frame-Options, HSTS                      | `server.js`, middleware                                            |
-| Extensions sensibles non servies + garde anti-traversée  | `lib/routes/statique.js`                                           |
-| Fichiers de configuration servis en 404                  | middleware                                                         |
-| Mutations protégées par validation d'origine             | `server.js` (`POST/PUT/PATCH/DELETE`)                              |
-| Conteneurs Docker sans privilège root                    | `Dockerfile` (`USER node`), `Dockerfile.bot` (`USER 10001`)        |
-| Secrets hors dépôt et hors image                         | `.gitignore`, `.dockerignore`, `local/.env.securise`               |
-| SSRF : redirections revalidées à chaque saut             | `lib/recherche_web.js` (`telecharger`)                             |
+| Mesure                                                                | Où                                                                 |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Mots de passe en scrypt + sel aléatoire                               | `hashMdpScrypt`, migration automatique des anciens hachages sha256 |
+| **Aucun mot de passe dans le dépôt**                                  | `ADMIN_MDP`, sinon génération aléatoire                            |
+| Verrouillage après 5 échecs de connexion (15 min)                     | route `/login`                                                     |
+| Jeton secret par invite (256 bits, stocké **haché**)                  | `lib/routes/compte.js`                                             |
+| Un uid d'invite seul ne suffit **jamais** : le jeton est exigé        | `extraireAuth`                                                     |
+| Re-inscription d'une invite : nonce de /invite (10 min, usage unique) | `lib/routes/compte.js`, `POST /invite/jeton`                       |
+| Limititation de débit par IP, par clé et par utilisateur              | `lib/rate_limit.js`                                                |
+| Rôle admin par `ADMIN_PSEUDO` / `ADMIN_UID`                           | `isAdminUid`                                                       |
+| En-têtes CSP, X-Frame-Options, HSTS                                   | `server.js`, middleware                                            |
+| Extensions sensibles non servies + garde anti-traversée               | `lib/routes/statique.js`                                           |
+| Fichiers de configuration servis en 404                               | middleware                                                         |
+| Mutations protégées par validation d'origine                          | `server.js` (`POST/PUT/PATCH/DELETE`)                              |
+| Conteneurs Docker sans privilège root                                 | `Dockerfile` (`USER node`), `Dockerfile.bot` (`USER 10001`)        |
+| Secrets hors dépôt et hors image                                      | `.gitignore`, `.dockerignore`, `local/.env.securise`               |
+| SSRF : redirections revalidées à chaque saut                          | `lib/recherche_web.js` (`telecharger`)                             |
 
 ## Points connus, à traiter avant une exposition publique
 
@@ -99,7 +100,36 @@ un serveur — l'appel WinINet réel n'est pas exécuté sous Linux. La
 destination d'un `bot.exe` tournant sous Windows reste un contrôle de
 dépôt + compilation locale, pas un test d'exécution.
 
-### 3. Rate limiting en mémoire — assumé
+### 3. ~~Re-inscription d'une invite sans jeton~~ — corrigé (2026-11-08)
+
+`extraireAuth` acceptait une invite **sans enregistrement de jeton** : c'était
+le chemin de « migration des vieilles invitations », où le seul uid ouvrait la
+conversation. Or `ecrireInvites()` **oublie les jetons inactifs depuis 30
+jours**. Une invite revenue après un mois perdait donc son jeton, gardait son
+dossier `users/<uid>/`, et reprenait la conversation **sans aucune preuve** —
+il suffisait de connaître l'uid. `POST /invite/jeton` rendait même un jeton
+neuf à tout uid dont le dossier existait désormais.
+
+Le correctif, appliqué sur trois étages :
+
+1. **`extraireAuth` refuse une invite sans enregistrement** (et les pierres
+   tombales). Plus de « mode legacy » : uid seul = 401, systématiquement.
+2. **`POST /invite` rend un `nonce`** (192 bits, 10 min, un seul usage, lié à
+   l'uid) à celui qui demande l'invitation. `POST /invite/jeton` n'accepte
+   plus qu'une preuve : le jeton actuel, ou ce nonce. Un uid deviné, ou
+   repris par un autre, n'en a pas.
+3. **La purge traite les dossiers orphelins** (invite sans enregistrement)
+   comme des invitations : ils meurent à 48 h au lieu de s'accumuler.
+
+Le site (`site/app.js`) conserve le nonce et l'échange contre un jeton au
+chargement ; un refus 401 sans jeton efface l'identité locale plutôt que
+d'afficher une application condamnée à un 401 par message.
+
+_Conséquence assumée_ : une invitation d'avant 2026-11-08 dont le jeton a
+été oublié **perd son accès** (les données restent). C'est le prix de la
+règle ; l'invité recrée une invitation ou un compte.
+
+### 4. Rate limiting en mémoire — assumé
 
 `lib/rate_limit.js` garde les compteurs en mémoire du processus. Sur
 Render à l'échelle gratuite, l'instance redémarre et les compteurs repartent

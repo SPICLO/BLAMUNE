@@ -456,32 +456,29 @@ function extraireAuth(req) {
   // amont de toutes les lectures et ecritures de dossier utilisateur.
   if (uid && !FORMAT_UID.test(uid)) return { uid: '', ego: '' };
   if (uid && !uid.startsWith('inv_') && !ego) return { uid: '', ego: '' };
-  // Jeton invite : un uid invite avec enregistrement n'est accepte QUE
-  // muni de son jeton (possession du uid ne suffit plus). Une invite
-  // PURGEE (lib/purge_invites.js) porte une pierre tombale { s } : elle
-  // est refusee pour toujours, jeton ou pas — sinon, privée de son
-  // enregistrement, le uid reprendrait le chemin "Pas d'enregistrement"
-  // des vieilles invitations et redeviendrait sans jeton.
+  // JETON INVITE (correctif A) : un uid invite n'est accepte que muni du
+  // jeton dont le serveur garde le SHA-256 (comparaison en temps constant).
+  // AUCUN enregistrement = jamais emis par /invite, ou jeton OUBLIE par la
+  // chasse des 30 jours d'ecrireInvites() : refus. L'ancien code laissait
+  // passer ce cas ("migration sans deconnexion") ; le dossier
+  // users/<uid>/ suffisait alors a reprendre la conversation avec le seul
+  // uid. La seule reprise permise passe par /invite/jeton et son nonce.
+  // Une invite PURGEE (lib/purge_invites.js) porte une pierre tombale { s } :
+  // lireJetonInvite la rend telle quelle, donc refusee aussi.
   if (uid && uid.startsWith('inv_')) {
-    const pierre = invitesJeton[uid];
-    if (pierre && pierre.s) return { uid: '', ego: '' };
     const enregistrement = lireJetonInvite(uid);
-    if (enregistrement) {
-      const jeton = req.headers['x-jeton'] || req.body?.jeton || req.query?.jeton || '';
-      if (!jeton || !egaleTimingSafe(hashJeton(jeton), enregistrement.h))
-        return { uid: '', ego: '' };
-    }
-    // Pas d'enregistrement : invite creee avant les jetons, on laisse passer
-    // (migration sans deconnexion ; le client l'echange au chargement).
+    if (!enregistrement || enregistrement.s) return { uid: '', ego: '' };
+    const jeton = req.headers['x-jeton'] || req.body?.jeton || req.query?.jeton || '';
+    if (!jeton || !egaleTimingSafe(hashJeton(jeton), enregistrement.h)) return { uid: '', ego: '' };
   }
   return { uid, ego };
 }
 
 // ==================== JETON INVITE ====================
 // Chaque invite recoit un jeton secret de 256 bits, conserve HACHE cote
-// serveur : le uid devient une simple identite. Une invite d'avant cette
-// fonction n'a aucun enregistrement : elle continue de marcher au uid seul,
-// puis le client l'echange contre un vrai jeton via POST /invite/jeton.
+// serveur : le uid devient une simple identite. Sans enregistrement
+// (correctif A), extraireAuth refuse l'invite : la reprise passe par
+// /invite/jeton et le nonce rendu par /invite.
 const FICHIER_INVITES = path.join(RACINE, 'invites.json');
 
 function chargerInvites() {
@@ -2467,7 +2464,6 @@ creerRoutesCompte(app, {
   hashJeton,
   connexionsActives,
   apiHistoriqueParUser,
-  usersDir: USERS_DIR,
   savoirDb,
   sansAccentsDB,
   savoirEnregistrer,

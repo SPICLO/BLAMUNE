@@ -122,6 +122,26 @@ test('deux candidates : purgent ensemble, un seul message de synthese', () => {
   assert.ok(messages[0].includes('2 invite(s)'), 'message : ' + messages[0]);
 });
 
+// Correctif A : la chasse des 30 jours de /invite peut oublier un jeton
+// encore valide ; le dossier reste, or plus aucun repli ne le reprend.
+// La purge le traite comme son invitation (elle meurt a 48 h).
+test('dossier orphelin (jeton oublie, aucun enregistrement) : purge a 48 h', () => {
+  const f = fabrique();
+  const orphelin = 'inv_' + 'e'.repeat(24);
+  f.vieux(orphelin, 3);
+  assert.deepStrictEqual(f.purge.ronde(), [orphelin]);
+  assert.ok(!fs.existsSync(path.join(f.usersDir, orphelin)), 'dossier efface');
+  assert.deepStrictEqual(f.tombstones, [orphelin], 'pierre tombale posee');
+});
+
+test('dossier orphelin FRAIS (moins de 48 h) : epargne, la re-inscription reste possible', () => {
+  const f = fabrique();
+  const orphelin = 'inv_' + 'd'.repeat(24);
+  f.vieux(orphelin, 1);
+  assert.deepStrictEqual(f.purge.ronde(), []);
+  assert.ok(fs.existsSync(path.join(f.usersDir, orphelin)));
+});
+
 test('uid non fabrique par le serveur dans users/ : non vise et sans casse', () => {
   const f = fabrique();
   f.vieux('inv_nope', 3); // 6 hex seulement : pas une invite legale

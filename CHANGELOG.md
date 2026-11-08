@@ -21,6 +21,30 @@
   `PRODUCT.md` et `.env.example`. Plan en trois semaines et méthode de
   vérification inclus.
 
+### Sécurité
+
+- **Fin du repli « invitation sans jeton »** (correctif A, audit en
+  profondeur). `extraireAuth` acceptait une invite dont le jeton n'avait
+  AUCUN enregistrement — le chemin de « migration des vieilles
+  invitations ». Or `ecrireInvites()` oublie les jetons inactifs depuis
+  30 jours : une invite revenue après un mois reprenait la conversation
+  avec le seul uid, dès lors que son dossier `users/<uid>/` existait.
+  `POST /invite/jeton` rendait même un jeton neuf à tout uid dont le
+  dossier existait. Trois corrections :
+  - `extraireAuth` refuse une invite sans enregistrement (uid seul = 401) ;
+  - `POST /invite` rend un **nonce** (192 bits, `INVITE_NONCE_MS` = 10 min,
+    usage unique, lié à l'uid) et `POST /invite/jeton` n'accepte plus que
+    le jeton actuel ou ce nonce (nouvel en-tête `X-Invite-Nonce`) ;
+  - `lib/purge_invites.js` purge les **dossiers orphelins** (invite sans
+    enregistrement) comme des invitations : 48 h, pas l'éternité.
+    Le site garde le nonce et l'échange au chargement ; un 401 sans jeton
+    efface l'identité locale au lieu d'une app condamnée à un 401 par
+    message. Détail et conséquence assumée : `SECURITY.md`, point 3.
+    Tests : `tests/invite_nonce.test.js` (3 cas), 2 nouveaux cas de purge,
+    et le bloc 1ter de `tests/run.js` (uid sans preuve refusé même avec un
+    dossier, nonce d'un autre uid refusé, nonce rejoué refusé, rotation
+    avec le jeton).
+
 ### Nouveau
 
 - **Savoir : un invité propose, l'admin dispose** (phase 3, P3-5, décision 1).

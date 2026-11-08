@@ -87,7 +87,10 @@ var AUTH_CLES = {
   ego: 'blamune_ego',
   pseudo: 'blamune_pseudo_auth',
   userId: 'blamune_userId',
-  jeton: 'blamune_invite_jeton'
+  jeton: 'blamune_invite_jeton',
+  // Recette rendue par /invite (correctif A) : le seul moyen de retrouver
+  // un jeton si le navigateur l'a perdu. Elle expire en 10 min cote serveur.
+  nonce: 'blamune_invite_nonce'
 };
 
 function getAuthEgo() {
@@ -109,12 +112,14 @@ function setAuthInfo(ego, pseudo, uid) {
   localStorage.setItem(AUTH_CLES.userId, uid);
   // Un compte classique n'a pas besoin du jeton invite.
   localStorage.removeItem(AUTH_CLES.jeton);
+  localStorage.removeItem(AUTH_CLES.nonce);
 }
 function clearAuth() {
   localStorage.removeItem(AUTH_CLES.ego);
   localStorage.removeItem(AUTH_CLES.pseudo);
   localStorage.removeItem(AUTH_CLES.userId);
   localStorage.removeItem(AUTH_CLES.jeton);
+  localStorage.removeItem(AUTH_CLES.nonce);
 }
 function estAuth() {
   return !!getAuthEgo();
@@ -175,28 +180,45 @@ function envoyerAvis(avis, msg, reponse) {
   }).catch(function () {});
 }
 
-// Migration des invites creees avant les jetons : elles n'ont que leur uid.
-// Une fois par chargement, on l'envoie au serveur qui rend un jeton ; a partir
-// de la, le uid seul n'est plus accepte. Echec silencieux (hors ligne) :
-// on continue en mode legacy, le serveur accepte encore le uid sans record.
+// Retrouver un jeton d'invite (correctif A). Sans jeton, le serveur REFUSE
+// l'invite : plus de "mode legacy" ou le uid seul ouvrait la conversation.
+// Deux preuves acceptees (voir POST /invite/jeton) : le jeton encore valide,
+// ou le nonce remis par /invite a CELUI qui a demande l'invitation. Le
+// nonce vaut 10 min et un seul usage : le recuperer a la demande, jamais
+// un secret long — c'est ce qui fait la difference avec un jeton..
 async function migrerJetonInvite() {
   var uid = getAuthUserId();
-  if (!uid || uid.indexOf('inv_') !== 0 || getAuthJeton()) return;
+  if (!uid || uid.indexOf('inv_') !== 0) return;
+  var nonce = localStorage.getItem(AUTH_CLES.nonce) || '';
+  // Jeton present et nonce absent : rien a reprendre, on ne fait pas d'appel.
+  if (getAuthJeton() && !nonce) return;
   try {
     var ctrl = new AbortController();
     var minuteur = setTimeout(function () {
       ctrl.abort();
     }, 8000);
+    var entetes = { 'Content-Type': 'application/x-www-form-urlencoded', 'X-UID': uid };
+    if (nonce) entetes['X-Invite-Nonce'] = nonce;
+    if (getAuthJeton()) entetes['X-Jeton'] = getAuthJeton();
     var r = await fetch('/invite/jeton', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-UID': uid },
-      body: 'uid=' + encodeURIComponent(uid),
+      headers: entetes,
+      body: 'uid=' + encodeURIComponent(uid) + (nonce ? '&nonce=' + encodeURIComponent(nonce) : ''),
       signal: ctrl.signal
     });
     clearTimeout(minuteur);
-    if (!r.ok) return;
+    if (!r.ok) {
+      // Jeton et nonce refuses : l'invite est perdue (expiree, purgee, ou
+      // nonce use). On repart honnete plutot que d'afficher une app
+      // condamnee a un 401 par message.
+      if (r.status === 401 && !getAuthJeton()) clearAuth();
+      return;
+    }
     var j = await r.json();
-    if (j && j.ok && j.jeton) localStorage.setItem(AUTH_CLES.jeton, j.jeton);
+    if (j && j.ok && j.jeton) {
+      localStorage.setItem(AUTH_CLES.jeton, j.jeton);
+      localStorage.removeItem(AUTH_CLES.nonce); // usage unique
+    }
   } catch (e) {}
 }
 
@@ -493,6 +515,10 @@ async function authInvite() {
       localStorage.removeItem(AUTH_CLES.pseudo);
       localStorage.setItem(AUTH_CLES.userId, j.uid);
       if (j.jeton) localStorage.setItem(AUTH_CLES.jeton, j.jeton);
+      // Recette de reprise (correctif A) : sans elle, un jeton perdu
+      // condamne l'invitation. Elle expire en 10 min, usage unique.
+      if (j.nonce) localStorage.setItem(AUTH_CLES.nonce, j.nonce);
+      else localStorage.removeItem(AUTH_CLES.nonce);
       jouerTransitionConnexion('Mode invite active !');
     } else if (j) {
       // Serveur vivant mais refuse : pas de faux "Mode invite actif !".
@@ -2557,8 +2583,9 @@ window.addEventListener('load', async function () {
   // Theme DES LA PREMIERE SECONDE : l'ecran de connexion aussi est colore,
   // et on ne re-render pas au brusque passage sombre->clair au login.
   appliquerTheme(localStorage.getItem('blamune_theme') || 'sombre');
-  // Avant la premiere requete : l'invite legacy echange son uid contre un
-  // jeton, pour ne pas se faire refuser des la seconde appelee.
+  // Avant la premiere requete : une invitation sans jeton tente de le
+  // retrouver (nonce de /invite), sinon elle sera refusee — plus de
+  // "mode legacy" (correctif A).
   try {
     await migrerJetonInvite();
   } catch (e) {}
