@@ -1,0 +1,63 @@
+﻿<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#eef2f9" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1020" />
+    <meta name="robots" content="index, follow" />
+    <title>Journal du bot - BLAMUNE</title>
+    <meta
+      name="description"
+      content="Les bonnes surprises du jour : ce que BLAMUNE a appris cette semaine, en chiffres seulement."
+    />
+    <!-- Open Graph / Twitter : la page est pensee pour circuler, le partage
+         doit rendre une carte complete (titre, description, image perle). -->
+    <meta property="og:title" content="Journal du bot - BLAMUNE" />
+    <meta
+      property="og:description"
+      content="Les bonnes surprises du jour : ce que BLAMUNE a appris cette semaine, en chiffres seulement."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://blamune.onrender.com/journal.html" />
+    <meta property="og:image" content="https://blamune.onrender.com/logo.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Journal du bot - BLAMUNE" />
+    <meta
+      name="twitter:description"
+      content="Les bonnes surprises du jour : ce que BLAMUNE a appris cette semaine, en chiffres seulement."
+    />
+    <meta name="twitter:image" content="https://blamune.onrender.com/logo.png" />
+    <link rel="icon" href="favicon.ico?v=16" sizes="any" />
+    <link rel="stylesheet" href="style.css?v=16" />
+    <link rel="stylesheet" href="journal.css?v=17" />
+  </head>
+  <body>
+    <main class="journal-boite">
+      <div class="journal-tete">
+        <img src="logo-repos.svg?v=16" alt="BLAMUNE" />
+        <div>
+          <h1 data-i18n="Journal du bot">Journal du bot</h1>
+          <p id="journal-date"></p>
+        </div>
+      </div>
+      <div class="journal-grille" id="journal-grille" aria-live="polite">
+        <div class="journal-carte"><b>…</b><span></span></div>
+      </div>
+      <noscript>
+        <p class="journal-note">JavaScript est requis pour lire le journal du bot.</p>
+      </noscript>
+      <p class="journal-note" data-i18n="JournalNote">
+        Des nombres seulement : ce que des visiteurs confient au bot reste privé. Ici, on célèbre le
+        volume de ce qu'il apprend, jamais le contenu.
+      </p>
+      <a class="journal-retour" href="/" data-i18n="← Discuter avec BLAMUNE"
+        >← Discuter avec BLAMUNE</a
+      >
+    </main>
+    <!-- I18N du site reutilise : le choix de langue persiste (localStorage),
+         la detection navigateur et le RTL arabe sont geres par langues.js. -->
+    <script defer src="langues.js"></script>
+    <script defer src="journal.js?v=17"></script>
+  </body>
+</html>

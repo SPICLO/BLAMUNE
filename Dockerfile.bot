@@ -42,10 +42,17 @@ COPY personnalite.txt /app/personnalite.txt
 COPY vocabulaire.txt /app/vocabulaire.txt
 COPY vocabulaire_partage.txt /app/vocabulaire_partage.txt
 
-# Repertoire des donnees apprises (monte en volume).
-RUN mkdir -p /app/users
+# Repertoire des donnees apprises (monte en volume) et ownership de l'image.
+# UID/GID numeriques : pas besoin d'un utilisateur dans /etc/passwd, et le
+# volume nomme bot_data:/app est initialise avec cet ownership.
+RUN mkdir -p /app/users \
+ && chown -R 10001:10001 /app
 
 EXPOSE 8090
+
+# Jamais root : le service ecrit uniquement dans /app (volume) et lit
+# /savoir en lecture seule.
+USER 10001:10001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD python3 -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8090/health',timeout=4)" || exit 1

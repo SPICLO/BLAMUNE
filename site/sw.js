@@ -1,11 +1,15 @@
 // BLAMUNE Service Worker - offline cache + notifications push
-const CACHE = 'blamune-v16';
+const CACHE = 'blamune-v17';
 const ASSETS = [
   '/',
   '/index.html',
   '/style.css',
   '/app.js',
   '/ia-secours.js',
+  '/langues.js',
+  '/journal.html',
+  '/journal.css',
+  '/journal.js',
   '/manifest.json',
   '/logo.png'
 ];
@@ -33,6 +37,9 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== self.location.origin) return;
   // Ne pas cacher les requetes API ni les appels dynamiques
   if (
+    // /journal est une API JSON ; /journal.html, /journal.css et
+    // /journal.js restent des assets cachables.
+    url.pathname === '/journal' ||
     url.pathname.startsWith('/send') ||
     url.pathname.startsWith('/historique') ||
     url.pathname.startsWith('/mode') ||

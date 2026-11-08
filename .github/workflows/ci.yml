@@ -47,6 +47,11 @@ jobs:
       - name: Format prettier
         run: npm run format:check
 
+      # Le fichier .env.securise ne doit jamais entrer dans git ni dans
+      # l'image : le scanner echoue si une vraie cle est suivie.
+      - name: Verifier qu'aucun secret n'est committe
+        run: python scripts/verifier_secrets.py
+
       - name: Tests unitaires
         run: npm run test:unit
 

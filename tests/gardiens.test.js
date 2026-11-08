@@ -172,7 +172,14 @@ test('tension : eco PREEMPTIF s arme sur la pression locale (sans attendre un 42
   await attendre(20);
   assert.ok(concurrence.etat().file >= 30, 'file surchargee en place');
   assert.strictEqual(tension.enTension(), true, 'eco PREEMPTIF sur file chargee');
-  assert.strictEqual(tension.etat().preemptif, true, 'preemptif visible pour /admin');
+  // P3-3 : l'eco est LISIBLE comme eco (pas seulement `preemptif`), avec
+  // sa cause et son heure d'entree — c'est ce que le client affiche.
+  const etatPre = tension.etat();
+  assert.strictEqual(etatPre.preemptif, true, 'preemptif visible pour /admin');
+  assert.strictEqual(etatPre.eco, true, 'le preemptif compte comme eco');
+  assert.strictEqual(etatPre.cause, 'file', 'cause lue : la file');
+  assert.ok(etatPre.ecoDepuis > 0, 'heure d entree datable');
+  assert.strictEqual(etatPre.entrees.file, 1, 'une entree eco par cause');
   // Debordement seul (etait le 2e signal) : fenetre des debords.
   assert.strictEqual(concurrence.etat().debordementsFenetre, 0, 'aucun debordement encore');
   // Retour au calme : la file se vide, le sejour PREEMPTIF tient 90 s
@@ -243,6 +250,50 @@ test('cache reponses : hit sans modele, non-cacheables exclus, reponse nommee ja
   assert.strictEqual(cache.retenir(k1, ''), false, 'vide : pas de cache');
   cache.reinitialiser();
   assert.strictEqual(cache.etat().entrees, 0, 'zero apres remise a zero');
+});
+
+// P3-2 : le niveau STABLE (question sans contexte) doit servir une
+// conversation NEUVE — c'est exactement le cas que le cache contextuel
+// ratait toujours (cle videe par `avant`).
+test('cache stable : une conversation neuve est servie sans modele (P3-2)', () => {
+  cache.reinitialiser();
+  assert.strictEqual(cache.estStable('Bonjour !'), true, 'salutation reconnue');
+  assert.strictEqual(cache.estStable('ça va ?'), true, 'accent et ponctuation ignores');
+  assert.strictEqual(
+    cache.estStable('c est quoi ton nom ?'),
+    true,
+    'identite : question sans contexte'
+  );
+  assert.strictEqual(cache.estStable('et toi ?'), false, 'question contextuelle exclue');
+  assert.strictEqual(cache.estStable('bonjour, tu as vu le match ?'), false, 'texte libre exclu');
+  // Deux conversations neuves : aucune phrase precedente du bot.
+  const a = cache.cle('2', 'Bonjour', {});
+  const b = cache.cle('2', 'bonjour !', {});
+  assert.ok(a && a === b, 'meme cle stable pour deux variantes');
+  // Meme question APRES un message du bot : c'est le niveau contextuel,
+  // jamais le stable (et inversement : une cle ne change pas de famille).
+  const contextuel = cache.cle('2', 'Bonjour', { avant: 'Tu veux une blague ?' });
+  assert.ok(contextuel && contextuel !== a, 'en milieu de fil : autre cle');
+  assert.ok(cache.retenir(a, 'Salut ! Bon retour parmi nous.'), 'retenu');
+  assert.ok(cache.retenir(contextuel, 'Salut ! Tu voulais une blague ?'), 'retenu aussi');
+  assert.strictEqual(cache.repondre(b), 'Salut ! Bon retour parmi nous.', 'hit stable');
+  assert.strictEqual(
+    cache.repondre(contextuel),
+    'Salut ! Tu voulais une blague ?',
+    'hit contextuel'
+  );
+  const e = cache.etat();
+  assert.strictEqual(e.coupsStable, 1, 'un coup stable');
+  assert.strictEqual(e.coupsContextuel, 1, 'un coup contextuel');
+  // Verdict (decision du proprietaire) : utile des le premier coup ;
+  // jamais "aSupprimer" avant la fin de la fenetre de 14 jours.
+  assert.strictEqual(e.observation.verdict, 'utile');
+  cache.reinitialiser();
+  assert.strictEqual(
+    cache.etat().observation.verdict,
+    'indetermine',
+    'zero coup : fenetre en cours'
+  );
 });
 
 test('tension : les notes vieillissent (fenetre 5 min), du jour re-arme', async () => {
@@ -431,4 +482,57 @@ test('cache recherche : echecs non caches, TTL a zero desactive', async () => {
   } finally {
     arreter2();
   }
+});
+
+// ============================ TENSION : JOURNAL ============================
+// Phase 3, P3-3 : l'eco ne s'arme plus en silence. Une ligne a l'ENTREE,
+// une a la SORTIE, jamais une par message.
+
+function capturerJournal() {
+  const lignes = [];
+  tension.configurerJournal((m) => lignes.push(m));
+  return lignes;
+}
+
+test('tension : le journal ecrit UNE entree et UNE sortie, pas plus', () => {
+  concurrence.reinitialiser();
+  tension.reinitialiser();
+  const t0 = 1700000000000;
+  tension.noter(t0);
+  tension.noter(t0 + 1);
+  tension.noter(t0 + 2);
+  const lignes = capturerJournal();
+  // 3 429 dans la fenetre : une seule transition (entree).
+  assert.strictEqual(tension.enTension(t0 + 10), true);
+  assert.strictEqual(tension.enTension(t0 + 20), true, 'toujours en eco');
+  assert.strictEqual(
+    lignes.filter((l) => l.indexOf('eco active') === 0).length,
+    1,
+    'une seule entree journalisee : ' + JSON.stringify(lignes)
+  );
+  // La fenetre se vide et le sejour passe : sortie, une seule fois.
+  assert.strictEqual(
+    tension.enTension(t0 + 5 * 60 * 1000 + 10 * 60 * 1000 + 100000),
+    false,
+    'eco levable apres sejour et fenetre vide'
+  );
+  assert.strictEqual(tension.enTension(t0 + 5 * 60 * 1000 + 10 * 60 * 1000 + 200000), false);
+  assert.strictEqual(
+    lignes.filter((l) => l.indexOf('eco levee') === 0).length,
+    1,
+    'une seule sortie journalisee'
+  );
+  tension.configurerJournal(null);
+});
+
+test('tension : etat() expose la cause et les entrees par cause, sans journaliser', () => {
+  tension.reinitialiser();
+  concurrence.reinitialiser();
+  concurrence.configurer({ max: 1, attenteMs: 40 });
+  tension.configurerJournal(() => {});
+  tension.enTension();
+  assert.ok(tension.etat().entrees && typeof tension.etat().entrees === 'object');
+  tension.configurerJournal(null);
+  concurrence.reinitialiser();
+  tension.reinitialiser();
 });

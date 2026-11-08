@@ -35,6 +35,10 @@ utilisateurs, déni de service par requête.
 | En-têtes CSP, X-Frame-Options, HSTS                      | `server.js`, middleware                                            |
 | Extensions sensibles non servies + garde anti-traversée  | `lib/routes/statique.js`                                           |
 | Fichiers de configuration servis en 404                  | middleware                                                         |
+| Mutations protégées par validation d'origine             | `server.js` (`POST/PUT/PATCH/DELETE`)                              |
+| Conteneurs Docker sans privilège root                    | `Dockerfile` (`USER node`), `Dockerfile.bot` (`USER 10001`)        |
+| Secrets hors dépôt et hors image                         | `.gitignore`, `.dockerignore`, `local/.env.securise`               |
+| SSRF : redirections revalidées à chaque saut             | `lib/recherche_web.js` (`telecharger`)                             |
 
 ## Points connus, à traiter avant une exposition publique
 

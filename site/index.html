@@ -65,8 +65,11 @@
     <div id="ecranAuth">
       <div class="auth-box">
         <div class="auth-avatar"><img src="logo-repos.svg" alt="BLAMUNE" /></div>
-        <h2>Bienvenue sur BLAMUNE</h2>
-        <p class="auth-sous">
+        <h2 data-i18n="Bienvenue sur BLAMUNE">Bienvenue sur BLAMUNE</h2>
+        <p
+          class="auth-sous"
+          data-i18n="Connecte-toi pour garder ton historique et personnaliser ton experience."
+        >
           Connecte-toi pour garder ton historique et personnaliser ton experience.
         </p>
 
@@ -77,6 +80,7 @@
                 id="authEmail"
                 type="email"
                 placeholder="Ton email"
+                data-i18n-ph="Ton email"
                 autocomplete="email"
                 maxlength="100"
                 aria-label="Ton email"
@@ -87,24 +91,29 @@
                 id="authMdp"
                 type="password"
                 placeholder="Mot de passe"
+                data-i18n-ph="Mot de passe"
                 autocomplete="current-password"
                 maxlength="100"
                 aria-label="Mot de passe"
               />
             </div>
-            <button id="btnLogin" class="auth-btn" type="button">Se connecter</button>
+            <button id="btnLogin" class="auth-btn" type="button" data-i18n="Se connecter">
+              Se connecter
+            </button>
             <p class="auth-err" id="authErrLogin"></p>
             <p class="auth-switch">
-              Pas encore de compte ? <a href="#" id="authShowRegister">Creer un compte</a>
+              <span data-i18n="Pas encore de compte ?">Pas encore de compte ?</span>
+              <a href="#" id="authShowRegister" data-i18n="Creer un compte">Creer un compte</a>
             </p>
           </div>
 
-          <div id="authFormRegister" class="auth-form" style="display: none">
+          <div id="authFormRegister" class="auth-form cache">
             <div class="champ">
               <input
                 id="authPseudoReg"
                 type="text"
                 placeholder="Choisis un pseudo"
+                data-i18n-ph="Choisis un pseudo"
                 autocomplete="username"
                 maxlength="30"
                 aria-label="Choisis un pseudo"
@@ -115,6 +124,7 @@
                 id="authEmailReg"
                 type="email"
                 placeholder="Ton email"
+                data-i18n-ph="Ton email"
                 autocomplete="email"
                 maxlength="100"
                 aria-label="Ton email"
@@ -124,24 +134,43 @@
               <input
                 id="authMdpReg"
                 type="password"
-                placeholder="Choisis un mot de passe"
+                placeholder="Mot de passe"
+                data-i18n-ph="Choisis un mot de passe"
                 autocomplete="new-password"
                 maxlength="100"
                 aria-label="Choisis un mot de passe"
               />
             </div>
-            <button id="btnRegister" class="auth-btn" type="button">Creer mon compte</button>
+            <button id="btnRegister" class="auth-btn" type="button" data-i18n="Creer mon compte">
+              Creer mon compte
+            </button>
             <p class="auth-err" id="authErrRegister"></p>
             <p class="auth-switch">
-              Deja un compte ? <a href="#" id="authShowLogin">Se connecter</a>
+              <span data-i18n="Deja un compte ?">Deja un compte ?</span>
+              <a href="#" id="authShowLogin" data-i18n="Se connecter">Se connecter</a>
             </p>
           </div>
 
-          <div class="auth-sep"><span>ou</span></div>
-          <button id="btnInvite" class="auth-btn auth-invite" type="button">
+          <div class="auth-sep"><span data-i18n="ou">ou</span></div>
+          <button
+            id="btnInvite"
+            class="auth-btn auth-invite"
+            type="button"
+            data-i18n="Continuer en tant qu'invite"
+          >
             Continuer en tant qu'invite
           </button>
-          <p class="auth-note">L'invite ne sauvegarde pas tes messages.</p>
+          <p class="auth-note" data-i18n="L'invite ne sauvegarde pas tes messages.">
+            L'invite ne sauvegarde pas tes messages.
+          </p>
+          <p class="auth-note">
+            <select id="choixLangue" aria-label="Langue">
+              <option value="fr">Français</option>
+              <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="ar">العربية</option>
+            </select>
+          </p>
         </div>
 
         <div id="authSuccess" class="auth-success" aria-live="polite">
@@ -167,29 +196,16 @@
             <h1>BLAMUNE</h1>
             <div class="statut" id="statut">
               <span class="point" id="pointStatut"></span>
-              <span id="texteStatut">Connexion...</span>
+              <span id="texteStatut" data-i18n="Connexion...">Connexion...</span>
             </div>
             <!-- Etat interieur visible (sprint E) : humeur de BLAMUNE et ce
                  qu'elle a note de toi — alimente par /stats-perso, disparaît
                  quand il n'y a rien a dire. -->
-            <div
-              id="etatIA"
-              aria-live="polite"
-              style="
-                display: none;
-                color: var(--texte-doux);
-                font-size: 11px;
-                line-height: 14px;
-                max-width: 260px;
-              "
-            ></div>
+            <div id="etatIA" class="etat-ia" aria-live="polite"></div>
           </div>
         </div>
         <div id="boutons">
-          <span
-            id="noteInvite"
-            style="display: none; color: var(--texte-doux); font-size: 11px; margin-right: 8px"
-            aria-hidden="true"
+          <span id="noteInvite" class="note-invite" aria-hidden="true" data-i18n="Mode invite"
             >Mode invite</span
           >
           <div class="segmente" role="group" aria-label="Mode de l'IA">
@@ -219,19 +235,29 @@
                plus sur un ecran de 360px. -->
           <div id="menuMobile" class="menu-mobile">
             <button
+              id="btnProfil"
+              class="btn-petit"
+              title="Voir ce que BLAMUNE enregistre sur toi (et l'oublier)"
+              data-i18n-title="Voir ce que BLAMUNE enregistre sur toi (et l'oublier)"
+              type="button"
+            >
+              Mon profil
+            </button>
+            <button
               id="btnRechercher"
               class="btn-petit"
               title="Rechercher dans l'historique"
+              data-i18n-title="Rechercher dans l'historique"
               type="button"
             >
               Rechercher
             </button>
             <button
               id="btnNotifications"
-              class="btn-petit"
+              class="btn-petit cache"
               title="Recevoir les messages de BLAMUNE hors du site"
+              data-i18n-title="Recevoir les messages de BLAMUNE hors du site"
               type="button"
-              style="display: none"
             >
               Notifications
             </button>
@@ -239,19 +265,36 @@
               id="btnExport"
               class="btn-petit"
               title="Exporter l'historique (fichier texte, il reste chez toi)"
+              data-i18n-title="Exporter l'historique (fichier texte, il reste chez toi)"
               type="button"
             >
               Export
             </button>
-            <button id="btnTheme" class="btn-petit" title="Passer en mode clair" type="button">
+            <button
+              id="btnJournal"
+              class="btn-petit"
+              title="Voir le journal public du bot (ce qu'il apprend, en chiffres)"
+              data-i18n-title="Voir le journal public du bot (ce qu'il apprend, en chiffres)"
+              data-i18n="Journal"
+              type="button"
+            >
+              Journal
+            </button>
+            <button
+              id="btnTheme"
+              class="btn-petit"
+              title="Passer en mode clair"
+              data-i18n-title="Passer en mode clair"
+              type="button"
+            >
               Clair
             </button>
             <button
               id="btnDeconnexion"
-              class="btn-petit"
+              class="btn-petit cache"
               title="Deconnexion"
+              data-i18n-title="Deconnexion"
               type="button"
-              style="display: none"
             >
               Deconnexion
             </button>
@@ -273,43 +316,54 @@
         </div>
       </header>
 
+      <!-- PROFIL (Mon profil) : ce que BLAMUNE a retenu de toi. Panneau
+           repliable, comme la recherche : lecture par /profil (GET),
+           correction champ par champ (POST), oubli total (DELETE). -->
+      <div id="zoneProfil" class="zone-repliable">
+        <div class="profil-boite">
+          <div class="profil-tete">
+            <strong data-i18n="Ce que BLAMUNE sait de toi">Ce que BLAMUNE sait de toi</strong>
+            <button id="btnFermerProfil" class="btn-petit" type="button" data-i18n="Fermer">
+              Fermer
+            </button>
+          </div>
+          <div id="listeProfil" class="profil-liste">
+            <p class="profil-note" data-i18n="Charger le profil...">Charger le profil...</p>
+          </div>
+          <div class="profil-pied">
+            <button id="btnProfilSauver" class="btn-petit" type="button" data-i18n="Enregistrer">
+              Enregistrer
+            </button>
+            <button
+              id="btnProfilOublier"
+              class="btn-petit profil-oublier"
+              type="button"
+              data-i18n="Tout oublier"
+            >
+              Tout oublier
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Recherche dans l'historique (sprint E) : panneau repliable, la
            recherche fouille toute l'archive cote serveur (?q=), pas
            seulement les dernieres bulles affichees. -->
-      <div id="zoneRecherche" style="display: none; align-items: stretch">
+      <div id="zoneRecherche" class="zone-repliable">
         <input
           id="champRecherche"
           type="search"
           placeholder="Retrouver une phrase de ton historique..."
+          data-i18n-ph="Retrouver une phrase de ton historique..."
           autocomplete="off"
-          style="
-            flex: 1;
-            background: var(--surface);
-            border: 1px solid var(--bordure);
-            border-radius: 8px;
-            color: var(--texte);
-            padding: 7px 10px;
-            font-size: 13px;
-          "
+          class="champ-recherche"
         />
-        <span
-          id="noteRecherche"
-          aria-live="polite"
-          style="color: var(--texte-doux); font-size: 11px; align-self: center"
-        ></span>
+        <span id="noteRecherche" class="note-recherche" aria-live="polite"></span>
         <button
           id="btnFermerRecherche"
+          class="btn-fermer-recherche"
           title="Revenir au fil de la conversation"
           type="button"
-          style="
-            background: var(--surface);
-            border: 1px solid var(--bordure);
-            border-radius: 8px;
-            color: var(--texte-doux);
-            padding: 4px 10px;
-            font-size: 12px;
-            cursor: pointer;
-          "
         >
           Fermer
         </button>
@@ -317,14 +371,12 @@
 
       <main id="chat" aria-live="polite" aria-label="Conversation">
         <noscript
-          ><p style="text-align: center; padding: 40px; color: #9fb3c8">
-            JavaScript est requis pour utiliser BLAMUNE.
-          </p></noscript
+          ><p class="msg-noscript">JavaScript est requis pour utiliser BLAMUNE.</p></noscript
         >
       </main>
 
       <footer id="barre">
-        <div id="apercuPhoto" class="apercu-photo" style="display: none" aria-live="polite">
+        <div id="apercuPhoto" class="apercu-photo cache" aria-live="polite">
           <img id="apercuPhotoImg" alt="Photo choisie" />
           <span id="apercuPhotoNom" class="apercu-photo-nom"></span>
           <button
@@ -332,6 +384,7 @@
             class="apercu-photo-x"
             type="button"
             title="Retirer la photo"
+            data-i18n-title="Retirer la photo"
             aria-label="Retirer la photo"
           >
             &times;
@@ -341,6 +394,7 @@
           id="zone"
           type="text"
           placeholder="Écris un message..."
+          data-i18n-ph="Écris un message..."
           autocomplete="off"
           autocapitalize="sentences"
           spellcheck="false"
@@ -352,7 +406,7 @@
           id="fichierImage"
           type="file"
           accept="image/*"
-          style="display: none"
+          class="cache"
           aria-hidden="true"
           tabindex="-1"
         />
@@ -389,6 +443,7 @@
       </footer>
     </div>
 
+    <script defer src="langues.js"></script>
     <script defer src="ia-secours.js"></script>
     <script defer src="app.js"></script>
   </body>

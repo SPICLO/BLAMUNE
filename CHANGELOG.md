@@ -1,5 +1,73 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-08 (audit approfondi, phase 3 : usage réel et robustesse)
+
+### Documentation
+
+- **Phase 3 de l'analyse en profondeur écrite** :
+  `docs/superpowers/plans/2026-11-08-audit-phase-3-usage-et-robustesse.md`.
+  Huit constats vérifiés dans le code et classés par gravité, chacun avec un
+  coût chiffré et une décision à trancher : (1) `sauvegarderEtat` réécrit
+  `etat_blamune.json` en synchrone à chaque message, sans aucun compteur
+  d'I/O ; (2) le cache de réponses dépend du message précédent du bot et
+  rate beaucoup plus qu'il ne sert, contrairement à ce que le README suppose ;
+  (3) le mode éco peut rester armé 90 s pour trois débordements et rendre la
+  recherche web muette sans qu'aucun log ne le dise ; (4) les embeddings
+  recalculés au démarrage ne sont pas sauvegardés et ne se voient pas dans
+  `/health` ; (5) `/savoir` accepte un fait d'un invité authentifié sans
+  borne de longueur ni limite par uid ; (6) `/admin/avis` n'a pas de boucle
+  fermée vers `/admin/savoir` ; (7) aucun compteur d'usage réel (uid uniques,
+  rétention, réussite par fournisseur) ; (8) la doc Qdrant se contredit entre
+  `PRODUCT.md` et `.env.example`. Plan en trois semaines et méthode de
+  vérification inclus.
+
+### Nouveau
+
+- **Savoir : un invité propose, l'admin dispose** (phase 3, P3-5, décision 1).
+  `POST /savoir` depuis un `inv_…` répond **201 `{enAttente: true}`** : le fait
+  est accepté, mais il ne répond à personne tant qu'un admin ne l'a pas
+  validé. Un compte réel (`u…`) ou l'admin écrit directement (c'est le
+  propriétaire et ses proches). Concrètement : colonne `valide` dans `savoir`
+  (défaut 1, migration des 1 266 faits existants sans réimport), export
+  `savoir.txt`, Map de secours et index Qdrant filtrés sur `valide = 1`,
+  nouvelle route `POST /admin/savoir/valider`, `enAttente` exposé par
+  `/admin/savoir`, bloc « Fait proposé à valider » dans le panneau admin
+  (Valider / Supprimer). Une correction proposée sur un fait déjà validé
+  n'est pas servie — mais elle ne fait pas taire l'ancienne réponse.
+  Tests : `tests/savoir_validation.test.js` (5 cas) + bloc 23 de
+  `tests/run.js`.
+- **Cache de réponses à deux niveaux, mesurés séparément** (phase 3, P3-2).
+  Le cache contextuel (question + dernier message du bot) ne servait jamais
+  une conversation neuve. D'où un niveau **stable** pour les questions sans
+  contexte (« bonjour », « présente-toi », « c'est quoi ton nom »), TTL court
+  (`CACHE_STABLE_MS`, 15 min). Coups comptés séparément (`coupsStable` /
+  `coupsContextuel`) et verdict automatique dans `/admin` : `utile`, ou
+  `A SUPPRIMER (0 coup en 14 jours)` — décision du propriétaire : si le
+  niveau stable ne sert personne, il se retire.
+- **Mode éco enfin lisible** (phase 3, P3-3). `tension.etat()` publie
+  `eco: true` pour l'éco **préemptif** aussi (avant : `entrees` montait sans
+  que `eco` passe à vrai), avec sa cause et l'heure d'entrée ; les compteurs
+  par cause montent même sans logger (ils restaient à zéro hors du serveur) ;
+  `/admin` affiche `Entrees eco depuis le demarrage : 429= / debordements= /
+file=`. `PREEMPT_DEB` reste à 3 le temps d'une semaine d'observation, le
+  tradeoff est documenté dans `.env.example`.
+
+### Correction
+
+- **`RATE_FENETRE_MS` documentée** : la fenêtre glissante des quotas
+  (`lib/rate_limit.js`) était lue depuis l'environnement sans figurer dans
+  `.env.example` — le test qui vérifie la documentation des variables
+  échouait (164/165). Défaut inchangé : 60 000 ms.
+
+### Maintenance
+
+- **eslint** : directive `no-control-regex` inutile retirée de
+  `lib/routes/compte.js` (règle non activée dans `eslint.config.mjs`) —
+  `npm run lint` repasse à 0 erreur / 0 avertissement.
+- **eslint** : `exports`, `__filename` et `queueMicrotask` déclarés comme
+  globales Node (absence qui aurait fait échouer un `no-undef` au premier
+  `module.exports` oublié dans un fichier CommonJS).
+
 Le format s'inspire de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Ce journal démarre avec la mise à niveau « hygiène du dépôt » ci-dessous ; les
 versions antérieures sont visibles dans `git log`.

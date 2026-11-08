@@ -166,7 +166,16 @@ Le bot Windows local pousse ses connaissances vers `/savoir` (route
 - Ollama est lié sur `127.0.0.1` : il **n'est jamais public**.
 - Seul `server.js` est exposé sur le port `8080`.
 - Le bot (`8090`) n'est joignable que depuis le réseau Docker interne.
+- Les deux conteneurs tournent en **utilisateur non-root** (`node` pour le
+  serveur, UID `10001` pour le bot) : un processus compromis ne peut pas
+  écrire hors de `/app` et de `/savoir`.
+- Les secrets (`.env.securise`, clés VAPID, JSONBin) vivent dans `local/`,
+  ignoré par git et exclu du contexte Docker. Ne les remontez jamais à la
+  racine du dépôt.
 - Si tu mets un reverse proxy devant `server.js`, ajoute HTTPS.
+- Les mutations (`POST/PUT/PATCH/DELETE`) sont refusées si l'`Origin` est
+  tierce ; le serveur à serveur (bot, curl) reste admis car il n'envoie pas
+  d'`Origin`.
 
 ---
 

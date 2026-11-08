@@ -2,36 +2,73 @@
 node_modules
 npm-debug.log*
 
+# Metadonnees et outillage de developpement.
 .git
 .github
 .gitignore
+.gitattributes
+.editorconfig
+.nvmrc
+.prettierignore
+.prettierrc.json
+eslint.config.mjs
 
-# Donnees locales / secrets : jamais dans l'image.
+# Secrets et donnees locales : jamais dans l'image.
 .env
+.env.*
+local/
 config.json
 comptes.json
 historique.json
 invites.json
 stats.json
-.protection_hash.json
+avis.json
+tests_identite.json
+.protection_hash.json*
 .blamune_session
 users/
 backups/
 logs/
 *.log
+savoir.db
+savoir.db-*
+cache_embeddings.json
+health_live.json
 
-# Bot local (C++) : non utilise par le serveur Node.
+# Bot local (C++) : le binaire Windows n'entre pas dans l'image serveur.
+# bot.cpp reste dans le contexte : Dockerfile.bot le compile.
 bot.exe
-bot.cpp
 cloudflared.exe
 *.exe
 *.dll
 
-# Gros fichiers generes.
+# Gros fichiers generes et projets annexes.
 themes.txt
 themes_manquants.txt
+vocabulaire_ajouts.txt
 curl_out.txt
 curl_output.txt
+deepproxy/
+OpenMontage/
+motion-design/
+videos/
+__pycache__/
+*.pyc
+.obsidian/
+.agents/
+.claude/
+.codex/
+.impeccable/
+.skill-archive/
+.vscode/
+agent/
+2026-11-05.md
+Sans titre.*
 *.zip
 *.bak
 *.bak_*
+
+# Tests, documentation et scripts d'exploitation : hors image de production.
+tests/
+docs/
+scripts/

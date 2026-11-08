@@ -12,12 +12,15 @@ export default [
         process: 'readonly',
         require: 'readonly',
         module: 'writable',
+        exports: 'writable',
         __dirname: 'readonly',
+        __filename: 'readonly',
         Buffer: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
         setInterval: 'readonly',
         clearInterval: 'readonly',
+        queueMicrotask: 'readonly',
         URL: 'readonly',
         // Runtime Node >= 18 (deja requis pour le pool et push) : le
         // chercheur web lib/recherche_web.js compte dessus.
@@ -57,6 +60,7 @@ export default [
         FileReader: 'readonly',
         Image: 'readonly',
         SpeechSynthesisUtterance: 'readonly',
+        Event: 'readonly',
         Response: 'readonly',
         URL: 'readonly',
         Headers: 'readonly',

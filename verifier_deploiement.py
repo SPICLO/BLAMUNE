@@ -11,6 +11,16 @@ Controle ce qui peut casser un deploiement gratuit :
 """
 import os, re, subprocess, json, sys
 
+# La console Windows n'est pas toujours en UTF-8 (cp850/cp1252). Sans cela,
+# la derniere ligne du rapport ("PRÊT À PUBLIER") leve UnicodeEncodeError :
+# Python meurt alors avec un code inhabituel et SANS afficher les controles
+# deja calcules, ce qui laisse croire a un echec du projet.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 P = os.path.dirname(os.path.abspath(__file__))
 os.chdir(P)
 ok = True

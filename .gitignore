@@ -1,5 +1,10 @@
 node_modules/
 .env
+# Secrets locaux (Render, VAPID, JSONBin...) : jamais versionnes. Le fichier
+# vit de preference dans local/ (ignore plus bas), ou reste a la racine mais
+# doit rester hors git. Le scanner scripts/verifier_secrets.py le verifie.
+.env.securise
+.env.local
 __pycache__/
 *.pyc
 *.exe
@@ -28,6 +33,8 @@ curl_output.txt
 cloudflared.exe
 bot.exe
 stats.json
+avis.json
+tests_identite.json
 .bin-id
 bins.json
 logs/

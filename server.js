@@ -30,6 +30,9 @@ const { creerPoolIA } = require('./lib/pool_ia');
 const { demarrerKeepalive } = require('./lib/keepalive');
 const { creerCompression } = require('./lib/compression');
 const { creerCompteurSortie } = require('./lib/sortie');
+// Ecritures differees par utilisateur (etat, memoire, proactif) : le disque
+// ne recoit plus une ecriture par message. Voir lib/ecritures.js.
+const { creerEcritures } = require('./lib/ecritures');
 const { creerGardeFichiers } = require('./lib/garde_fichiers');
 const { creerServiceBot } = require('./lib/service_bot');
 const { creerSavoir } = require('./lib/savoir');
@@ -59,6 +62,9 @@ const rechercheWeb = creerRechercheWeb({
 // et exposent etat() pour /admin.
 const concurrence = require('./lib/concurrence');
 const tension = require('./lib/tension');
+// L'eco ne s'arme pas silencieusement (phase 3, P3-3) : une ligne a l'entree
+// et a la sortie, jamais une par message (voir journaliserTransitions).
+tension.configurerJournal((msg) => loggerErreur('tension', msg));
 
 const app = express();
 // Render passe un reverse proxy devant le serveur : sans cette ligne,
@@ -137,30 +143,31 @@ const SENSITIVE_FILES = [
 // garder un vieux corps, et les JSON de l'API restent no-store.
 const ASSETS_PUBLICS_RE =
   /\.(css|js|mjs|html?|svg|png|jpe?g|ico|txt|xml|json|map|webp|wasm|woff2?)$/i;
+// Allowlist CORS : domaines EXACTS, jamais de wildcard sur un
+// sous-domaine de plateforme. Une regle comme /.onrender.com$/ acceptait
+// aussi evil.onrender.com — un sous-domaine gratuit que n'importe qui
+// peut reserver sur le meme PaaS que nous. Les origines autorisees se
+// reglent par CORS_ORIGINS (separateur espace), les valeurs par defaut
+// couvrent le developpement local : une instance deployee ailleurs
+// declare son propre domaine dans son environnement.
+//   ex. CORS_ORIGINS=https://blamune.onrender.com https://blamune.vercel.app
+const ORIGINES_CORS = (process.env.CORS_ORIGINS || '')
+  .split(/\s+/)
+  .map((s) => s.trim())
+  .filter(Boolean);
+function origineAutorisee(origin) {
+  if (ORIGINES_CORS.includes(origin)) return true;
+  // Local uniquement, port borne : jamais un domaine distant.
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+}
+
 app.use((req, res, next) => {
   const reqPath = req.path.toLowerCase();
   if (SENSITIVE_FILES.some((f) => reqPath.endsWith(f))) return res.status(404).end();
   const origin = req.headers.origin || '';
-  // Allowlist CORS : domaines EXACTS, jamais de wildcard sur un
-  // sous-domaine de plateforme. Une regle comme /.onrender.com$/ acceptait
-  // aussi evil.onrender.com — un sous-domaine gratuit que n'importe qui
-  // peut reserver sur le meme PaaS que nous. Les origines autorisees se
-  // reglent par CORS_ORIGINS (separateur espace), les valeurs par defaut
-  // couvrent le developpement local : une instance deployee ailleurs
-  // declare son propre domaine dans son environnement.
-  //   ex. CORS_ORIGINS=https://blamune.onrender.com https://blamune.vercel.app
-  const ORIGINES_CORS = (process.env.CORS_ORIGINS || '')
-    .split(/\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const autoriseOrigin = (o) => {
-    if (ORIGINES_CORS.includes(o)) return true;
-    // Local uniquement, port borne : jamais un domaine distant.
-    return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o);
-  };
   let corsOrigin = '*';
   if (origin && origin !== 'null') {
-    corsOrigin = autoriseOrigin(origin) ? origin : '';
+    corsOrigin = origineAutorisee(origin) ? origin : '';
   } else if (origin === 'null') {
     corsOrigin = '';
   }
@@ -194,13 +201,12 @@ app.use((req, res, next) => {
   // frame-ancestors renforce X-Frame-Options (convertit en erreur dans les
   // navigateurs modernes), base-uri et form-action ferment les messages
   // qui tenteraient de rediriger une soumission ou une balise <base>.
+  //
+  // style-src ne contient plus 'unsafe-inline' : tous les styles inline
+  // ont ete migres vers des classes CSS (site/style.css).
   res.setHeader(
     'Content-Security-Policy',
-    // 'unsafe-inline' sur style-src SEULEMENT : index.html pose 12 styles
-    // inline (style="display: none" des bascules d'affichage). Les retirer
-    // exigerait de les migrer en classes CSS — progression a part. script-src
-    // n'a JAMAIS d'unsafe-inline : le JS inline reste interdit.
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://text.pollinations.ai; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://text.pollinations.ai; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
   );
   if (req.method === 'OPTIONS') return res.status(204).end();
   next();
@@ -218,6 +224,10 @@ app.use(creerCompression({ logger: loggerErreur }));
 // sortis/mois, une fuite doit se voir avant la suspension du workspace.
 const compteurSortie = creerCompteurSortie();
 app.use(compteurSortie.middleware);
+// Ecritures disque differees (etat_blamune.json, memoire.txt, proactif.json) :
+// un flush groupe par fenetre au lieu d'une ecriture par message. Le
+// compteur `ecritures` de /health est la contrepartie honnete de `sortie`.
+const ecritures = creerEcritures({ logger: loggerErreur });
 
 // Plafond d'octets servis par IP et par jour (defaut 60 Mo : ~800 pages
 // pour un humain, quelques ordres de grandeur sous un robot). Protege le
@@ -541,12 +551,23 @@ const FICHIERS_RACINE = [
   // Avis de sante des reponses (👍/👎) et rapport d'auto-test d'identite :
   // petits, mais on n'y renonce pas au moment du restore.
   'avis.json',
-  'tests_identite.json'
+  'tests_identite.json',
+  // Vecteurs du savoir (phase 3, P3-4) : sans lui, une instance neuve
+  // repaie TOUS les embeddings Gemini au premier boot (~13 min pour 1266
+  // faits ; plus d'une heure a 10 000). Filtre par taille ci-dessous : il ne
+  // doit jamais pousser le payload JSONBin au-dela du plafond Pro (10 Mo).
+  'cache_embeddings.json'
 ];
 const CLE_SAVOIR_SQL = 'savoir.sql';
+// Plafond du cache d'embeddings DANS LA SAUVEGARDE (et non sur disque) :
+// au-dela, on l'omet et le boot suivant re-vectorise. Le compromis est
+// documente ; il vaut mieux une re-vectorisation qu'un 413 de JSONBin qui
+// ferait echouer la sauvegarde ENTIERE (comptes compris).
+const TAILLE_MAX_CACHE_EMBED =
+  parseInt(process.env.SAUVEGARDE_EMBED_MAX || '', 10) || 5 * 1024 * 1024;
 // config.json (cle API) et logs/ ne quittent jamais le serveur.
 const CHEMIN_SAUVEGARDE =
-  /^(comptes\.json|invites\.json|savoir\.sql|savoir\.txt|vocabulaire\.txt|replis\.txt|stats\.json|avis\.json|tests_identite\.json|users\/[A-Za-z0-9_\-]{1,64}\/[A-Za-z0-9_.\-]{1,64})$/;
+  /^(comptes\.json|invites\.json|savoir\.sql|savoir\.txt|vocabulaire\.txt|replis\.txt|stats\.json|avis\.json|tests_identite\.json|cache_embeddings\.json|users\/[A-Za-z0-9_\-]{1,64}\/[A-Za-z0-9_.\-]{1,64})$/;
 const TAILLE_MAX_FICHIER = 2 * 1024 * 1024;
 const TAILLE_MAX_TOTALE = 40 * 1024 * 1024;
 
@@ -555,7 +576,19 @@ function creerSauvegarde() {
   for (const nom of FICHIERS_RACINE) {
     try {
       const f = path.join(RACINE, nom);
-      if (fs.existsSync(f)) fichiers[nom] = fs.readFileSync(f, 'utf8');
+      if (!fs.existsSync(f)) continue;
+      if (nom === 'cache_embeddings.json' && fs.statSync(f).size > TAILLE_MAX_CACHE_EMBED) {
+        loggerErreur(
+          'sauvegarde',
+          'cache_embeddings.json omis (' +
+            fs.statSync(f).size +
+            ' octets > plafond ' +
+            TAILLE_MAX_CACHE_EMBED +
+            ') : re-vectorisation au prochain boot'
+        );
+        continue;
+      }
+      fichiers[nom] = fs.readFileSync(f, 'utf8');
     } catch (e) {}
   }
   // Source de verite du savoir : dump SQL (texte), pas le fichier binaire.
@@ -739,7 +772,8 @@ function extraireChamp(req, champ) {
 // CONFIG : c'est le seul point de contact avec le disque.
 const { dossierUser, lireMemoire, ecrireMemoire, sauvegarderMemoireComplete } = creerMemoire({
   usersDir: USERS_DIR,
-  storage
+  storage,
+  ecritures
 });
 
 // ==================== AUTO-APPRENTISSAGE BLAMUNE ====================
@@ -831,12 +865,17 @@ const { requeterHttp } = serviceBot;
 //  reutilise exporterSavoir / chargerSavoirSecours : ne jamais ruber
 //  l'ordre de declaration.
 // =====================================================================
+// Etat de l'index des embeddings (phase 3, P3-4) : alimente par lib/savoir.js
+// au demarrage, expose tel quel par /health (`embeddings`).
+const { creerEtatEmbeddings } = require('./lib/etat_embeddings');
+const etatEmbeddings = creerEtatEmbeddings();
 const savoir = creerSavoir({
   racine: RACINE,
   dossierDepot: __dirname,
   loggerErreur,
   requeterHttp,
-  appelerBotLocal: serviceBot.appelerBotLocal
+  appelerBotLocal: serviceBot.appelerBotLocal,
+  etatEmbeddings
 });
 const savoirDb = savoir.savoirDb;
 const sansAccentsDB = savoir.sansAccentsDB;
@@ -844,6 +883,9 @@ const savoirEnregistrer = savoir.savoirEnregistrer;
 // Nettoyage admin : lecture paginee + suppression (base + secours + Qdrant).
 const savoirSupprimer = savoir.savoirSupprimer;
 const savoirListe = savoir.savoirListe;
+// File de validation des faits proposes par les invites (phase 3, P3-5).
+const faitsEnAttente = savoir.faitsEnAttente;
+const validerFait = savoir.validerFait;
 const reponseSecours = savoir.reponseSecours;
 const exporterSavoir = savoir.exporterSavoir;
 const chargerSavoirSecours = savoir.chargerSavoirSecours; // Tous les modeles en meme temps (vu en live a 22h10) : la cascade rend la
@@ -1813,8 +1855,23 @@ function blocRituel(etat, maintenant) {
 // ==================== ETAT INTERIEUR / CONSCIENCE ====================
 // 'etat_blamune.json' par utilisateur : memoire du temps qui passe et des moments partages.
 
+// ECRITURE DIFFEREE (phase 3, P3-1) : etat_blamune.json, proactif.json et
+// memoire.txt etaient reecrits a chaque message. Le disque ne recoit plus
+// qu'une version par fenetre (ECRITURES_FLUSH_MS) et fermerProperement()
+// vide la file a l'arret. Voir lib/ecritures.js.
+//
+// Les LECTEURS servent la version EN ATTENTE avant le disque : sans cela,
+// deux messages rapproches reliraient l'ancien fichier et le second
+// ecraserait l'ecriture du premier (le compteur de messages ne monterait
+// plus). Les Map sont declarees ici, avant leur premiere utilisation.
+const etatsEnAttente = new Map();
+const proactifsEnAttente = new Map();
+
 function lireEtat(uid) {
   const defaut = { premierContact: 0, dernierContact: 0, sessions: 0, souvenirs: [], messages: 0 };
+  // Lecture de la version differee AVANT le disque (voir sauvegarderEtat) :
+  // le meme objet que l'appelant vient de modifier, donc a jour.
+  if (etatsEnAttente.has(uid)) return etatsEnAttente.get(uid);
   try {
     const f = path.join(dossierUser(uid), 'etat_blamune.json');
     if (!fs.existsSync(f)) return defaut;
@@ -1831,12 +1888,28 @@ function lireEtat(uid) {
   }
 }
 
+// Reprise / forcage de l'etat (tests de dates, /admin/etat) : les DEUX
+// chemins portent la meme version, pour que le prochain message la lise.
+function reprendreEtat(uid, etat) {
+  sauvegarderEtat(uid, etat);
+  return etat;
+}
+
+// L'inverse pour proactif.json : le disque fait foi (fixture de test), la
+// version en attente est abandonnee pour que la relecture voie le fichier.
+function reprendreProactif(uid) {
+  proactifsEnAttente.delete(uid);
+  ecritures.oublier('proactif:' + uid);
+}
+
+// Voir le bloc ECRITURE DIFFEREE ci-dessus (declare avant lireEtat).
 function sauvegarderEtat(uid, etat) {
   try {
-    fs.writeFileSync(
+    etatsEnAttente.set(uid, etat);
+    ecritures.differer(
+      'etat:' + uid,
       path.join(dossierUser(uid), 'etat_blamune.json'),
-      JSON.stringify(etat, null, 2),
-      'utf8'
+      JSON.stringify(etat, null, 2)
     );
   } catch (e) {}
 }
@@ -1889,6 +1962,7 @@ const PROACTIF_PROMESSE_MS = 7 * 86400000; // rappel de promesse hebdo
 
 function lireProactif(uid) {
   const defaut = { dernierEnvoi: 0, notices: {} };
+  if (proactifsEnAttente.has(uid)) return proactifsEnAttente.get(uid);
   try {
     const f = path.join(dossierUser(uid), 'proactif.json');
     if (!fs.existsSync(f)) return defaut;
@@ -1904,10 +1978,11 @@ function lireProactif(uid) {
 
 function ecrireProactif(uid, p) {
   try {
-    fs.writeFileSync(
+    proactifsEnAttente.set(uid, p);
+    ecritures.differer(
+      'proactif:' + uid,
       path.join(dossierUser(uid), 'proactif.json'),
-      JSON.stringify(p, null, 2),
-      'utf8'
+      JSON.stringify(p, null, 2)
     );
   } catch (e) {}
 }
@@ -2111,6 +2186,16 @@ async function extraireAvecModele(uid, msg) {
  * la route (lib/routes/admin.js).
  */
 function purgerRamUtilisateur(uid) {
+  // Fichiers en attente d'ecriture (etat, memoire, proactif) : sans cette
+  // ligne, un flush arriere ressusciterait un dossier que la purge vient de
+  // supprimer. Ne jamais laisser une ecriture differee survivre a son uid.
+  try {
+    ecritures.oublier('etat:' + uid);
+    ecritures.oublier('memoire:' + uid);
+    ecritures.oublier('proactif:' + uid);
+    etatsEnAttente.delete(uid);
+    proactifsEnAttente.delete(uid);
+  } catch (e) {}
   if (extractionMinuteur[uid]) {
     clearTimeout(extractionMinuteur[uid]);
     delete extractionMinuteur[uid];
@@ -2211,6 +2296,46 @@ async function extraireFileExtraction(uid) {
   }
 }
 
+// ==================== ORIGINE (methodes mutatives) ====================
+// L'authentification voyage par en-tetes personnalises (X-UID, X-EGO,
+// X-Jeton) : un formulaire tiers ne peut pas les poser, et une requete
+// cross-origin doit passer le preflight CORS. On verifie donc l'Origine
+// des mutations plutot qu'un jeton CSRF :
+//   - origine absente : serveur-a-serveur (bot local, curl, tests) -> admis ;
+//   - origine presente : meme hote, allowlist CORS ou local -> admis ;
+//   - origine tierce ou "null" -> 403.
+// Sec-Fetch-Site: cross-site sans Origine est refuse aussi (navigateurs
+// recents qui omettraient l'en-tete).
+const METHODES_MUTATIVES = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+app.use((req, res, next) => {
+  if (!METHODES_MUTATIVES.has(req.method)) return next();
+  const origin = req.headers.origin;
+  if (!origin) {
+    if (req.headers['sec-fetch-site'] === 'cross-site') {
+      return res.status(403).json({ ok: false, message: 'Origine refusee.' });
+    }
+    return next();
+  }
+  if (origin === 'null') {
+    return res.status(403).json({ ok: false, message: 'Origine refusee.' });
+  }
+  let memeHote = false;
+  try {
+    const hoteOrigine = new URL(origin).host;
+    // Derriere un proxy (Render), Host peut etre l'hote interne et
+    // X-Forwarded-Host l'hote public : on accepte les deux.
+    const hotes = [
+      req.headers.host,
+      String(req.headers['x-forwarded-host'] || '')
+        .split(',')[0]
+        .trim()
+    ].filter(Boolean);
+    memeHote = hotes.includes(hoteOrigine);
+  } catch (e) {}
+  if (memeHote || origineAutorisee(origin)) return next();
+  return res.status(403).json({ ok: false, message: 'Origine refusee.' });
+});
+
 // ==================== ROUTES ====================
 
 // Avis des visiteurs sur les reponses (👍/👎) : implementation dans
@@ -2245,6 +2370,9 @@ creerRoutesAdmin(app, {
   getPoolSante: () => pool.sante(),
   // Etat de l'index semantique Qdrant pour /health.
   getQdrantSante: savoir.qdrantSante,
+  // Etat des embeddings (phase 3, P3-4) : mode, faits restant a calculer,
+  // echecs. Un `aCalculer` eleve pendant une heure = quota paye en fond.
+  getEtatEmbeddings: () => etatEmbeddings.etat(),
   // Gardiens anti-saturation (file de concurrence, tension/eco, cache
   // recherche, plafond global /send) : un seul getter qui recompte au coup
   // par coup.
@@ -2258,6 +2386,23 @@ creerRoutesAdmin(app, {
   // Bande passante sortante (octets du jour par famille, top chemins) :
   // exposee telle quelle par /health sous le champ `sortie`.
   getSortie: () => compteurSortie.etat(),
+  // Ecritures disque differees : la contrepartie de `sortie` (phase 3).
+  getEcritures: () => ecritures.etat(),
+  // Etat differe : lecture au moment voulu, forcage ou abandon (tests).
+  lireEtat,
+  reprendreEtat,
+  lireProactif,
+  reprendreProactif,
+  // Une purge de compte/id empêche un flush en attente de recreer le dossier.
+  ecrituresOublier: (uid) => {
+    try {
+      ecritures.oublier('etat:' + uid);
+      ecritures.oublier('memoire:' + uid);
+      ecritures.oublier('proactif:' + uid);
+      etatsEnAttente.delete(uid);
+      proactifsEnAttente.delete(uid);
+    } catch (e) {}
+  },
   // Plafond d'octets par IP/jour sur les fichiers servis : etat public
   // (jamais de liste d'IP, seulement le nombre d'IP surveillees).
   getGardeFichiers: () => gardeFichiers.etat(),
@@ -2280,6 +2425,8 @@ creerRoutesAdmin(app, {
   savoirEnregistrer,
   savoirSupprimer,
   savoirListe,
+  faitsEnAttente,
+  validerFait,
   // Rapport de l'auto-test d'identite quotidien. L'auto-test est construit
   // plus bas (apres push) : getter paresseux, juge a l'appel, pas a la
   // declaration.
@@ -2301,6 +2448,9 @@ creerRoutesAdmin(app, {
 creerRoutesCompte(app, {
   getIp,
   checkRateLimit,
+  // Plafond PAR UID sur /savoir (phase 3, P3-5) : la limite par IP ne
+  // freine pas un client authentifie qui pousse des milliers de faits.
+  checkUserRateLimit,
   extraireAuth,
   extraireChamp,
   getComptes: () => comptes,
@@ -2402,9 +2552,18 @@ creerRoutesConsultation(app, {
   lireEtat,
   lireMemoire,
   ecrireMemoire,
+  // OUBLI complet du profil (DELETE /profil) : chaque champ repasse a vide.
+  sauvegarderMemoireComplete,
+  // /journal limite par IP : la factory ne peut pas atteindre getIp seul.
+  getIp,
   joursAvantAnniversaire,
   savoirDb,
-  histoAffichageMax: HISTO_AFFICHAGE_MAX
+  // Journal public (/journal) : nombre de membres enregistres, NOMBRES
+  // seulement.
+  getComptes: () => comptes,
+  histoAffichageMax: HISTO_AFFICHAGE_MAX,
+  // Mode eco visible dans /stats-perso (phase 3, P3-3).
+  getTension: () => tension.etat()
 });
 
 // ==================== WEB PUSH (sprint E) ====================
@@ -2490,7 +2649,8 @@ function lancerAutoTestIdentite() {
 }
 setTimeout(lancerAutoTestIdentite, 5 * 60 * 1000).unref?.();
 setInterval(lancerAutoTestIdentite, 24 * 60 * 60 * 1000).unref?.();
-const getTestIdentite = () => autotestIdentite.etat();
+// (le getter vivant est passe a creerRoutesAdmin plus haut :
+// getTestIdentite: () => autotestIdentite.etat())
 
 // La vague d'arriere-plan (toutes les PUSH_CHECK_MS) : pour chaque
 // utilisateur INJOIGNABLE (dernier contact plus vieux que
@@ -2539,6 +2699,25 @@ creerRoutesStatique(app, {
   limiteStatiqueGet: parseInt(process.env.RATE_STATIQUE_GET || '120', 10),
   // Et le vrai mur : en OCTETS par IP et par jour (60 Mo par defaut).
   gardeFichiers
+});
+
+// ==================== GESTION D'ERREURS CENTRALISEE ====================
+// Middleware d'erreur en fin de chaîne (après toutes les routes).
+// Formate les réponses d'erreur de façon cohérente et ne fuit pas les
+// détails internes en production.
+app.use((err, req, res, next) => {
+  const status = err.statusCode || 500;
+  loggerErreur('http', `${req.method} ${req.originalUrl || req.path} → ${err.message}`);
+  res.status(status).json({
+    ok: false,
+    error:
+      process.env.NODE_ENV === 'production'
+        ? status === 500
+          ? 'Erreur interne du serveur'
+          : err.message
+        : err.message,
+    ...(process.env.NODE_ENV !== 'production' && err.stack ? { stack: err.stack } : {})
+  });
 });
 
 // ==================== START ====================
@@ -2702,6 +2881,14 @@ setInterval(sauverStats, 60000);
 // l'instance en otage au moment ou l'hebergeur coupe.
 function fermerProperement() {
   sauverStats();
+  // File des ecritures differees : un redemarrage ne doit perdre que ce qui
+  // est arrive dans les dernieres ECRITURES_FLUSH_MS, pas plus. Ecrit avant
+  // la sauvegarde cloud (qui relit ces fichiers pour son snapshot).
+  try {
+    ecritures.vider();
+    etatsEnAttente.clear();
+    proactifsEnAttente.clear();
+  } catch (e) {}
   const filet = setTimeout(() => process.exit(0), 5000);
   if (filet.unref) filet.unref();
   Promise.resolve(storage.sauvegarderFinale ? storage.sauvegarderFinale() : null)
@@ -2747,6 +2934,8 @@ const purgeInvites = creerPurgeInvites({
     ecrireInvites();
   },
   supprimerToutCloud: (uid) => storage.supprimerTout(uid),
+  // purgerRamUtilisateur oublie aussi les ecritures differees de cet uid :
+  // un flush arriere ne doit pas recreer un dossier purge.
   purgerRamUtilisateur,
   connexionsActives,
   loggerErreur,

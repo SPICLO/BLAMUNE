@@ -54,7 +54,7 @@
 
       <main>
         <!-- ALERTE QUOTA / MODELE : visible sans ouvrir les logs -->
-        <div id="alerteBanniere" class="banniere-alerte" style="display: none"></div>
+        <div id="alerteBanniere" class="banniere-alerte"></div>
 
         <!-- STATS -->
         <section class="stats-grid">
@@ -83,13 +83,7 @@
             <div class="stat-label">En ligne</div>
           </div>
           <div class="stat-card">
-            <div
-              class="stat-chiffre"
-              id="statModele"
-              style="font-size: 14px; word-break: break-all"
-            >
-              -
-            </div>
+            <div class="stat-chiffre stat-chiffre-modele" id="statModele">-</div>
             <div class="stat-label">Modele actif</div>
           </div>
         </section>
@@ -105,7 +99,7 @@
         <!-- UTILISATEURS INSCRITS -->
         <section class="panel">
           <h2>Utilisateurs inscrits <span class="subtitle" id="inscritsCount"></span></h2>
-          <p id="inscritsMessage" class="vide" style="display: none"></p>
+          <p id="inscritsMessage" class="vide masquee"></p>
           <div id="inscritsContenu" class="panel-body">
             <p class="vide">Chargement...</p>
           </div>
@@ -129,8 +123,52 @@
 
         <!-- SAVOIR -->
         <section class="panel">
+          <h2>
+            Fait propose a valider
+            <span class="subtitle" id="savoirAttenteCount"></span>
+            <span class="subtitle">(pousse par un invite : jamais servi avant validation)</span>
+          </h2>
+          <div id="savoirAttente" class="panel-body">
+            <p class="vide">Chargement...</p>
+          </div>
+        </section>
+
+        <section class="panel">
           <h2>Savoir <span class="subtitle" id="savoirCount"></span></h2>
           <div id="savoirContenu" class="panel-body">
+            <p class="vide">Chargement...</p>
+          </div>
+          <!-- Boucle fermee des avis (phase 3, P3-6) : un fait corrige ici
+               est servi des le message suivant (source de verite SQLite). -->
+          <div class="panel-body ligne-formulaire">
+            <input
+              type="text"
+              id="savoirMettreCle"
+              placeholder="cle (sujet)"
+              maxlength="100"
+              title="Sujet du fait a corriger ou ajouter"
+            />
+            <input
+              type="text"
+              id="savoirMettreReponse"
+              placeholder="reponse du fait"
+              maxlength="500"
+              title="Texte servi aux visiteurs"
+            />
+            <button id="btnSavoirMettre" class="btn-secondary" type="button">
+              Enregistrer le fait
+            </button>
+            <span id="savoirMettreMessage" class="message-inline"></span>
+          </div>
+        </section>
+
+        <!-- AVIS DES VISITEURS -->
+        <section class="panel">
+          <h2>
+            Avis des visiteurs <span class="subtitle" id="avisCount"></span>
+            <span class="subtitle">(les 👎 sont une file de travail)</span>
+          </h2>
+          <div id="avisContenu" class="panel-body">
             <p class="vide">Chargement...</p>
           </div>
         </section>
@@ -168,10 +206,7 @@
             Sauvegarde &amp; restauration
             <span class="subtitle">toutes les donnees du serveur</span>
           </h2>
-          <div
-            class="panel-body"
-            style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"
-          >
+          <div class="panel-body ligne-actions">
             <button id="btnBackup" class="btn-secondary" type="button">
               Telecharger la sauvegarde
             </button>
@@ -182,11 +217,11 @@
               type="file"
               id="fichierRestore"
               accept="application/json,.json"
-              style="display: none"
+              class="masquee"
             />
-            <span id="backupMessage" style="font-size: 12px; color: var(--texte-doux)"></span>
+            <span id="backupMessage" class="message-inline"></span>
           </div>
-          <p style="font-size: 12px; color: var(--texte-doux); padding: 0 16px 14px; margin: 0">
+          <p class="note-inline">
             La sauvegarde contient les comptes, les jetons d'invite, les memoires, les historiques,
             les etats et les stats (jamais la cle API). La restauration reecrit les fichiers
             immediatement, sans redemarrer le serveur.
@@ -196,29 +231,16 @@
         <!-- CHANGER MDP -->
         <section class="panel">
           <h2>Changer le mot de passe</h2>
-          <div
-            class="panel-body"
-            style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"
-          >
+          <div class="panel-body ligne-actions">
             <input
               type="password"
               id="nouveauMdp"
               minlength="8"
               placeholder="Nouveau mot de passe (8+ chars)"
-              style="
-                flex: 1;
-                min-width: 200px;
-                padding: 8px 12px;
-                background: var(--surface);
-                border: 1px solid var(--bordure);
-                border-radius: 8px;
-                color: var(--texte);
-                font-size: 13px;
-                outline: none;
-              "
+              class="champ-mdp"
             />
             <button id="btnChangeMdp" class="btn-secondary" type="button">Changer</button>
-            <span id="mdpMessage" style="font-size: 12px; color: var(--texte-doux)"></span>
+            <span id="mdpMessage" class="message-inline"></span>
           </div>
         </section>
       </main>
@@ -226,16 +248,8 @@
 
     <script src="/admin/admin.js?v=6"></script>
     <noscript>
-      <div
-        style="
-          max-width: 400px;
-          margin: 80px auto;
-          text-align: center;
-          color: #e2e8f0;
-          font-family: sans-serif;
-        "
-      >
-        <h2 style="color: #f87171">JavaScript requis</h2>
+      <div class="sans-js">
+        <h2>JavaScript requis</h2>
         <p>Activez JavaScript pour utiliser Dashmin.</p>
       </div>
     </noscript>

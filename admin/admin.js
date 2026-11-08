@@ -211,11 +211,100 @@ function initDashboard() {
         msg.textContent = 'Fichier invalide.';
       }
     };
+    // Enregistrer un fait depuis le panneau (phase 3, P3-6) : c'est la fin
+    // du parcours "un 👎 -> une correction". Le fait arrive dans SQLite (la
+    // source de verite) et sert des le message suivant, sans deploy.
+    var btnMettre = document.getElementById('btnSavoirMettre');
+    if (btnMettre) {
+      btnMettre.onclick = async function () {
+        var elCle = document.getElementById('savoirMettreCle');
+        var elRep = document.getElementById('savoirMettreReponse');
+        var elMsg = document.getElementById('savoirMettreMessage');
+        var cle = elCle ? elCle.value.trim() : '';
+        var reponse = elRep ? elRep.value.trim() : '';
+        if (!cle || !reponse) {
+          if (elMsg) {
+            elMsg.textContent = 'Cle et reponse obligatoires.';
+            elMsg.style.color = 'var(--danger)';
+          }
+          return;
+        }
+        btnMettre.disabled = true;
+        try {
+          var r = await fetch(API + '/admin/savoir/mettre', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-EGO': adminToken },
+            body: JSON.stringify({ cle: cle, reponse: reponse })
+          });
+          var out = null;
+          try {
+            out = await r.json();
+          } catch (e) {}
+          if (elMsg) {
+            elMsg.style.color = r.ok && out && out.ok ? 'var(--ok)' : 'var(--danger)';
+            elMsg.textContent =
+              r.ok && out && out.ok
+                ? 'Fait enregistre.'
+                : (out && out.message) || 'Erreur ' + r.status;
+          }
+          if (r.ok && elRep) elRep.value = '';
+        } catch (e) {
+          if (elMsg) {
+            elMsg.textContent = 'Erreur reseau.';
+            elMsg.style.color = 'var(--danger)';
+          }
+        }
+        btnMettre.disabled = false;
+      };
+    }
     dashboardInit = true;
   }
   chargerDonnees();
   if (refreshInterval) clearInterval(refreshInterval);
   refreshInterval = setInterval(chargerDonnees, 30000);
+}
+
+// Valide ou supprime un fait propose par un invite (phase 3, P3-5).
+// Une seule issue serveur au refus possible : l'erreur est affichee DANS la
+// ligne, la file reste en place (on ne recharge pas une page pour montrer
+// qu'une ecriture a echoue).
+async function traiterProposition(route, cle, ligne) {
+  var boutons = ligne.getElementsByTagName('button');
+  for (var i = 0; i < boutons.length; i++) boutons[i].disabled = true;
+  try {
+    var r = await fetch(API + route, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-EGO': adminToken },
+      body: JSON.stringify({ cle: cle })
+    });
+    if (r.ok) {
+      ligne.remove();
+      return;
+    }
+    var out = null;
+    try {
+      out = await r.json();
+    } catch (e) {}
+    var err = document.createElement('div');
+    err.style.color = 'var(--danger)';
+    err.textContent = (out && out.message) || 'Erreur ' + r.status;
+    ligne.appendChild(err);
+  } catch (e) {
+    var errR = document.createElement('div');
+    errR.style.color = 'var(--danger)';
+    errR.textContent = 'Erreur reseau.';
+    ligne.appendChild(errR);
+  }
+  for (var j = 0; j < boutons.length; j++) boutons[j].disabled = false;
+}
+
+// Verdict du niveau STABLE du cache (P3-2), dit en clair : "utile",
+// "a supprimer dans N jours" ou "a supprimer maintenant".
+function gprTexte(o) {
+  if (!o) return '';
+  if (o.verdict === 'utile') return '   |   utile';
+  if (o.verdict === 'aSupprimer') return '   |   A SUPPRIMER (0 coup en 14 jours)';
+  return '   |   fenetre : ' + (o.reste || 0) + ' jour(s) restant(s)';
 }
 
 function setSectionErreur(id, msg) {
@@ -236,6 +325,8 @@ function afficherErreur(msg) {
   setSectionErreur('tousMessagesContenu', msg);
   setSectionErreur('profilContenu', msg);
   setSectionErreur('savoirContenu', msg);
+  setSectionErreur('savoirAttente', msg);
+  setSectionErreur('avisContenu', msg);
   setSectionErreur('vocabContenu', msg);
   setSectionErreur('configContenu', msg);
   var bann = document.getElementById('alerteBanniere');
@@ -420,7 +511,15 @@ async function chargerDonnees() {
           (gt.nb429Jour || 0) +
           '   |   Eco ' +
           (gt.eco ? 'ACTIF' : 'inactif') +
-          (gt.preemptif ? '(PREEMPTIF)' : '') +
+          (gt.eco && gt.cause ? '(' + gt.cause + ')' : '') +
+          (gt.entrees && (gt.entrees.debordements || gt.entrees.file)
+            ? '   |   Entrees eco depuis le demarrage : 429=' +
+              (gt.entrees['429'] || 0) +
+              ' debordements=' +
+              (gt.entrees.debordements || 0) +
+              ' file=' +
+              (gt.entrees.file || 0)
+            : '') +
           (gt.tachesSuspendues ? '   |   Taches de fond suspendues : ' + gt.tachesSuspendues : ''),
         'Cache recherche : ' +
           (gcr.entrees || 0) +
@@ -453,7 +552,16 @@ async function chargerDonnees() {
               ' / ' +
               ((gpt.coups || 0) + (gpt.rater || 0)) +
               ' messages'
-            : '')
+            : ''),
+        // Deux niveaux mesures SEPAREMENT (P3-2) : stable = question sans
+        // contexte ("bonjour"), contextuel = meme question apres le meme
+        // message du bot. Le verdict est la decision du proprietaire, dite
+        // avant l'echeance et pas apres.
+        'Cache stable (questions sans contexte) : ' +
+          (gpt.coupsStable || 0) +
+          ' coup(s)' +
+          gprTexte(gpt.observation),
+        'Cache contextuel : ' + (gpt.coupsContextuel || 0) + ' coup(s)'
       ];
       lignesG.forEach(function (texte) {
         var p = document.createElement('p');
@@ -714,6 +822,153 @@ async function chargerDonnees() {
         pLimite2.style.marginTop = '8px';
         savoirEl.appendChild(pLimite2);
       }
+    }
+
+    // File de validation du savoir (phase 3, P3-5) : un invite peut PROPOSER
+    // un fait via /savoir ; rien n'est servi avant l'accord d'un humain.
+    // On montre ici le texte exact propose, avec les deux seules issues :
+    // valider (le fait rejoint le savoir partage) ou supprimer (il disparait).
+    try {
+      var rAtt = await fetch(API + '/admin/savoir', { headers: headers });
+      var jAtt = rAtt.ok ? await rAtt.json() : { enAttente: [] };
+      var attEl = document.getElementById('savoirAttente');
+      var attCountEl = document.getElementById('savoirAttenteCount');
+      if (attCountEl) attCountEl.textContent = '(' + (jAtt.enAttenteTotal || 0) + ' en attente)';
+      if (attEl) {
+        attEl.replaceChildren();
+        var proposes = jAtt.enAttente || [];
+        if (proposes.length === 0) {
+          var pVideAtt = document.createElement('p');
+          pVideAtt.className = 'vide';
+          pVideAtt.textContent = 'Aucun fait propose en attente.';
+          attEl.appendChild(pVideAtt);
+        }
+        proposes.forEach(function (f) {
+          var d = document.createElement('div');
+          d.style.cssText = 'padding:8px;border-bottom:1px solid var(--bordure);font-size:13px;';
+          var topic = document.createElement('strong');
+          topic.style.color = 'var(--accent)';
+          topic.textContent = (f.cle || '?') + ' : ';
+          var cont = document.createElement('span');
+          cont.textContent = f.reponse || '-';
+          var src = document.createElement('span');
+          src.className = 'vide';
+          src.style.marginLeft = '6px';
+          src.textContent = '(' + (f.source || '?') + ')';
+          var bOk = document.createElement('button');
+          bOk.type = 'button';
+          bOk.textContent = 'Valider';
+          bOk.style.margin = '0 4px';
+          var bNo = document.createElement('button');
+          bNo.type = 'button';
+          bNo.textContent = 'Supprimer';
+          var ligne = document.createElement('div');
+          ligne.appendChild(topic);
+          ligne.appendChild(cont);
+          ligne.appendChild(src);
+          var barre = document.createElement('div');
+          barre.style.marginTop = '6px';
+          barre.appendChild(bOk);
+          barre.appendChild(bNo);
+          d.appendChild(ligne);
+          d.appendChild(barre);
+          bOk.onclick = function () {
+            traiterProposition('/admin/savoir/valider', f.cle, d);
+          };
+          bNo.onclick = function () {
+            traiterProposition('/admin/savoir/supprimer', f.cle, d);
+          };
+          attEl.appendChild(d);
+        });
+      }
+    } catch (e) {}
+
+    // Avis des visiteurs (phase 3, P3-6) : les 👎 sont une file de travail,
+    // pas un chiffre. "Corriger" pre-remplit le savoir avec la reponse
+    // jugee ; "Ignorer" ferme l'avis (traite).
+    try {
+      var rAvis = await fetch(API + '/admin/avis', { headers: headers });
+      var jAvis = rAvis.ok ? await rAvis.json() : { derniers: [] };
+      var avisEl = document.getElementById('avisContenu');
+      var avisCountEl = document.getElementById('avisCount');
+      if (avisEl) {
+        avisEl.replaceChildren();
+        var baisse = (jAvis.derniers || []).filter(function (a) {
+          return a.avis === 'down';
+        });
+        if (avisCountEl)
+          avisCountEl.textContent =
+            '(' + baisse.length + ' 👎, ' + (jAvis.enAttente || 0) + ' a traiter)';
+        var enTete = document.createElement('p');
+        enTete.className = 'vide';
+        enTete.textContent =
+          '👍 ' +
+          ((jAvis.counters && jAvis.counters.haute) || 0) +
+          '   ·   👎 ' +
+          ((jAvis.counters && jAvis.counters.basse) || 0) +
+          '   ·   ' +
+          (jAvis.enAttente || 0) +
+          ' 👎 des 7 derniers jours restent a traiter.';
+        avisEl.appendChild(enTete);
+        if (baisse.length === 0) {
+          var pVideA = document.createElement('p');
+          pVideA.className = 'vide';
+          pVideA.textContent = 'Aucun avis negatif. Bonne nouvelle.';
+          avisEl.appendChild(pVideA);
+        }
+        baisse.slice(0, 30).forEach(function (a) {
+          var bloc = document.createElement('div');
+          bloc.style.cssText =
+            'padding:8px;border-bottom:1px solid var(--bordure);font-size:13px;' +
+            (a.traite ? 'opacity:.55;' : '');
+          var quand = document.createElement('span');
+          quand.style.cssText = 'color:var(--texte-doux);font-size:11px;margin-right:8px;';
+          quand.textContent = a.t ? new Date(a.t).toLocaleString('fr-FR') : '-';
+          var q = document.createElement('div');
+          q.style.color = 'var(--texte)';
+          q.textContent = 'Visiteur : ' + (a.msg || '(sans texte)').substring(0, 200);
+          var rp = document.createElement('div');
+          rp.style.cssText = 'color:var(--accent);margin:4px 0;';
+          rp.textContent = 'BLAMUNE : ' + (a.reponse || '').substring(0, 400);
+          var bCorr = document.createElement('button');
+          bCorr.type = 'button';
+          bCorr.textContent = 'Corriger dans le savoir';
+          bCorr.style.cssText =
+            'font-size:11px;margin-right:6px;background:transparent;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:3px 8px;cursor:pointer;';
+          bCorr.onclick = function () {
+            var tap = document.getElementById('savoirMettreCle');
+            var trep = document.getElementById('savoirMettreReponse');
+            if (tap) tap.value = (a.msg || '').substring(0, 100);
+            if (trep) trep.value = '';
+            if (tap) tap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (trep) trep.focus();
+          };
+          var bIgn = document.createElement('button');
+          bIgn.type = 'button';
+          bIgn.textContent = a.traite ? 'Rouvrir' : 'Ignorer';
+          bIgn.style.cssText =
+            'font-size:11px;background:transparent;border:1px solid var(--bordure);color:var(--texte-doux);border-radius:6px;padding:3px 8px;cursor:pointer;';
+          bIgn.onclick = async function () {
+            bIgn.disabled = true;
+            try {
+              await fetch(API + '/admin/avis/traiter', {
+                method: 'POST',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, headers),
+                body: JSON.stringify({ t: a.t, traite: !a.traite })
+              });
+            } catch (e) {}
+            chargerDonnees();
+          };
+          bloc.appendChild(quand);
+          bloc.appendChild(q);
+          bloc.appendChild(rp);
+          bloc.appendChild(bCorr);
+          bloc.appendChild(bIgn);
+          avisEl.appendChild(bloc);
+        });
+      }
+    } catch (eAvis) {
+      /* section cosmetique : jamais bloquante pour le reste du panneau */
     }
 
     // Vocabulaire (limite a 100)

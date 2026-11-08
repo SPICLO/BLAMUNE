@@ -134,6 +134,27 @@ function authHeaders() {
   return h;
 }
 
+// ==================== MENU DES LANGUES ====================
+// Le select de l'ecran d'authentification (et celui de l'app) est rempli
+// par le HTML ; ici on branche le changement et on garde la selection
+// a jour apres un changement venu d'ailleurs (autre onglet, module).
+(function initChoixLangue() {
+  function brancher(id) {
+    var sel = document.getElementById(id);
+    if (!sel) return;
+    sel.value = window.I18N ? window.I18N.get() : 'fr';
+    sel.addEventListener('change', function () {
+      if (window.I18N) window.I18N.changer(sel.value);
+    });
+    // Un changement venu d'ailleurs resynchronise le select.
+    window.addEventListener('blamune:langue', function () {
+      sel.value = window.I18N ? window.I18N.get() : sel.value;
+    });
+  }
+  brancher('choixLangue');
+  brancher('choixLangueApp');
+})();
+
 // ==================== AVIS (👍/👎) ====================
 // Dernier message de l'utilisateur : rattache a chaque bulle du bot pour
 // que le vote rappelle LE couple question/reponse (la boussole lit le
@@ -919,11 +940,16 @@ function ajouterMessage(qui, texte, confiance, epoch) {
   // (langue : celle du navigateur ; l'arabe et le francais passent sur
   // la plupart des moteurs modernes).
   if (qui === 'bot' && window.speechSynthesis) {
+    var T = window.I18N
+      ? window.I18N.t
+      : function (c) {
+          return c;
+        };
     var lire = document.createElement('button');
     lire.type = 'button';
     lire.className = 'btn-lire';
-    lire.setAttribute('aria-label', 'Lire a voix haute');
-    lire.textContent = '▶ lire';
+    lire.setAttribute('aria-label', T('Lire a voix haute'));
+    lire.textContent = T('▶ lire');
     var estEnLecture = false;
     lire.addEventListener('click', function () {
       var synth = window.speechSynthesis;
@@ -931,19 +957,30 @@ function ajouterMessage(qui, texte, confiance, epoch) {
       if (estEnLecture) {
         synth.cancel();
         estEnLecture = false;
-        lire.textContent = '▶ lire';
+        lire.textContent = T('▶ lire');
         return;
       }
       // Fragmentchercheur : streaming = la bulle change en cours de route.
       // On lit ce qui est affiche AU CLIC ; complet ou pas, ca reste naturel.
       var u = new SpeechSynthesisUtterance(String(texte));
-      u.lang = document.documentElement.lang || 'fr-FR';
+      // Langue de la voix : celle de l'interface (fr, en, es, ar), pas
+      // seulement celle du navigateur — un visiteur en anglais doit
+      // entendre une voix anglaise meme sur un telephone en francais.
+      u.lang =
+        {
+          fr: 'fr-FR',
+          en: 'en-US',
+          es: 'es-ES',
+          ar: 'ar-SA'
+        }[(window.I18N && window.I18N.get()) || ''] ||
+        document.documentElement.lang ||
+        'fr-FR';
       u.onend = u.onerror = function () {
         estEnLecture = false;
-        lire.textContent = '▶ lire';
+        lire.textContent = T('▶ lire');
       };
       estEnLecture = true;
-      lire.textContent = '⏹ stop';
+      lire.textContent = T('⏹ stop');
       synth.cancel();
       synth.speak(u);
     });
@@ -1083,31 +1120,37 @@ function majStatut(etat, texte) {
   var p = document.getElementById('pointStatut');
   var t = document.getElementById('texteStatut');
   if (!p || !t) return;
+  // Traduction (module I18N de site/langues.js, si charge).
+  var T = window.I18N
+    ? window.I18N.t
+    : function (c) {
+        return c;
+      };
   switch (etat) {
     case 'pret':
       p.className = 'point enligne';
-      t.textContent = 'En ligne';
+      t.textContent = T('En ligne');
       break;
     case 'demarrage':
       p.className = 'point demarrage';
-      t.textContent = texte || 'Demarrage...';
+      t.textContent = texte || T('Demarrage...');
       break;
     case 'arrete':
     case 'erreur':
       p.className = 'point horsligne';
-      t.textContent = texte || 'Hors ligne';
+      t.textContent = texte || T('Hors ligne');
       break;
     case 'pense':
       p.className = 'point pense';
-      t.textContent = 'Reflechit...';
+      t.textContent = T('Reflechit...');
       break;
     case 'horsligne':
       p.className = 'point horsligne';
-      t.textContent = texte || 'Serveur injoignable';
+      t.textContent = texte || T('Serveur injoignable');
       break;
     default:
       p.className = 'point horsligne';
-      t.textContent = texte || 'Statut inconnu';
+      t.textContent = texte || T('Statut inconnu');
   }
 }
 
@@ -1494,6 +1537,158 @@ async function actualiserEtatIA() {
     if (j.ok) majEtatIA(j);
   } catch (e) {}
 }
+
+// ---------------- MON PROFIL (ce que BLAMUNE sait de toi) ----------------
+// Le panneau #zoneProfil (index.html) est vivant ici : lecture par
+// /profil (GET), correction champ par champ (POST champ/valeur), oubli
+// total (DELETE). Les champs prives du serveur (humeur interne,
+// promesses) n'arrivent jamais ici : /profil ne les livre pas.
+var CHAMPS_PROFIL = [
+  { cle: 'nom', etiquette: 'Nom' },
+  { cle: 'prenom', etiquette: 'Prenom' },
+  { cle: 'age', etiquette: 'Age' },
+  { cle: 'ville', etiquette: 'Ville' },
+  { cle: 'metier', etiquette: 'Metier' },
+  { cle: 'gouts', etiquette: 'Gouts' },
+  { cle: 'anniversaire', etiquette: 'Anniversaire (JJ-MM)' }
+];
+
+function ouvrirProfil() {
+  var z = document.getElementById('zoneProfil');
+  if (!z) return;
+  z.style.display = 'flex';
+  chargerProfil();
+}
+
+function fermerProfil() {
+  var z = document.getElementById('zoneProfil');
+  if (z) z.style.display = 'none';
+}
+
+function T_(c) {
+  return window.I18N ? window.I18N.t(c) : c;
+}
+
+async function chargerProfil() {
+  var liste = document.getElementById('listeProfil');
+  if (!liste) return;
+  liste.textContent = '';
+  var note = document.createElement('p');
+  note.className = 'profil-note';
+  note.textContent = T_('Charger le profil...');
+  liste.appendChild(note);
+  try {
+    var r = await fetch('/profil', { headers: authHeaders() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var j = await r.json();
+    var profil = (j && j.profil) || {};
+    liste.textContent = '';
+    var connu = false;
+    CHAMPS_PROFIL.forEach(function (c) {
+      var ligne = document.createElement('div');
+      ligne.className = 'profil-ligne';
+      var lab = document.createElement('label');
+      lab.className = 'profil-label';
+      lab.setAttribute('for', 'prof_' + c.cle);
+      lab.textContent = T_(c.etiquette);
+      var inp = document.createElement('input');
+      inp.type = 'text';
+      inp.id = 'prof_' + c.cle;
+      inp.className = 'profil-champ';
+      inp.maxLength = 200;
+      inp.value = String(profil[c.cle] || '');
+      if (profil[c.cle]) connu = true;
+      ligne.appendChild(lab);
+      ligne.appendChild(inp);
+      liste.appendChild(ligne);
+    });
+    // Champs connus du bot hors grille (memoire libre) : visibles et
+    // modifiables eux aussi — le visiteur controle TOUT ce qui est retenu.
+    Object.keys(profil).forEach(function (c) {
+      if (
+        CHAMPS_PROFIL.some(function (x) {
+          return x.cle === c;
+        })
+      )
+        return;
+      var ligne = document.createElement('div');
+      ligne.className = 'profil-ligne';
+      var lab = document.createElement('label');
+      lab.className = 'profil-label';
+      lab.setAttribute('for', 'prof_' + c);
+      lab.textContent = c;
+      var inp = document.createElement('input');
+      inp.type = 'text';
+      inp.id = 'prof_' + c;
+      inp.className = 'profil-champ';
+      inp.maxLength = 200;
+      inp.value = String(profil[c] || '');
+      ligne.appendChild(lab);
+      ligne.appendChild(inp);
+      liste.appendChild(ligne);
+    });
+    if (!connu && !Object.keys(profil).length) {
+      var vide = document.createElement('p');
+      vide.className = 'profil-note';
+      vide.textContent = T_('Rien, pour le moment. BLAMUNE apprend en te parlant.');
+      liste.appendChild(vide);
+    }
+  } catch (e) {
+    liste.textContent = '';
+    var err = document.createElement('p');
+    err.className = 'profil-note';
+    err.textContent = T_('Profil indisponible pour le moment.');
+    liste.appendChild(err);
+  }
+}
+
+async function sauverProfil() {
+  var liste = document.getElementById('listeProfil');
+  if (!liste) return;
+  var champs = liste.querySelectorAll('.profil-champ');
+  try {
+    for (var i = 0; i < champs.length; i++) {
+      var inp = champs[i];
+      var cle = (inp.id || '').replace(/^prof_/, '');
+      if (!cle) continue;
+      await fetch('/profil', {
+        method: 'POST',
+        headers: Object.assign(
+          { 'Content-Type': 'application/x-www-form-urlencoded' },
+          authHeaders()
+        ),
+        body: 'champ=' + encodeURIComponent(cle) + '&valeur=' + encodeURIComponent(inp.value.trim())
+      });
+    }
+    afficherToastDeco(T_('Profil sauvegarde.'), 'ok');
+  } catch (e) {
+    afficherToastDeco(T_('Profil indisponible pour le moment.'));
+  }
+}
+
+async function oublierProfil() {
+  if (!window.confirm(T_('Effacer tout ce que BLAMUNE a retenu de toi ?'))) return;
+  try {
+    var r = await fetch('/profil', { method: 'DELETE', headers: authHeaders() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    afficherToastDeco(T_('Profil oublie.'), 'ok');
+    fermerProfil();
+  } catch (e) {
+    afficherToastDeco(T_('Profil indisponible pour le moment.'));
+  }
+}
+
+(function initBoutonProfil() {
+  var b = document.getElementById('btnProfil');
+  if (!b) return;
+  b.addEventListener('click', ouvrirProfil);
+  var f = document.getElementById('btnFermerProfil');
+  if (f) f.addEventListener('click', fermerProfil);
+  var s = document.getElementById('btnProfilSauver');
+  if (s) s.addEventListener('click', sauverProfil);
+  var o = document.getElementById('btnProfilOublier');
+  if (o) o.addEventListener('click', oublierProfil);
+})();
 
 // ---------------- NOTIFICATIONS PUSH (sprint E) ----------------
 // Un seul bouton, une seule decision : /push/config dit si le serveur est
@@ -2263,9 +2458,14 @@ function appliquerTheme(nom) {
   if (meta) meta.setAttribute('content', clair ? '#eef2f9' : '#0b1020');
   var b = document.getElementById('btnTheme');
   if (b) {
+    var T = window.I18N
+      ? window.I18N.t
+      : function (c) {
+          return c;
+        };
     // Le libelle annonce le mode d'arrivee, pas celui d'aujourd'hui.
-    b.textContent = clair ? 'Sombre' : 'Clair';
-    b.title = clair ? 'Passer en mode sombre' : 'Passer en mode clair';
+    b.textContent = clair ? T('Sombre') : T('Clair');
+    b.title = clair ? T('Passer en mode sombre') : T('Passer en mode clair');
   }
 }
 
@@ -2337,6 +2537,16 @@ function exporterHistorique() {
   var b = document.getElementById('btnExport');
   if (!b) return;
   b.addEventListener('click', exporterHistorique);
+})();
+
+// Journal public du bot : page vitrine (site/journal.html), chiffres
+// seulement. Un onglet separe : on ne quitte pas la conversation.
+(function initBoutonJournal() {
+  var b = document.getElementById('btnJournal');
+  if (!b) return;
+  b.addEventListener('click', function () {
+    window.open('/journal.html', '_blank', 'noopener');
+  });
 })();
 
 window.addEventListener('load', async function () {

@@ -135,29 +135,69 @@ class SavoirDB {
         valeur TEXT
       );
     `);
+    // VALIDATION (phase 3, P3-5) : un fait pousse par un invite n'est pas
+    // servi avant la validation admin. Colonne ajoutee APRES coup : une
+    // base existante (1266 faits en production) reste valide sans reimport
+    // (defaut 1, deja servis), et un index partiel rend le scan des
+    // `enAttente` instantane sans peser sur les faits servis.
+    const colonnes = this.db.prepare('PRAGMA table_info(savoir)').all();
+    if (!colonnes.some((c) => c.name === 'valide')) {
+      this.db.exec('ALTER TABLE savoir ADD COLUMN valide INTEGER NOT NULL DEFAULT 1');
+    }
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_savoir_valide ON savoir(valide, maj_le)
+        WHERE valide = 0;
+    `);
     this._prep = {
       get: this.db.prepare('SELECT cle, reponse, categorie FROM savoir WHERE cle_norm = ?'),
       // L'export conserve l'ordre du fichier d'origine (`rang`) : sans cela,
       // chaque export trierait par cle et le diff git du savoir deviendrait
       // illisible, alors que c'est justement le moyen de relire les
       // connaissances ajoutees.
+      // WHERE valide = 1 (P3-5) : ce que l'export savoir.txt, la Map de
+      // secours et le RAG peuvent lire. Un fait PROPOSE reste en base mais
+      // n'y figure pas tant que l'admin ne l'a pas valide.
       all: this.db.prepare(
-        'SELECT cle, reponse, categorie FROM savoir ORDER BY rang IS NULL, rang, cle_norm'
+        'SELECT cle, reponse, categorie FROM savoir WHERE valide = 1 ORDER BY rang IS NULL, rang, cle_norm'
       ),
       allRang: this.db.prepare(
         'SELECT cle_norm, cle, reponse, categorie, rang, source FROM savoir ORDER BY rang IS NULL, rang, cle_norm'
       ),
       count: this.db.prepare('SELECT COUNT(*) AS n FROM savoir'),
+      // Import / restauration : etat ecrit tel quel (1 si absent du dump).
+      upsertEtat: this.db.prepare(`
+        INSERT INTO savoir (cle_norm, cle, reponse, categorie, rang, source, maj_le, valide)
+        VALUES (@cle_norm, @cle, @reponse, @categorie, @rang, @source, datetime('now'), @valide)
+        ON CONFLICT(cle_norm) DO UPDATE SET
+          cle = excluded.cle,
+          reponse = excluded.reponse,
+          categorie = excluded.categorie,
+          rang = COALESCE(savoir.rang, excluded.rang),
+          source = excluded.source,
+          maj_le = excluded.maj_le,
+          valide = excluded.valide
+      `),
+      // Faits en attente de validation (P3-5) : lus par /admin/savoir. La
+      // nouvelle reponse n'est pas servie tant que l'admin ne valide pas.
+      enAttente: this.db.prepare(
+        'SELECT cle, reponse, categorie, source, maj_le FROM savoir WHERE valide = 0 ORDER BY maj_le DESC, cle_norm'
+      ),
+      // maj_le repart de maintenant : le fait, approuve par un humain, suit
+      // la meme fenetre de fraicheur que tout le reste.
+      valider: this.db.prepare(`
+        UPDATE savoir SET valide = 1, maj_le = datetime('now') WHERE cle_norm = ? AND valide = 0
+      `),
       upsert: this.db.prepare(`
-        INSERT INTO savoir (cle_norm, cle, reponse, categorie, rang, source, maj_le)
-        VALUES (@cle_norm, @cle, @reponse, @categorie, @rang, @source, datetime('now'))
+        INSERT INTO savoir (cle_norm, cle, reponse, categorie, rang, source, maj_le, valide)
+        VALUES (@cle_norm, @cle, @reponse, @categorie, @rang, @source, datetime('now'), @valide)
         ON CONFLICT(cle_norm) DO UPDATE SET
           cle = excluded.cle,
           reponse = CASE WHEN excluded.reponse <> '' THEN excluded.reponse ELSE savoir.reponse END,
           categorie = COALESCE(excluded.categorie, savoir.categorie),
           rang = COALESCE(savoir.rang, excluded.rang),
           source = excluded.source,
-          maj_le = excluded.maj_le
+          maj_le = excluded.maj_le,
+          valide = excluded.valide
       `),
       meta: this.db.prepare(
         'INSERT INTO meta (cle, valeur) VALUES (?, ?) ON CONFLICT(cle) DO UPDATE SET valeur = excluded.valeur'
@@ -184,7 +224,9 @@ class SavoirDB {
 
   // Remplace la reponse d'une cle, ou cree l'entree si elle n'existe pas.
   // `categorie` : nombre, ou null pour "non classe".
-  mettre(cle, reponse, categorie, source) {
+  // `valide` : 0 = PROPOSE, pas encore servi (P3-5). Absent = 1 : la
+  // correction d'un fait deja valide ne le repasse jamais en attente.
+  mettre(cle, reponse, categorie, source, valide) {
     const c = String(cle || '').trim();
     if (!c) return false;
     const norm = sansAccents(c);
@@ -195,19 +237,34 @@ class SavoirDB {
       reponse: String(reponse == null ? '' : reponse),
       categorie: typeof categorie === 'number' && Number.isFinite(categorie) ? categorie : null,
       rang: null,
-      source: source || 'serveur'
+      source: source || 'serveur',
+      valide: valide === 0 ? 0 : 1
     });
     return true;
   }
 
   // Met a jour la reponse d'une cle existente sans jamais l'effacer si la
   // nouvelle reponse est vide (cas du mot-cle de categorie).
-  repondre(cle, reponse, categorie) {
-    return this.mettre(cle, reponse, categorie, 'apprentissage');
+  repondre(cle, reponse, categorie, valide) {
+    return this.mettre(cle, reponse, categorie, 'apprentissage', valide);
   }
 
   parCle(norm) {
     return this._prep.get.get(String(norm || ''));
+  }
+
+  // Faits proposes par un invite, en attente de validation admin (P3-5).
+  faitsEnAttente() {
+    return this._prep.enAttente.all();
+  }
+
+  // Un admin valide un fait propose : il devient servisable. Retourne vrai
+  // si une ligne etait bien en attente.
+  valider(cle) {
+    const norm = sansAccents(cle);
+    if (!norm) return false;
+    const r = this._prep.valider.run(norm);
+    return (r && r.changes) > 0;
   }
 
   // Toutes les entrees qui AFFIRMENT quelque chose (reponse non vide).
@@ -224,6 +281,24 @@ class SavoirDB {
   // Tout, y compris le rang et la source : utilise par le dump SQL.
   toutesAvecCategorieRang() {
     return this._prep.allRang.all();
+  }
+
+  // Agregat du journal public (/journal) : combien de faits le bot a
+  // APPRIS en usage (source 'apprentissage' = le chat, pas la main ni
+  // le fichier de depot), au total et sur les n derniers jours. Aucun
+  // contenu sort ici : des NOMBRES, jamais un fait personnel d'un
+  // visiteur (la page est public, les faits ne le sont pas).
+  statistiques(nJours) {
+    const jours = Math.max(1, Number(nJours) || 7);
+    const m = this.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM savoir WHERE source = 'apprentissage' AND maj_le >= datetime('now', '-' || ? || ' days')`
+      )
+      .get(jours);
+    const total = this.db
+      .prepare(`SELECT COUNT(*) AS n FROM savoir WHERE source = 'apprentissage'`)
+      .get();
+    return { appris: total.n || 0, semaine: m.n || 0 };
   }
 
   // Analyse un fichier plat en lignes structures.
@@ -319,7 +394,7 @@ class SavoirDB {
       (entrees) => {
         let n = 0;
         for (const e of entrees) {
-          this._prep.upsert.run(Object.assign({ rang: n }, e));
+          this._prep.upsertEtat.run(Object.assign({ rang: n, valide: 1 }, e));
           n++;
         }
         return n;
@@ -501,7 +576,7 @@ class SavoirDB {
     `);
         for (const e of entrees) {
           if (!e.cle_norm || !e.cle) continue;
-          stmt.run(e);
+          stmt.run(Object.assign({ valide: 1 }, e));
         }
         return entrees.length;
       },

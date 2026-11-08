@@ -36,13 +36,24 @@ WORKDIR /app
 # npm ci, et non npm install : le build suit package-lock.json au lieu de
 # resoudre les plages de versions au moment du build. C'est ce qui rend deux
 # builds identiques a partir du meme commit.
-COPY package*.json ./
+COPY --chown=node:node package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-COPY . .
+COPY --chown=node:node . .
+
+# Dossiers d'ecriture du serveur (donnees locales, logs, sauvegardes) et
+# point de montage du savoir partage avec le bot. Le volume nomme
+# server_data:/app est initialise depuis l'image : l'ownership node:node est
+# donc recopie, et le processus n'a plus besoin de root pour ecrire.
+RUN mkdir -p /app/users /app/logs /app/backups /savoir \
+ && chown -R node:node /app /savoir
 
 ENV PORT=8080
 EXPOSE 8080
+
+# Jamais root dans le conteneur : le serveur n'a besoin que de /app et
+# /savoir. Les volumes montes conservent l'ownership ci-dessus.
+USER node
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://127.0.0.1:8080/ping || exit 1

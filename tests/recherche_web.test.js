@@ -4,6 +4,7 @@
 // 100 % hors reseau : l'analyse des resultats passe par des fixtures HTML,
 // pas par une vraie recherche. Le reseau (DuckDuckGo) reste verifie en
 // exploitation reelle, pas en CI (les datacenters sont souvent flagges).
+/* global Response */
 const test = require('node:test');
 const assert = require('node:assert');
 
@@ -70,6 +71,69 @@ test('garde-fou SSRF : hotes prives refuses, publics passes', () => {
   assert.strictEqual(mod.urlLisible('file:///etc/passwd'), false, 'file refuse');
   assert.strictEqual(mod.urlLisible('http://127.0.0.1:9655/'), false, 'boucle locale refusee');
   assert.strictEqual(mod.urlLisible('https://fr.wikipedia.org/wiki/Tokyo'), true, 'public accepte');
+});
+
+test('telechargement : une redirection vers une cible privee est refusee', async () => {
+  const appels = [];
+  const vraiFetch = global.fetch;
+  global.fetch = async (url) => {
+    appels.push(String(url));
+    return new Response('', {
+      status: 302,
+      headers: { location: 'http://169.254.169.254/latest/meta-data/' }
+    });
+  };
+  try {
+    await assert.rejects(
+      () => mod.telecharger('https://exemple-public.fr/page'),
+      /destination non lisible/
+    );
+    assert.deepStrictEqual(
+      appels,
+      ['https://exemple-public.fr/page'],
+      'la cible privee n est jamais appelee'
+    );
+  } finally {
+    global.fetch = vraiFetch;
+  }
+});
+
+test('telechargement : une redirection publique est suivie et le corps rendu', async () => {
+  const appels = [];
+  const vraiFetch = global.fetch;
+  global.fetch = async (url) => {
+    appels.push(String(url));
+    if (String(url) === 'https://exemple-public.fr/page') {
+      return new Response('', { status: 301, headers: { location: '/suite' } });
+    }
+    return new Response('<html><body>Bonjour</body></html>', {
+      status: 200,
+      headers: { 'content-type': 'text/html' }
+    });
+  };
+  try {
+    const texte = await mod.telecharger('https://exemple-public.fr/page');
+    assert.ok(texte.includes('Bonjour'), 'corps final rendu');
+    assert.deepStrictEqual(appels, [
+      'https://exemple-public.fr/page',
+      'https://exemple-public.fr/suite'
+    ]);
+  } finally {
+    global.fetch = vraiFetch;
+  }
+});
+
+test('telechargement : une chaine de redirections sans fin est bornee', async () => {
+  const vraiFetch = global.fetch;
+  global.fetch = async () => new Response('', { status: 302, headers: { location: '/boucle' } });
+  try {
+    await assert.rejects(
+      () => mod.telecharger('https://exemple-public.fr/boucle'),
+      /trop de redirections/
+    );
+  } finally {
+    global.fetch = vraiFetch;
+  }
 });
 
 test('purgerBalises : scripts et styles jetes, entites lues', () => {

@@ -563,7 +563,9 @@ input:focus-visible {
   border-radius: 6px;
   cursor: pointer;
   opacity: 0.55;
-  transition: opacity 0.15s ease, background 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease;
 }
 .btn-lire:hover {
   opacity: 1;
@@ -1907,4 +1909,54 @@ html.console .auth-box::before {
   color: var(--sur-accent);
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   border-color: transparent;
+}
+
+/* ---------------- Classes utilitaires pour remplacer les styles inline ---------------- */
+/* Permet de supprimer 'unsafe-inline' de la CSP (style-src) */
+.cache {
+  display: none !important;
+}
+.etat-ia {
+  display: none;
+  color: var(--texte-doux);
+  font-size: 11px;
+  line-height: 14px;
+  max-width: 260px;
+}
+.note-invite {
+  display: none;
+  color: var(--texte-doux);
+  font-size: 11px;
+  margin-right: 8px;
+}
+.zone-repliable {
+  display: none;
+  align-items: stretch;
+}
+.champ-recherche {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  color: var(--texte);
+  padding: 7px 10px;
+  font-size: 13px;
+}
+.note-recherche {
+  color: var(--texte-doux);
+  font-size: 11px;
+  align-self: center;
+}
+.btn-fermer-recherche {
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  color: var(--texte-doux);
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.msg-noscript {
+  text-align: center;
+  padding: 40px;
+  color: #9fb3c8;
 }

@@ -82,14 +82,22 @@ async function condition(fn, ms, message) {
   throw new Error('trop long : ' + message);
 }
 
+// Un corps non-chaine devient un corps JSON (les routes admin attendent
+// application/json). `corps` vide ou absent : aucune ecriture.
 function requete(port, chemin, methode, corps, headers) {
+  let envoi = corps;
+  const h = Object.assign({}, headers || {});
+  if (envoi && typeof envoi === 'object') {
+    envoi = JSON.stringify(envoi);
+    if (!h['Content-Type']) h['Content-Type'] = 'application/json';
+  }
   return new Promise((resolve, reject) => {
     const options = {
       host: '127.0.0.1',
       port,
       path: chemin,
       method: methode || 'POST',
-      headers: Object.assign({ 'Content-Type': 'application/x-www-form-urlencoded' }, headers || {})
+      headers: Object.assign({ 'Content-Type': 'application/x-www-form-urlencoded' }, h)
     };
     const req = http.request(options, (res) => {
       let data = '';
@@ -103,7 +111,7 @@ function requete(port, chemin, methode, corps, headers) {
       });
     });
     req.on('error', reject);
-    if (corps) req.write(corps);
+    if (envoi) req.write(envoi);
     req.end();
   });
 }
@@ -254,12 +262,34 @@ function promptEgo() {
 
 // Reecrit l'etat interieur pour tester les dates de la relation
 // (premierContact, dernierContact, souvenirs) sans attendre le temps reel.
+// Sur un serveur VIVANT, etat_blamune.json est une ecriture differee (phase 3,
+// P3-1) : le disque n'a pas encore la version courante et un /send la
+// reecrirait par-dessus notre fixture. L'admin reprend donc l'etat au moment
+// voulu, puis on pose le notre (ETAT_FORCE) : les deux chemins (disque, cache
+// en attente) portent alors EXACTEMENT la date demandee.
 function ecrireEtat(dirUid, champs) {
   const base = { premierContact: 0, dernierContact: 0, sessions: 4, souvenirs: [], messages: 12 };
   fs.writeFileSync(
     path.join(dirUid, 'etat_blamune.json'),
     JSON.stringify(Object.assign(base, champs)),
     'utf8'
+  );
+  return Object.assign({}, base, champs);
+}
+
+async function poserEtat(port, dirUid, h, champs) {
+  const etat = ecrireEtat(dirUid, champs);
+  const r = await requete(
+    port,
+    '/admin/etat',
+    'POST',
+    JSON.stringify({ uid: path.basename(dirUid), etat }),
+    Object.assign({ 'Content-Type': 'application/json' }, h)
+  );
+  assert.strictEqual(
+    r.status,
+    200,
+    'admin/etat: HTTP ' + r.status + ' ' + String(r.texte).substring(0, 120)
   );
 }
 
@@ -286,6 +316,12 @@ async function main() {
     // produit, mais la suite envoie beaucoup en peu de temps : on les leve ici.
     RATE_SEND_IP: '1000',
     RATE_SEND_UID: '1000',
+    // Fenetre de la limite PAR UID sur /savoir (phase 3, P3-5) : 10/min en
+    // production. La suite pousse volontairement des faits de test en rafale
+    // (< 2 s) sur le meme compte ; sans cette valeur, elle tombe en 429 au
+    // 11e. Le plafond lui-meme doit donc etre porte plus haut ici, sinon on
+    // ne teste plus les bornes de contenu mais le throttle.
+    SAVOIR_RATE_UID: '1000',
     // Regroupement des extractions (8 s en prod) : desactive pour que chaque
     // message soit extrait immediatement comme avant, sans rallonger la suite.
     EXTRACT_PAUSE_MS: '0',
@@ -298,6 +334,11 @@ async function main() {
     // renvoient la MEME question simple ("quel est mon nom ?") et doivent
     // chacune prouver le chemin modele (et son extraction/son etat).
     CACHE_REPONSES_MS: '0',
+    // Ecritures differees coupees (phase 3, P3-1) : chaque etat_blamune.json,
+    // memoire.txt et proactif.json est ecrit tout de suite, comme avant. La
+    // suite complete des messages puis relit ces fichiers directement (tests
+    // 2 et 18) ; une fenetre de 5 s les ferait lire perimes.
+    ECRITURES_FLUSH_MS: '0',
     // Web Push actif dans le test (cles generees ci-dessus) ; vague
     // d'arriere-plan reportee a une heure : jamais declenchee ici.
     VAPID_PRIVATE_KEY: cleVapidPrivee,
@@ -612,8 +653,17 @@ async function main() {
     ok.push('anniversaire (dans 10 jours)');
 
     // 5bis. Rituels et jalons de la relation
+    // Les seeds passent par /admin/etat (etat differe, phase 3) : le cache en
+    // attente du serveur porte EXACTEMENT la date posee, pas une version
+    // anterieure reecrite par le message precedent.
+    const loginSeed = await requete(PORT_APP, '/login', 'POST', 'pseudo=admin&mdp=' + MDP_ENCODED);
+    assert(loginSeed.json && loginSeed.json.ok, 'login admin pour /admin/etat');
+    const hAdmin = { 'X-UID': loginSeed.json.uid, 'X-EGO': loginSeed.json.ego };
     const ilYa7 = Date.now() - 7 * 86400000;
-    ecrireEtat(dirUid, { premierContact: ilYa7, dernierContact: Date.now() - 3600000 });
+    await poserEtat(PORT_APP, dirUid, hAdmin, {
+      premierContact: ilYa7,
+      dernierContact: Date.now() - 3600000
+    });
     await envoyer('un petit test de date');
     assert(promptTexte().indexOf('JALON DE VOTRE RENCONTRE') >= 0, 'jalon annonce au prompt');
     assert(
@@ -624,12 +674,15 @@ async function main() {
 
     const ilYa1an = new Date();
     ilYa1an.setFullYear(ilYa1an.getFullYear() - 1);
-    ecrireEtat(dirUid, { premierContact: ilYa1an.getTime(), dernierContact: Date.now() - 3600000 });
+    await poserEtat(PORT_APP, dirUid, hAdmin, {
+      premierContact: ilYa1an.getTime(),
+      dernierContact: Date.now() - 3600000
+    });
     await envoyer('un deuxieme test de date');
     assert(promptTexte().indexOf('exactement un an') >= 0, "jalon d'un an");
     ok.push('jalon relation (un an)');
 
-    ecrireEtat(dirUid, {
+    await poserEtat(PORT_APP, dirUid, hAdmin, {
       premierContact: ilYa1an.getTime(),
       dernierContact: Date.now() - 3600000,
       souvenirs: [{ ts: ilYa1an.getTime(), texte: 'ses examens ou resultats' }]
@@ -639,7 +692,7 @@ async function main() {
     assert(promptTexte().indexOf('ses examens') >= 0, 'sujet du souvenir present');
     ok.push("anniversaire d'un souvenir");
 
-    ecrireEtat(dirUid, {
+    await poserEtat(PORT_APP, dirUid, hAdmin, {
       premierContact: Date.now() - 2 * 86400000,
       dernierContact: Date.now() - 26 * 3600000,
       souvenirs: []
@@ -911,7 +964,7 @@ async function main() {
 
     // 14ter. Sauvegarde complete : telechargement admin (sans la cle API)
     //        puis restauration appliquee immediatement, sans redemarrage.
-    const hAdmin = { 'X-UID': login.json.uid, 'X-EGO': login.json.ego };
+    //        (hAdmin est le meme en-tete admin que la section 5bis.)
     const backup = await requete(PORT_APP, '/admin/backup', 'GET', null, hAdmin);
     assert.strictEqual(backup.status, 200, 'sauvegarde admin: HTTP ' + backup.status);
     const snap = JSON.parse(backup.texte);
@@ -946,10 +999,22 @@ async function main() {
       restaurer.json && restaurer.json.ok && restaurer.json.fichiers > 0,
       'fichiers reecrits: ' + restaurer.texte.substring(0, 120)
     );
-    const profilApres = await requete(PORT_APP, '/profil', 'GET', null, h);
-    assert.strictEqual(profilApres.status, 200, 'profil relu apres restauration');
+    // Le savoir restauré est visible sans redémarrage : lecture PAR L'ADMIN
+    // (/admin/savoir) et plus par /profil — la page profil ne livre plus les
+    // faits appris (les faits des AUTRES visiteurs n'étaient pas à leur
+    // place dans la réponse d'un simple utilisateur).
+    const savoirApres = await requete(
+      PORT_APP,
+      '/admin/savoir?recherche=marqueur-restauration',
+      'GET',
+      null,
+      hAdmin
+    );
+    assert.strictEqual(savoirApres.status, 200, 'savoir relu apres restauration');
     assert(
-      (profilApres.json.savoir || []).some((s) => s.cle === 'marqueur-restauration'),
+      ((savoirApres.json && savoirApres.json.faits) || []).some(
+        (s) => s.cle === 'marqueur-restauration'
+      ),
       'savoir restaure visible sans redemarrage du serveur'
     );
     ok.push('restauration appliquee sans redemarrage');
@@ -1374,7 +1439,7 @@ async function main() {
     lignesMem[0] = 'Theo';
     lignesMem[16] = demain.getDate() + ' ' + MOIS[demain.getMonth()];
     fs.writeFileSync(path.join(dirP, 'memoire.txt'), lignesMem.join('\n'), 'utf8');
-    ecrireEtat(dirP, {
+    await poserEtat(PORT_APP, dirP, hAdmin, {
       premierContact: Date.now() - 86400000,
       dernierContact: Date.now() - 3600000,
       sessions: 2,
@@ -1401,14 +1466,27 @@ async function main() {
     );
 
     // Absence : 4 jours sans nouvelles -> "tu m'as manque".
+    // proactif.json est lui aussi une ecriture differee (phase 3, P3-1) : le
+    // serveur vient d'y noter la notice de l'anniversaire. Sans servir le
+    // fichier AVANT la requete, la sonde ne voit ni la notice (dans le cache
+    // en attente) ni le disque rassis, et ne renvoie pas de message.
     fs.writeFileSync(
       path.join(dirP, 'proactif.json'),
       JSON.stringify({ dernierEnvoi: 0, notices: {} }),
       'utf8'
     );
+    const forcerProactif = () =>
+      requete(
+        PORT_APP,
+        '/admin/etat',
+        'POST',
+        JSON.stringify({ uid: uidP, proactif: true }),
+        Object.assign({ 'Content-Type': 'application/json' }, hAdmin)
+      );
+    await forcerProactif();
     lignesMem[16] = ''; // plus d'anniversaire proche : l'absence prime
     fs.writeFileSync(path.join(dirP, 'memoire.txt'), lignesMem.join('\n'), 'utf8');
-    ecrireEtat(dirP, {
+    await poserEtat(PORT_APP, dirP, hAdmin, {
       premierContact: Date.now() - 10 * 86400000,
       // +1 h de marge : un micro-recul d'horloge (synchro NTP) ne doit pas
       // faire tomber l'ecart sous 4 jours et changer le rendu du message.
@@ -1431,7 +1509,8 @@ async function main() {
       JSON.stringify({ dernierEnvoi: 0, notices: {} }),
       'utf8'
     );
-    ecrireEtat(dirP, {
+    await forcerProactif();
+    await poserEtat(PORT_APP, dirP, hAdmin, {
       premierContact: Date.now() - 10 * 86400000,
       dernierContact: Date.now() - 3600000,
       sessions: 3,
@@ -1562,6 +1641,8 @@ async function main() {
     //        connaissances sans deploy. Place AVANT les tests de secours
     //        (22) : ceux-ci ferment le quota pour de bon, plus aucun envoi
     //        nominal ne doit venir apres.
+    // Un COMPTE ecrit direct (P3-5) : le RAG et la validation sont deux
+    // regles differentes, ce bloc doit rester sur le chemin nominal.
     const savRag = await requete(
       PORT_APP,
       '/savoir',
@@ -1570,7 +1651,7 @@ async function main() {
         encodeURIComponent('girafe de test') +
         '&reponse=' +
         encodeURIComponent('un animal a long cou qui mange des feuilles'),
-      h
+      { 'X-UID': login.json.uid, 'X-EGO': login.json.ego }
     );
     assert.strictEqual(savRag.status, 200, 'poussee savoir RAG: HTTP ' + savRag.status);
     // 21bis.a. La connaissance poussee remonte dans le prompt du message
@@ -1674,9 +1755,11 @@ async function main() {
     ok.push('question ouverte en secours : repli honnete, pas de definition hors sujet');
 
     // 23. Savoir AUTO : le bot local (POST /savoir) pousse ses
-    //     apprentissages : ecriture immediate dans savoir.txt (aucun commit
-    //     ni deploy) puis utilisation comme secours des le message suivant.
-    //     Ecriture stricte : invite avec jeton ou admin, jamais legacy.
+    //     apprentissages. Ecriture stricte : invite avec jeton ou compte,
+    //     jamais legacy. DEPUIS P3-5 un INVITE propose (en attente), un
+    //     compte ecrit direct : les deux chemins sont verifies ici.
+    //     Le bloc 21bis a deja fait valider 'girafe de test' — on repart
+    //     d'une cle neuve et on repasse par la validation admin.
     const invSav = await requete(PORT_APP, '/invite', 'POST', '');
     assert(invSav.json && invSav.json.ok, 'invite savoir: ok');
     const hSav = { 'X-UID': invSav.json.uid, 'X-Jeton': invSav.json.jeton };
@@ -1704,33 +1787,86 @@ async function main() {
       401,
       'savoir invite legacy refuse (ecriture stricte): HTTP ' + savLegacy.status
     );
+    // Un compte reel (pas inv_) ecrit DIRECT : c'est le proprietaire et ses
+    // proches. Le fait est servi des le message suivant, sans validation.
+    const savDirect = await requete(
+      PORT_APP,
+      '/savoir',
+      'POST',
+      'cle=' +
+        encodeURIComponent('tapir de test') +
+        '&reponse=' +
+        encodeURIComponent('un mammifere a trompe'),
+      { 'X-UID': login.json.uid, 'X-EGO': login.json.ego }
+    );
+    assert.strictEqual(savDirect.status, 200, 'savoir compte reel: HTTP ' + savDirect.status);
+    assert(
+      savDirect.json && savDirect.json.ok && !savDirect.json.enAttente,
+      'savoir compte reel ecrit direct: ' + String(savDirect.texte).substring(0, 120)
+    );
+    quotaGeneralRestant = 999;
+    const secoursDirect = await envoyer("c'est quoi un tapir de test ?");
+    const texteDirect = ((secoursDirect.json && secoursDirect.json.reponses) || []).join(' ');
+    assert(
+      /mammifere a trompe/i.test(texteDirect),
+      'savoir compte reel servi sans validation: ' + texteDirect.substring(0, 150)
+    );
+    quotaGeneralRestant = 0;
+    ok.push('savoir pousse par un compte: ecriture immediate (pas de validation)');
+
+    // Un INVITE, lui, propose : 201 + enAttente, rien n'est servi.
     const savPousse = await requete(
       PORT_APP,
       '/savoir',
       'POST',
       'cle=' +
-        encodeURIComponent('girafe de test') +
+        encodeURIComponent('okapi de test') +
         '&reponse=' +
-        encodeURIComponent('un animal a long cou qui mange des feuilles'),
+        encodeURIComponent('un animal a rayures sur les pattes'),
       hSav
     );
+    // P3-5 : un INVITE propose (201, enAttente), il n'ecrit pas direct.
     assert.strictEqual(
       savPousse.status,
-      200,
+      201,
       'poussee savoir: HTTP ' + savPousse.status + ' ' + String(savPousse.texte).substring(0, 120)
     );
     assert(
-      savPousse.json && savPousse.json.ok,
+      savPousse.json && savPousse.json.ok && savPousse.json.enAttente === true,
       'poussee savoir corps: ' + String(savPousse.texte).substring(0, 120)
     );
-    // Le quota est referme (22) : la connaissance poussee repondue aussitot,
-    // preuve que savoir.txt est relu sans redemarrage du serveur.
+    // Le quota est referme (22) : RIEN n'est encore servi — le fait propose
+    // attend un humain, meme en panne d'IA.
     quotaGeneralRestant = 999;
-    const secoursSav = await envoyer("c'est quoi une girafe de test ?");
+    const avantValidation = await envoyer("c'est quoi un okapi de test ?");
+    const texteAvant = ((avantValidation.json && avantValidation.json.reponses) || []).join(' ');
+    assert(
+      !/rayures sur les pattes/i.test(texteAvant),
+      'fait propose servi AVANT validation: ' + texteAvant.substring(0, 150)
+    );
+    // L'admin valide : le fait rejoint le savoir partage et repond aussitot.
+    const loginSav = await requete(PORT_APP, '/login', 'POST', 'pseudo=admin&mdp=' + MDP_ENCODED);
+    assert(loginSav.json && loginSav.json.ok, 'login admin pour valider un fait');
+    const hAdminSav = { 'X-UID': loginSav.json.uid, 'X-EGO': loginSav.json.ego };
+    const listAtt = await requete(PORT_APP, '/admin/savoir', 'GET', undefined, hAdminSav);
+    assert(
+      listAtt.json && (listAtt.json.enAttente || []).some((f) => f.cle === 'okapi de test'),
+      'file de validation: fait absent de enAttente: ' + String(listAtt.texte).substring(0, 150)
+    );
+    const valider = await requete(
+      PORT_APP,
+      '/admin/savoir/valider',
+      'POST',
+      { cle: 'okapi de test' },
+      hAdminSav
+    );
+    assert.strictEqual(valider.status, 200, 'validation admin: HTTP ' + valider.status);
+    quotaGeneralRestant = 999;
+    const secoursSav = await envoyer("c'est quoi un okapi de test ?");
     assert.strictEqual(secoursSav.status, 200, 'secours savoir pousse: HTTP ' + secoursSav.status);
     const texteSav = ((secoursSav.json && secoursSav.json.reponses) || []).join(' ');
     assert(
-      /animal a long cou/i.test(texteSav),
+      /rayures sur les pattes/i.test(texteSav),
       'savoir pousse repondu sans deploy: ' + texteSav.substring(0, 150)
     );
     assert(
@@ -1738,30 +1874,69 @@ async function main() {
       'savoir pousse evite le message quota: ' + texteSav.substring(0, 150)
     );
     // Meme cle : la reponse existante est remplacee (pas de doublon).
+    // Un fait deja VALIDE qu'un invite re-pousse : la cle est reconnue
+    // (remplace = true) mais la correction repart EN ATTENTE — un invite
+    // ne peut pas reecrire un fait public sans accord (P3-5).
     const savRemplace = await requete(
       PORT_APP,
       '/savoir',
       'POST',
       'cle=' +
-        encodeURIComponent('girafe de test') +
+        encodeURIComponent('okapi de test') +
         '&reponse=' +
-        encodeURIComponent('un animal encore plus long'),
+        encodeURIComponent('un animal aux pattes zbrees'),
       hSav
     );
-    assert.strictEqual(savRemplace.status, 200, 'remplacement savoir: HTTP ' + savRemplace.status);
+    assert.strictEqual(savRemplace.status, 201, 'remplacement savoir: HTTP ' + savRemplace.status);
     assert(
-      savRemplace.json && savRemplace.json.remplace === true,
-      'remplacement savoir: entree remplacee, pas dupliquee: ' +
+      savRemplace.json && savRemplace.json.remplace === true && savRemplace.json.enAttente,
+      'remplacement savoir: entree reconnue, correction en attente: ' +
         String(savRemplace.texte).substring(0, 120)
     );
+    // L'ancienne reponse, deja validee, continue d'etre servie : une
+    // correction en attente ne fait pas taire ce qui repondait.
+    quotaGeneralRestant = 999;
+    const apresRemplace = await envoyer("c'est quoi un okapi de test ?");
+    const texteApres = ((apresRemplace.json && apresRemplace.json.reponses) || []).join(' ');
+    // RIEN de la correction n'est servi avant validation (c'est la regle
+    // que ce test garde ; la forme exacte du repli honnete depend du bot
+    // local, present ou non selon l'environnement).
+    assert(
+      !/pattes zbrees/i.test(texteApres),
+      'correction en attente servie: ' + texteApres.substring(0, 300)
+    );
+
+    quotaGeneralRestant = 999;
+    // 23bis. Bornes d'ecriture /savoir (phase 3, P3-5) : caracteres de
+    // controle refuses AVANT ecriture, chaque refus laisse le savoir intact.
+    const savCtrl = await requete(
+      PORT_APP,
+      '/savoir',
+      'POST',
+      'cle=' + encodeURIComponent('cle controle') + '&reponse=' + encodeURIComponent('a\u0000b'),
+      hSav
+    );
+    assert.strictEqual(savCtrl.status, 400, 'caractere de controle refuse: ' + savCtrl.status);
+    const savTrop = await requete(
+      PORT_APP,
+      '/savoir',
+      'POST',
+      'cle=' + encodeURIComponent('cle longue') + '&reponse=' + encodeURIComponent('x'.repeat(501)),
+      hSav
+    );
+    assert.strictEqual(savTrop.status, 400, 'reponse > 500 caracteres refusee: ' + savTrop.status);
+    ok.push('savoir: caracteres de controle et reponses trop longues refuses');
     quotaGeneralRestant = 0;
-    ok.push('savoir pousse par le bot: ecriture immediate utilisee comme secours (sans deploy)');
+    ok.push('savoir pousse par un invite: en attente, jamais servi avant validation admin');
+    ok.push('correction proposee par un invite: ancienne reponse validee toujours servie');
+    ok.push('savoir valide par l admin: ecriture immediate utilisee comme secours (sans deploy)');
 
     console.log('\nOK  ' + ok.length + ' verifications :');
     ok.forEach((l) => console.log('  - ' + l));
     console.log('');
   } catch (e) {
     console.error('\nECHEC : ' + e.message);
+    if (process.env.TRACE) console.error(e && e.stack);
     if (journal) console.error('\n--- journal serveur ---\n' + journal.slice(-3000));
     if (journalExtractions.length) {
       console.error(

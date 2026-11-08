@@ -445,3 +445,46 @@ main {
   color: var(--ok);
   font-weight: 500;
 }
+
+/* ---- UTILITAIRES SANS STYLE INLINE (CSP) ---- */
+.stat-chiffre-modele {
+  font-size: 14px;
+  word-break: break-all;
+}
+.ligne-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.champ-mdp {
+  flex: 1;
+  min-width: 200px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  color: var(--texte);
+  font-size: 13px;
+  outline: none;
+}
+.message-inline {
+  font-size: 12px;
+  color: var(--texte-doux);
+}
+.note-inline {
+  font-size: 12px;
+  color: var(--texte-doux);
+  padding: 0 16px 14px;
+  margin: 0;
+}
+.sans-js {
+  max-width: 400px;
+  margin: 80px auto;
+  text-align: center;
+  color: #e2e8f0;
+  font-family: sans-serif;
+}
+.sans-js h2 {
+  color: #f87171;
+}
