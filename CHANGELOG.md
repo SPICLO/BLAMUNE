@@ -21,6 +21,21 @@
   `PRODUCT.md` et `.env.example`. Plan en trois semaines et méthode de
   vérification inclus.
 
+### Correction
+
+- **Trois faits servis avec du bruit d'encodage** (correctif C, audit en
+  profondeur). `plage`, `ciel` et `farine` répondaient avec la barre oblique
+  inversée et le backtick recopiés d'un JSON (« le sol est recouvert de
+  \"sable\" par les vagues »), visibles par le visiteur. Bruit présent dans
+  `savoir.txt` (source `migration`), donc recopié en base à chaque boot.
+  Corrigé sur deux plans :
+  - `savoir.txt` : les trois réponses sont réécrites proprement (et la base
+    mise à jour par le point d'écriture unique, pas à la main) ;
+  - `POST /savoir` **refuse** désormais un contenu contenant `\"` ou un
+    backtick (`400`), ce qui fermait la porte aux faits du bot et des
+    invités ; un test de non-régression lit le savoir de dépôt :
+    `tests/qualite_savoir.test.js` (3 cas).
+
 ### Sécurité
 
 - **Fin du repli « invitation sans jeton »** (correctif A, audit en

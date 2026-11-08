@@ -24,7 +24,7 @@ recette|Liste des ingrédients et instructions pour cuisiner.
 valise|Un contenant souple ou rigide pour transporter des vetements et des effets. Une valise cabine respecte les limites de la compagnie, generalement un format de 55 centimètres de long au maximum.|2
 avion|Un transport aerien qui deplace des passagers ou du fret entre deux aeroports. La cabine est pressurisee pour preserver la sante a l'altitude, et l'equipage navigue a l'aide d'instruments ou de satellites.|2
 hotel|Un etablissement qui loue des chambres pour une ou plusieurs nuits, avec un service de reception, un petit-dejeuner et souvent un reseau wifi. On le classe par nombre d'etoiles, qui refletent le niveau de confort et de service.|2
-plage|Une étendue de sable ou de galets au bord de l'eau. On y trouve le sablesec, le `\"` galet, les Recreations et les Comparable. Les plages surveillées sont reconnaissables à leur drapeau bleu, qui signale un espace classé et surveillé.|2
+plage|Une étendue de sable ou de galets au bord de l'eau. On y trouve le sable, les galets, les rochers, et l'on y fait des jeux de plage. Les plages surveillées sont reconnaissables à leur drapeau bleu, qui signale un espace classé et surveillé.|2
 montagne|Une elevation de terrain de plusieurs centaines de metres de denivele, au-dessus de la limite des arbres. On y pratique la randonnee, l'escalade, le ski en hiver, mais l'air y est plus rare et la temperature plus basse.|2
 carte|Une représentation plane d'un territoire, qui montre les routes, les villes et les reliefs. La carte topographique indique les courbes de niveau, la carte de l'IGN la navigation, et la carte routière les temps de parcours.|2
 pays|Territoire délimité par des frontières.
@@ -120,7 +120,7 @@ année|Période de 365 jours.
 soleil|Étoile qui éclaire la Terre.
 lune|Satellite naturel de la Terre.
 étoile|Corps céleste lumineux.
-ciel|L'espace atmospherique visible quand on leve les yeux. Il change de couleur selon le temps et l'heure : bleu le jour, rouge au lever et au coucher. Le ciel couvre la terre entière et ne s'arrête pas à l'horizon, le\"`"` c'est un effet de perspective.|12
+ciel|L'espace atmosphérique visible quand on lève les yeux. Il change de couleur selon le temps et l'heure : bleu le jour, rouge au lever et au coucher. Le ciel couvre la terre entière et ne s'arrête pas à l'horizon : c'est un effet de perspective.|12
 terre|Planète où nous vivons.
 eau|Liquide transparent et vital.
 feu|Flamme qui produit chaleur et lumière.
@@ -704,7 +704,7 @@ yaourt|Lait fermenté.|1
 beurre|Un corps gras obtenu en barattant la crème. Le beurre demi-sel, salé à 1,5 %, est utilisé en cuisine française ; le beurre doux, salé à 0,3 %, sert surtout en pâtisserie. Il distingue notamment une béchamel d'une sauce au beurre.|1
 crème|Produit laitier épais.|1
 oeuf|Un aliment de la ponte des oiseaux, composé d'un blanc riche en protéines et d'un jaune riche en lipides. Un œuf moyen pèse environ 50 g et apporte 70 kcal. Il se conserve plusieurs semaines au réfrigérateur.|1
-farine|Une poudre de blé ou d'une autre céréale obtenue par mouture. La farine de blé T65 convient aux pains et aux `\"` pâtes, la T55 aux `\"` pâtisseries. Plus le type est élevé, plus la farine est blanche et légère.|1
+farine|Une poudre de blé ou d'une autre céréale obtenue par mouture. La farine de blé T65 convient aux pains et aux pâtes, la T55 aux pâtisseries. Plus le type est élevé, plus la farine est blanche et légère.|1
 levure|Agent qui fait gonfler la pâte.|1
 miel|Substance sucrée produite par les abeilles.|1
 destination|Lieu où l'on se rend.|2

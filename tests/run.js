@@ -1980,7 +1980,26 @@ async function main() {
       hSav
     );
     assert.strictEqual(savTrop.status, 400, 'reponse > 500 caracteres refusee: ' + savTrop.status);
-    ok.push('savoir: caracteres de controle et reponses trop longues refuses');
+    // Correctif C : un artefact de citation (\" ou backtick) ne rentre plus
+    // dans le savoir — il s'afficherait mot pour mot au visiteur.
+    const savBruit = await requete(
+      PORT_APP,
+      '/savoir',
+      'POST',
+      'cle=' +
+        encodeURIComponent('cle bruit') +
+        '&reponse=' +
+        encodeURIComponent('le sol est recouvert de \\"sable\\" par les vagues'),
+      hSav
+    );
+    assert.strictEqual(
+      savBruit.status,
+      400,
+      'artefact de citation refuse: ' + savBruit.status + ' ' + String(savBruit.texte).slice(0, 120)
+    );
+    ok.push(
+      'savoir: caracteres de controle, reponses trop longues et artefacts de citation refuses'
+    );
     quotaGeneralRestant = 0;
     ok.push('savoir pousse par un invite: en attente, jamais servi avant validation admin');
     ok.push('correction proposee par un invite: ancienne reponse validee toujours servie');
@@ -1991,7 +2010,6 @@ async function main() {
     console.log('');
   } catch (e) {
     console.error('\nECHEC : ' + e.message);
-    if (process.env.TRACE) console.error(e && e.stack);
     if (journal) console.error('\n--- journal serveur ---\n' + journal.slice(-3000));
     if (journalExtractions.length) {
       console.error(
