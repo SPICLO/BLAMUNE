@@ -64,6 +64,8 @@ let decouverte = null;
 // d'un disque neuf (1 compte admin sur Render). Un PUT au nom de ces
 // restes ecraserait comptes + historiques + memoires REELS du bin.
 let binLuAuMoinsUneFois = false;
+// Signale que le bin JSONBin est plein (403 > 100 Ko) : arrete de tenter des PUT.
+let binPleinSignale = false;
 
 function enregistrerFabrique(fn) {
   fabriqueSauvegarde = fn;
@@ -321,6 +323,22 @@ async function sauvegarderTout() {
     echecSauvegarde = 0;
   } catch (e) {
     derniereErreur = e.message;
+    const msg = String(e.message || '');
+    // HTTP 403 sur JSONBin gratuit = bin depasse 100 ko : les PUT suivants
+    // echoueront systematiquement. On arrete de tenter pour ne pas spammer
+    // les logs ni consommer le quota de requetes JSONBin. Le serveur passe
+    // en mode lecture seule depuis le cloud ; les nouvelles ecritures restent
+    // en local (perdues au prochain redemarrage Render sans disque persistant).
+    if (/403|over 100kb|Free users cannot update/i.test(msg)) {
+      if (!binPleinSignale) {
+        binPleinSignale = true;
+        console.warn(
+          `[storage] Bin JSONBin plein (>100 Ko, plan gratuit) : sauvegardes cloud `
+          + 'arretees. Ecrivez en local uniquement ou passez a JSONBin Pro.'
+        );
+      }
+      return;
+    }
     echecSauvegarde += 1;
     // Reprise a dosage croissant : l'ecriture suivante redeclenche aussi
     // la sauvegarde, mais si personne n'ecrit plus, la file reste vivante
