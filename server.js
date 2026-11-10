@@ -3002,13 +3002,12 @@ const entretien = setInterval(() => {
 }, 300000);
 if (entretien.unref) entretien.unref();
 
-// ==================== PURGE DES INVITES (48 h) ====================
-// Les comptes d'invitation vivent 48 h depuis leur creation (decision du
-// 2026-11-04, docs/superpowers/specs/2026-11-04-purge-invites-48h-design.md)
+// ==================== PURGE DES INVITES (24 h) ====================
+// Les comptes d'invitation vivent 24 h depuis leur creation.
 // : dossier disque, cloud, RAM, et le jeton devient une pierre tombale.
 // En test, la ronde ne tourne pas : le comportement est teste dans
 // tests/purge_invites.test.js avec des fixtures vieux de deux jours.
-const vieInviteMs = Number(process.env.INVITE_VIE_MS || 2 * 86400000); // 48 h = 2 jours
+const vieInviteMs = Number(process.env.INVITE_VIE_MS || 1 * 86400000); // 24 h = 1 jour
 const intervallePurgeMs = Number(process.env.PURGE_INVITES_MS || 3600000);
 const purgeInvites = creerPurgeInvites({
   usersDir: USERS_DIR,
