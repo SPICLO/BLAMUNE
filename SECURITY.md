@@ -32,14 +32,38 @@ utilisateurs, déni de service par requête.
 | Un uid d'invite seul ne suffit **jamais** : le jeton est exigé        | `extraireAuth`                                                     |
 | Re-inscription d'une invite : nonce de /invite (10 min, usage unique) | `lib/routes/compte.js`, `POST /invite/jeton`                       |
 | Limititation de débit par IP, par clé et par utilisateur              | `lib/rate_limit.js`                                                |
+| Rate limiting **par route dédiée** (send, login, register, admin…)    | `lib/securite.js` (`LIMITES_ROUTES`) + middleware `server.js`      |
 | Rôle admin par `ADMIN_PSEUDO` / `ADMIN_UID`                           | `isAdminUid`                                                       |
-| En-têtes CSP, X-Frame-Options, HSTS                                   | `server.js`, middleware                                            |
-| Extensions sensibles non servies + garde anti-traversée               | `lib/routes/statique.js`                                           |
-| Fichiers de configuration servis en 404                               | middleware                                                         |
-| Mutations protégées par validation d'origine                          | `server.js` (`POST/PUT/PATCH/DELETE`)                              |
+| En-têtes CSP, X-Frame-Options, HSTS, Referrer-Policy, Permissions     | `lib/securite.js` (`appliquerEnTetesSecurite`) + middleware        |
+| Extensions sensibles non servies + garde anti-traversée               | `lib/routes/statique.js` + middleware global `server.js`           |
+| Fichiers de configuration servis en 404                               | `lib/securite.js` (`BLOCKED_NAMES`) + middleware global            |
+| Validation stricte des corps JSON (champs autorisés, tailles max)     | `lib/validation.js` (`validerSend`, `validerPseudo`, etc.)         |
+| Validation stricte des UID (liste blanche, anti-traversée)            | `lib/securite.js` (`uidValide`, `RE_UID_COMPTE`, `RE_UID_INVITE`)  |
+| Middleware d'erreur global (pas de crash silencieux)                  | `server.js` (après toutes les routes)                              |
+| Mutations protégées par validation d'origine                          | `server.js`, section ORIGINE (`POST/PUT/PATCH/DELETE`)             |
 | Conteneurs Docker sans privilège root                                 | `Dockerfile` (`USER node`), `Dockerfile.bot` (`USER 10001`)        |
 | Secrets hors dépôt et hors image                                      | `.gitignore`, `.dockerignore`, `local/.env.securise`               |
 | SSRF : redirections revalidées à chaque saut                          | `lib/recherche_web.js` (`telecharger`)                             |
+
+## Nouveautés de sécurité (2026-11-09)
+
+Les mesures suivantes ont été ajoutées lors de l'audit de sécurité :
+
+| Domaine                | Mesure                                                                                                            | Fichier                                                          |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Centre de sécurité     | Module centralisé regroupant extensions bloquées, validation UID, en-têtes HTTP, rate limit par route, scrypt+sel | `lib/securite.js`                                                |
+| Validation des entrées | Rejet des champs non autorisés, limitation des tailles, sanitisation des champs libres                            | `lib/validation.js`                                              |
+| Middleware global      | Blocage des fichiers sensibles + en-têtes de sécurité sur toutes les réponses + rate limiting par route           | `server.js`                                                      |
+| Tests                  | 64 tests unitaires couvrant `securite.js` et `validation.js`                                                      | `tests/lib.securite.*.test.js`, `tests/lib.validation.*.test.js` |
+
+### Détails des nouvelles protections
+
+- **Extensions bloquées étendues** : `.env`, `.ps1`, `.bat`, `.exe`, `.db`, `.log`, `.pem`, `.key`, `.crt`, `.gitignore`, `.dockerignore`, et tous les fichiers de configuration sensibles (`comptes.json`, `config.json`, `savoir.db`, `savoir.txt`, `replis.txt`, etc.) sont servis en 404.
+- **En-têtes de sécurité** : CSP, HSTS, X-Frame-Options (DENY), X-Content-Type-Options (nosniff), Referrer-Policy, Permissions-Policy appliqués sur **toutes** les réponses.
+- **Rate limiting par route** : `/send` (30/min IP, 20/min uid), `/login` (10/min IP), `/register` (5/min IP), `/admin` (5/min IP), `/historique` (30/min uid), `/stats` (10/min uid), `/push` (5/min uid), `/invite` (10/min IP).
+- **CSRF / origine des mutations** : les requêtes mutantes (POST/PUT/PATCH/DELETE) d'une origine tierce, `null`, ou d'un `Sec-Fetch-Site: cross-site` sans `Origin` reçoivent un 403 (`server.js`, section ORIGINE). Les origines de confiance se déclarent par `CORS_ORIGINS` (séparateur espace).
+
+  _Supprimé le 2026-11-10_ : `lib/csrf.js` annonçait un jeton `X-CSRF-Token` dérivé de l'ego. Il n'était **importé par aucune ligne du serveur**, son `ALLOWED_ORIGINS` n'existait dans aucune configuration ni documentation, et le site n'envoyait évidemment pas le jeton qu'il exigeait. Un module de sécurité jamais monté ne protège rien ; il donne surtout la fausse impression que la question est traitée. Le seul contrôle réel — et suffisant ici, l'authentification passant par des en-têtes personnalisés que ni un formulaire tiers ni un appel `fetch` cross-origin simple ne peuvent poser — est le contrôle d'origine de `server.js`.
 
 ## Points connus, à traiter avant une exposition publique
 

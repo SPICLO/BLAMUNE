@@ -1727,13 +1727,20 @@ try {
                 $pseudo = Extraire-Param $body "pseudo"
                 $mdp = Extraire-Param $body "mdp"
                 $email = Extraire-Param $body "email"
-                if ($pseudo.Length -lt 2) {
-                    $json = @{ ok = $false; message = "Pseudo trop court (2 min)." } | ConvertTo-Json -Compress
+                # Memes regles que lib/validation.js (serveur Node) : un
+                # compte cree ici doit etre acceptable en ligne, et un
+                # refus doit dire la MEME chose aux deux endroits.
+                $pseudoOk = ($pseudo.Length -ge 3) -and ($pseudo.Length -le 32) -and ($pseudo -match '^[A-Za-z0-9_.\-]+$') -and ($pseudo.ToLower() -ne 'admin')
+                if (-not $pseudoOk) {
+                    $json = @{ ok = $false; message = "Pseudo : 3 a 32 caracteres (lettres, chiffres, _, ., -), admin reserve." } | ConvertTo-Json -Compress
                     $rep = Reponse-HTTP 400 "application/json" $json
-                } elseif ($mdp.Length -lt 6) {
-                    $json = @{ ok = $false; message = "Mot de passe trop court (6 min)." } | ConvertTo-Json -Compress
+                } elseif ($mdp.Length -lt 8) {
+                    $json = @{ ok = $false; message = "Mot de passe trop court (8 min)." } | ConvertTo-Json -Compress
                     $rep = Reponse-HTTP 400 "application/json" $json
-                } elseif ($email -eq "" -or $email -notmatch '@') {
+                } elseif ($mdp.Length -gt 128) {
+                    $json = @{ ok = $false; message = "Mot de passe trop long (128 max)." } | ConvertTo-Json -Compress
+                    $rep = Reponse-HTTP 400 "application/json" $json
+                } elseif ($email -eq "" -or $email -notmatch '^[^\s@]+@[^\s@]+\.[^\s@]+$') {
                     $json = @{ ok = $false; message = "Email invalide." } | ConvertTo-Json -Compress
                     $rep = Reponse-HTTP 400 "application/json" $json
                 } else {

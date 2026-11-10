@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#eef2f9" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1020" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="BLAMUNE" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Notifications - BLAMUNE</title>
+    <meta
+      name="description"
+      content="Activez les notifications push pour ne rien manquer de votre conversation avec BLAMUNE."
+    />
+    <link rel="icon" href="favicon.ico?v=16" sizes="any" />
+    <link rel="icon" type="image/png" href="icon-192.png?v=16" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png?v=16" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="stylesheet" href="style.css?v=16" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "BLAMUNE - Notifications",
+        "description": "Activer les notifications push pour suivre votre conversation avec BLAMUNE.",
+        "url": "{{BASE_URL}}/push",
+        "author": { "@type": "Organization", "name": "BLAMUNE" }
+      }
+    </script>
+  </head>
+  <body>
+    <a href="#contenu" class="skip-link">Aller au contenu principal</a>
+
+    <div id="ecranAuth" style="display: none">
+      <div class="auth-box">
+        <div class="auth-avatar"><img src="logo-repos.svg" alt="BLAMUNE" /></div>
+        <h2 data-i18n="Notifications">Notifications</h2>
+        <p
+          class="auth-sous"
+          data-i18n="Activez les notifications pour recevoir des alertes en temps reel"
+        >
+          Activez les notifications pour recevoir des alertes en temps reel
+        </p>
+
+        <div id="authPrincipal">
+          <!-- Etat de l'abonnement -->
+          <div id="etatNotifications" class="pane">
+            <div id="etatNotification" class="info-ligne" style="display: none">
+              <span class="icone-ok">&#10003;</span>
+              <span id="etatTexte"></span>
+            </div>
+            <div id="etatWait" class="info-ligne" style="display: none">
+              <span class="icone-attente">&#9203;</span>
+              <span id="waitTexte">En attente...</span>
+            </div>
+            <div id="etatErreur" class="info-ligne" style="display: none">
+              <span class="icone-erreur">&#10007;</span>
+              <span id="erreurTexte">Erreur.</span>
+            </div>
+          </div>
+
+          <div class="pane">
+            <p class="intro" data-i18n="NotificationsPush">Notifications Push</p>
+            <p class="sous" data-i18n="PushDesc">
+              Recevez une alerte quand BLAMUNE repond en mode
+              <em>BLAMUNE</em> (2). L'activation demande l'autorisation du navigateur ; elle n'envoi
+              par de donnees privées, seulement un identifiant anonyme.
+            </p>
+            <div class="champ-grp">
+              <label for="serie" class="champ-label" data-i18n="Serie"> Série </label>
+              <select id="serie" class="champ-select">
+                <option value="mode2" data-i18n="ModeBlamune">Mode BLAMUNE</option>
+                <option value="mode1" data-i18n="ModeEgo">Mode EGO</option>
+                <option value="tous" data-i18n="Tous">Tous les modes</option>
+              </select>
+            </div>
+            <div class="champ-grp">
+              <label for="interval" class="champ-label" data-i18n="Intervalle"> Intervalles </label>
+              <select id="interval" class="champ-select">
+                <option value="1" data-i18n="Token">Au nouveau token</option>
+                <option value="5" data-i18n="5Min">Toutes les 5 min</option>
+                <option value="30" data-i18n="30Min">Toutes les 30 min</option>
+              </select>
+            </div>
+            <div class="champ-grp">
+              <button id="btnActiver" class="btn" type="button">
+                <span data-i18n="Activer">Activer</span>
+                <span id="btnEtatTxt" class="btn-etat">désactivé</span>
+              </button>
+              <button id="btnDeactiver" class="btn" type="button" disabled>
+                <span data-i18n="Desactiver">Désactiver</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Historique des dernieres notifications (debug) -->
+          <div class="pane" style="display: none" id="debugZone">
+            <p class="intro" data-i18n="Journal">Journal</p>
+            <div id="journal" class="pane-contenu"></div>
+          </div>
+
+          <div id="messagerie" class="pane">
+            <p class="intro" data-i18n="Messagerie">Messagerie</p>
+            <p class="sous" data-i18n="PushMsg">
+              Quand BLAMUNE repond, vous recevrez une alerte avec un bouton pour retrouver la
+              conversation. La bulle apparait dans la barre d'etat du navigateur (ou en-bas sur
+              mobile).
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <main id="chat" aria-live="polite" aria-label="Notifications">
+      <noscript>
+        <p class="msg-noscript">JavaScript est requis pour activer les notifications push.</p>
+      </noscript>
+    </main>
+
+    <footer id="barre">
+      <div id="barreAction"></div>
+    </footer>
+
+    <script src="langues.js"></script>
+    <script src="push.js"></script>
+  </body>
+</html>

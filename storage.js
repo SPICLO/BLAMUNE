@@ -246,7 +246,19 @@ async function trouverOuCreerBin() {
   decouverte = Object.assign({}, decouverte, { creation: id });
   try {
     fs.writeFileSync(FICHIER_BIN_ID, id, 'utf8');
-  } catch (e) {}
+  } catch (e) {
+    // Le bin est cree mais son identifiant ne survit pas au redemarrage :
+    // l'instance en creera un NOUVEAU au prochain boot, et les donnees du
+    // precedent deviennent orphelines. C'est exactement le cas ou il faut
+    // le dire, avec l'identifiant a figer dans JSONBIN_BIN_ID.
+    console.error(
+      '[storage] identifiant du bin NON enregistre (' +
+        ((e && e.message) || e) +
+        ') : ajoute JSONBIN_BIN_ID=' +
+        id +
+        ' dans l environnement'
+    );
+  }
   console.log(`[storage] Bin cree: ${id}`);
   console.log(`[storage] Pour figer ce bin: ajoute JSONBIN_BIN_ID=${id} (Render > Environment)`);
   return binIdCourant;

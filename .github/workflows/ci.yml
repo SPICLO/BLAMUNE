@@ -58,15 +58,13 @@ jobs:
       - name: Tests d'integration
         run: npm test
 
-      # Verifie qu'aucune route n'est capturee par un wildcard : le catcher
-      # app.get('*') doit rester le dernier enregistre.
-      - name: 'Routes : aucune route ombriquee'
-        run: node tests/routes_smoke.test.js
-
-      # Cycle de vie d'une invite duree 48 h comprimee a 1 s : le VRAI
-      # server.js doit purger (dossier, cloud, jeton+tombstone, refus).
-      - name: 'Purge des invites (e2e temps comprime)'
-        run: node tests/e2e_purge.test.js
+      # E2E : routes non ombriquees (le catcher app.get('*') reste le
+      # dernier enregistre) + cycle de vie d'une invite duree 48 h
+      # comprimee a 1 s (le VRAI server.js purge dossier, cloud, jeton,
+      # puis refuse). Une seule entree, la meme que `npm run test:e2e` :
+      # un test qui n'existe que dans le YAML finit par diverger du local.
+      - name: 'E2E (routes non ombriquees + purge des invites)'
+        run: npm run test:e2e
 
       - name: Tests du service bot (Python)
         run: python tests/bot_service.test.py

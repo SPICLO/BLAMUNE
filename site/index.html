@@ -115,8 +115,9 @@
                 placeholder="Choisis un pseudo"
                 data-i18n-ph="Choisis un pseudo"
                 autocomplete="username"
-                maxlength="30"
-                aria-label="Choisis un pseudo"
+                minlength="3"
+                maxlength="32"
+                aria-label="Choisis un pseudo, 3 caracteres minimum"
               />
             </div>
             <div class="champ">
@@ -134,11 +135,12 @@
               <input
                 id="authMdpReg"
                 type="password"
-                placeholder="Mot de passe"
+                placeholder="Mot de passe (8 caracteres min.)"
                 data-i18n-ph="Choisis un mot de passe"
                 autocomplete="new-password"
                 maxlength="100"
-                aria-label="Choisis un mot de passe"
+                minlength="8"
+                aria-label="Choisis un mot de passe, 8 caracteres minimum"
               />
             </div>
             <button id="btnRegister" class="auth-btn" type="button" data-i18n="Creer mon compte">

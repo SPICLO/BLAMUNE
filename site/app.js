@@ -382,12 +382,19 @@ async function authRegister() {
   var email = emailEl.value.trim();
   var mdp = mdpEl.value;
   errEl.textContent = '';
+  // Memes regles que le serveur (lib/validation.js) : pseudo 3-32 caracteres
+  // alphanumeriques (_, ., - admis) et mot de passe 8 minimum. Avant, la page
+  // acceptait 2 et 6 puis le serveur repondait 400 : le visiteur voyait
+  // "Creation..." puis un refus, sans savoir quel champ corriger.
+  var pseudoOk = pseudo.length >= 3 && pseudo.length <= 32 && /^[A-Za-z0-9_.\-]+$/.test(pseudo);
+  var mdpOk = mdp.length >= 8;
   if (
-    !marquerChamp(pseudoEl, pseudo.length >= 2, true) ||
+    !marquerChamp(pseudoEl, pseudoOk, true) ||
     !marquerChamp(emailEl, email.indexOf('@') >= 0, true) ||
-    !marquerChamp(mdpEl, mdp.length >= 6, true)
+    !marquerChamp(mdpEl, mdpOk, true)
   ) {
-    errEl.textContent = 'Des champs sont invalides.';
+    errEl.textContent =
+      'Pseudo : 3 a 32 lettres, chiffres, point, tiret ou underscore. Mot de passe : 8 caracteres minimum.';
     majEchec(true);
     return;
   }

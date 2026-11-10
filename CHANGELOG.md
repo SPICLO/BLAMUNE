@@ -1,5 +1,95 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-10 (correctifs signales par l'usage)
+
+### Correction
+
+- **Le serveur ne demarrait plus** : `server.js` appelait `app.use(...)`
+  avant `const app = express()`, et un bloc de declarations etait duplique en
+  plein milieu du fichier. `GET /ping` repond de nouveau.
+- **Toute photo jointe depuis le site etait refusee en 400.**
+  `site/app.js` envoie `image=data:image/png;base64,...` ; `lib/validation.js`
+  n'acceptait qu'un booleen. `send.js` savait deja decoder la photo : la
+  porte en amont etait fermee. Data URL et booleen acceptes, photo seule
+  autorisee (le message devient `(photo)`).
+- **Le cache de memoire ne s'invalidait jamais.** `lireMemoire()` rendait le
+  cache RAM sans verifier le disque : une ecriture faite par un autre chemin
+  (restauration de sauvegarde, suppression de profil, migration) restait
+  invisible jusqu'au redemarrage. Cache marque par `mtimeMs`, invalide si le
+  fichier change, avec une fenetre « ecriture locale en attente » pour ne pas
+  casser le differe de 5 s.
+- **Limites de debit appliquees DEUX fois.** Le middleware global de
+  `server.js` posait un compteur en dur (`/send` 30/min, `/invite` 10/min,
+  `/admin` 5/min, `/register` 5/min) AVANT la route, qui a le sien : la
+  variable de configuration (`RATE_SEND_IP`, `INVITE_RATE_IP`...) etait morte
+  et le plafond le plus rigide gagnait. Un seul compteur par route, et
+  `RATE_ADMIN_IP` / `RATE_REGISTER_IP` ajoutees (documentees dans
+  `.env.example`).
+- **Fait appris perdu entre resume et extraction.** `majResume` et
+  `extraireAvecModele` partaient cote a cote et ecrivaient la meme
+  `memoire.txt` : le dernier ecrasait l'autre. L'extraction attend desormais
+  la fin du resume (`sequencerExtraction`, `tests/envoi_ordres.test.js`).
+- **Textos proactifs en mojibake** (« Tu m'as manquÃƒÆ'... »), visibles par le
+  visiteur : reecrits en ASCII, `tests/messages_propres.test.js` verrouille.
+- **Jalon « une semaine » masque par l'anniversaire de la rencontre** : a
+  7 jours pile, le texte disait « exactement un an ».
+- **`/register` ignorait `lib/validation.js`** : 2 caracteres de pseudo et 6
+  de mot de passe au lieu de 3 et 8. Les fonctions validees et testees
+  n'etaient jamais appelees. Site, `index.html` et `serveur_bot.ps1` alignes.
+- **Sonde Gemini perdue apres un echec** : le timer unique n'etait jamais
+  annule, donc `planifierSondeGemini()` sortait sans rien reprogrammer et
+  l'eclipse restait armee indefiniment.
+- **Arret du process** : `unref()` sur les entretiens periodiques (purge des
+  invites, sauvegarde cloud, stats, nettoyage memoire), taches de fond
+  reportees annulees a la fermeture, second signal plus jamais ignore, filet
+  de 5 s de nouveau referencable.
+- **14 `catch (e) {}` avalaient une ecriture de donnees** (historique,
+  memoire, etat, comptes, resume, invitations, identifiant de bin JSONBin).
+  Chacun trace desormais l'echec ; `dossierUser` qui leve ne fait plus tomber
+  `/send` en 500 (`tests/ecritures_tracees.test.js`).
+
+### Suppression
+
+- **`lib/csrf.js`** : module jamais importe, dont `ALLOWED_ORIGINS` n'existait
+  dans aucune configuration et dont le jeton `X-CSRF-Token` n'etait envoye par
+  aucun client. Le controle reel est celui de `server.js` (section ORIGINE),
+  verifie : origine tierce et `null` -> 403. `SECURITY.md` corrige.
+
+### Maintenance
+
+- **`lib/utilitaires.js` est la source unique** des fonctions pures du
+  prompt (jalons, souvenirs, intention, humeurs, anniversaires) : les 9
+  copies de `server.js` sont supprimees. Les deux versions avaient derive
+  (prefixe `\n\n`, textes d'humeur, bloc souvenir) ; `tests/utilitaires.test.js`
+  fige les sorties.
+- **Tests orphelins branches** : `saturation.test.js` n'etait lance par
+  personne ; `npm run test:e2e` et `npm run test:all` ajoutes, la CI utilise
+  le script au lieu de deux commandes ecrites en dur.
+
+- **« En quelle année as-tu été créée ? » pouvait répondre « 226 »** (mode
+  BLAMUNE et mode EGO). Le fait fixe du prompt est « juillet 2026 », mais un
+  modele du pool qui improvise abregeait l'annee. Cinq couches :
+  - prompts systeme EGO et BLAMUNE : regle « l'annee s'ecrit toujours en
+    entier, 2026 » ;
+  - `lib/utilitaires.js` : `corrigerAnneeIdentite()`, appele par
+    `nettoyerReponse()` — une auto-revelation a la 1re personne avec
+    « en/depuis 226 » est resserree sur l'annee en cours ; les annees de
+    l'utilisateur et les dates historiques ne sont jamais touchees ;
+  - `site/ia-secours.js` : meme regle dans la personnalite du repli ;
+  - `lib/autotest_identite.js` : 4 questions « annee » ajoutees (fr/en/es/ar),
+    12 au total — le retour du bug remonte en /admin/test-identite ;
+  - `tests/identite_annee.test.js` : 4 cas de garde.
+- **Mode clair : les bulles du chat restaient aux couleurs de la nuit.**
+  `.msg.bot .bulle` et `.msg.moi .bulle` (couleurs chiffrees : bleu nuit,
+  texte `#eafff7`) ne suivaient pas `[data-theme='clair']`. Surcharge
+  explicite dans `site/style.css` : bulle du bot claire, bulle envoyee vert
+  clair a texte sombre lisible, survols adoucis.
+- **« /oublie » n'effacait plus l'historique** (regression de l'ecriture
+  differee). `DELETE /historique` vidait le fichier et la RAM vivante mais
+  le cache memoire de `lib/historique.js` restituait l'ancien contenu a la
+  lecture suivante. Nouvelle fonction `effacerHistorique()` (fichier + cache
+  memoire + copie cloud) branchee dans la route.
+
 ## [Non publié] - 2026-11-08 (audit approfondi, phase 3 : usage réel et robustesse)
 
 ### Documentation

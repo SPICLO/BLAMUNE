@@ -73,6 +73,24 @@ export default [
     }
   },
   {
+    // Tests unitaires node:test (tests/*.test.js) : describe/it/test/suite et
+    // before/after sont des globales fournies par `node --test` (les fichiers
+    // ne les importent pas). Sans ca, no-undef les signale.
+    files: ['tests/**/*.test.js'],
+    languageOptions: {
+      globals: {
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        suite: 'readonly',
+        before: 'readonly',
+        after: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly'
+      }
+    }
+  },
+  {
     // vitrine/app.js : PROJETS est pose par vitrine/projets.js (script
     // classique charge AVANT app.js, cf. vitrine/index.html).
     files: ['vitrine/app.js'],

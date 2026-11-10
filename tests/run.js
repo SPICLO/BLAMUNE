@@ -316,6 +316,10 @@ async function main() {
     // produit, mais la suite envoie beaucoup en peu de temps : on les leve ici.
     RATE_SEND_IP: '1000',
     RATE_SEND_UID: '1000',
+    // Meme raison pour /admin : la suite enchaine une quinzaine de mutations
+    // admin (poserEtat, restauration, savoir) en une minute. 5/min est le
+    // vrai comportement produit, pas celui d'un script legitime.
+    RATE_ADMIN_IP: '1000',
     // Fenetre de la limite PAR UID sur /savoir (phase 3, P3-5) : 10/min en
     // production. La suite pousse volontairement des faits de test en rafale
     // (< 2 s) sur le meme compte ; sans cette valeur, elle tombe en 429 au
@@ -767,16 +771,39 @@ async function main() {
       'fait extrait ecrit dans memoire.txt'
     );
     ok.push('extraction par le modele (appel + ecriture)');
-    await envoyer('super, et tu as bien tout retenu ?');
+    const avantDernier = nbExtractions;
+    // L'ENVOI DOIT REUSSIR. Longtemps il ne l'etait pas : /send tombait en
+    // 429 (rate limit par uid, 20/min, le module ignorait RATE_SEND_UID) et
+    // le prompt relu etait celui du message PRECEDENT — d'ou un echec qui
+    // accusait l'extraction a tort. Un 429 ici doit s'entendre comme tel.
+    const dernierEnvoi = await envoyer('super, et tu as bien tout retenu ?');
+    assert.strictEqual(
+      dernierEnvoi.status,
+      200,
+      'envoi de verification en 200 (recu HTTP ' +
+        dernierEnvoi.status +
+        ' ' +
+        String(dernierEnvoi.texte).slice(0, 200) +
+        ')'
+    );
     const memoireTexte = fs.existsSync(fMemoire) ? fs.readFileSync(fMemoire, 'utf8') : '(absent)';
-    assert(
-      promptTexte().indexOf('Maeva') >= 0,
-      'fait extrait par le modele injecte â€” memoire: ' + JSON.stringify(memoireTexte)
-    );
-    assert(
-      promptTexte().indexOf('Bordeaux') >= 0,
-      'second fait extrait â€” memoire: ' + JSON.stringify(memoireTexte)
-    );
+    const derniereConsigne = journalExtractions.length
+      ? journalExtractions[journalExtractions.length - 1]
+      : '(aucune)';
+    const contexte = (m) =>
+      m +
+      ' — memoire: ' +
+      JSON.stringify(memoireTexte) +
+      ' — derniere consigne d extraction: ' +
+      JSON.stringify(derniereConsigne) +
+      ' — extractions: ' +
+      journalExtractions.length +
+      ' — premier bloc contenant Maeva: ' +
+      JSON.stringify(String(promptTexte()).match(/.{0,120}Maeva.{0,120}/) || null) +
+      ' — extractions lancees par le dernier envoi: ' +
+      (nbExtractions - avantDernier);
+    assert(promptTexte().indexOf('Maeva') >= 0, contexte('fait extrait par le modele injecte'));
+    assert(promptTexte().indexOf('Bordeaux') >= 0, contexte('second fait extrait'));
     ok.push('extraction par le modele (Maeva, Bordeaux)');
 
     // 8. Resume de conversation : les anciens echanges sont plies puis relus

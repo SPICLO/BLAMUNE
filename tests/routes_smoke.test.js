@@ -87,7 +87,12 @@ function requeteBrute(port, chemin, entetes) {
   const env = Object.assign({}, process.env, {
     NODE_ENV: 'test',
     PORT: String(port),
-    BLAMUNE_DATA_DIR: dataDir
+    BLAMUNE_DATA_DIR: dataDir,
+    // Ce smoke enchaine une dizaine de mutations /admin (suppressions de
+    // compte) en quelques secondes : sans ce plafond, il tombe en 429 au
+    // 6e appel et les controles suivants passent pour des echecs.
+    // Meme convention que tests/run.js.
+    RATE_ADMIN_IP: '1000'
   });
   const srv = spawn(process.execPath, [path.join(RACINE, 'server.js')], {
     cwd: RACINE,

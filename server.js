@@ -17,6 +17,21 @@ const {
   purger: purgerRateLimits
 } = require('./lib/rate_limit');
 const { creerHistorique } = require('./lib/historique');
+// SOURCE UNIQUE des fonctions pures de la relation et du prompt (jalons,
+// souvenirs, intention, sansAccents, humeurs, anniversaires). Elles etaient
+// dupliquees ici : voir l'en-tete de lib/utilitaires.js.
+// Seuls les noms REELLEMENT utilises par server.js sont importes : un nom
+// importe et inutilise laisse croire a une copie locale qui n'existe plus.
+const {
+  corrigerAnneeIdentite,
+  intentionDeMessage,
+  joursAvantAnniversaire,
+  texteHumeur,
+  // Consommes par blocSysteme, qui reste ici (il depend de la persona du
+  // serveur). Les implementations, elles, vivent dans lib/utilitaires.js.
+  blocJalons,
+  blocSouvenirsAnniversaires
+} = require('./lib/utilitaires');
 const { creerMemoire, indiceMemoire } = require('./lib/memoire');
 const { creerConfigIA } = require('./lib/config_ia');
 const { creerRoutesCompte } = require('./lib/routes/compte');
@@ -25,8 +40,10 @@ const { creerRouteAvis } = require('./lib/routes/avis');
 const { creerRoutesConsultation } = require('./lib/routes/consultation');
 const { creerRoutesStatique } = require('./lib/routes/statique');
 const { creerRouteSend } = require('./lib/routes/send');
+
 const { creerGemini, estQuota } = require('./lib/ia/gemini');
 const { creerPoolIA } = require('./lib/pool_ia');
+const securite = require('./lib/securite');
 const { demarrerKeepalive } = require('./lib/keepalive');
 const { creerCompression } = require('./lib/compression');
 const { creerCompteurSortie } = require('./lib/sortie');
@@ -67,6 +84,118 @@ const tension = require('./lib/tension');
 tension.configurerJournal((msg) => loggerErreur('tension', msg));
 
 const app = express();
+// ------------------- Middlewares de securite globaux -------------------
+
+// Middleware qui bloque les fichiers sensibles dans /admin et le site.
+// Il tourne AVANT les routes de fichiers, mais APRES toute la logique
+// qui pourrait modifier l'etat. Les routes de fichiers les verifient
+// aussi, mais ce garde est la derniere ligne de defense.
+app.use((req, res, next) => {
+  // Bloquer les extensions interdites
+  const ext = path.extname(req.path).toLowerCase();
+  if (securite.estBloque(ext) || securite.estBloque(req.path)) {
+    return res.status(404).send('Non autorise');
+  }
+
+  // Bloquer les fichiers non autorises dans /admin
+  if (req.path.startsWith('/admin/')) {
+    const fichier = req.path.replace(/^\/admin\//, '').toLowerCase();
+    if (securite.estBloque(fichier) || securite.BLOCKED_NAMES.has(fichier)) {
+      return res.status(404).send('Non autorise');
+    }
+  }
+
+  // Appliquer les en-tetes de securite sur TOUTES les reponses
+  securite.appliquerEnTetesSecurite(res);
+
+  // Rate limiting par route (avant les handlers de route)
+  const route = req.path
+    .split('/')
+    .slice(1) // skip leading empty
+    .join('/')
+    .split('?')[0];
+  const routeNom =
+    route === 'admin' || route.startsWith('admin/')
+      ? 'admin'
+      : route === 'send'
+        ? 'send'
+        : route === 'login'
+          ? 'login'
+          : route === 'register'
+            ? 'register'
+            : route === 'profil' || route.startsWith('profil/')
+              ? 'profil'
+              : route === 'historique' || route.startsWith('historique/')
+                ? 'historique'
+                : route === 'stats' || route.startsWith('stats/')
+                  ? 'stats'
+                  : route === 'statique'
+                    ? 'statique'
+                    : route === 'push'
+                      ? 'push'
+                      : route === 'invite'
+                        ? 'invite'
+                        : 'statique';
+
+  // Rate limit par IP pour les routes sensibles.
+  // /send est VOLONTAIREMENT absent : son quota vit dans lib/routes/send.js
+  // (RATE_SEND_IP / RATE_SEND_UID, fenetre distincte par IP ET par compte).
+  // Un second compteur ici, en dur a 30/min, s'appliquait AVANT la route,
+  // ignorait RATE_SEND_IP et faisait tomber en 429 la suite de tests comme
+  // une vraie session dense (48 messages/minute) : deux limites pour une
+  // seule route, la plus rigide gagne et la configurable est morte.
+  if (routeNom === 'admin') {
+    const ip = getIp(req);
+    // /admin en LECTURE (GET) est consulte par le tableau de bord qui
+    // interroge plusieurs routes d'affilee (/admin/data, /admin/logs,
+    // /admin/savoir...). 5 requetes/minute pour TOUTES les lectures
+    // admin ensemble bloquaient l'admin des le 6e chargement, alors que
+    // les routes de lib/routes/admin.js ont deja leur propre compteur.
+    // Les MUTATIONS (POST/PUT/PATCH/DELETE) gardent le plafond serre.
+    // RATE_ADMIN_IP surcharge le tout (suite de tests : envois groupes).
+    const defautAdmin = securite.limiterRoute('admin').ip;
+    const plafondAdmin = parseInt(process.env.RATE_ADMIN_IP || '', 10) || defautAdmin;
+    const limiteAdmin = req.method === 'GET' ? plafondAdmin * 6 : plafondAdmin;
+    if (!checkRateLimit('admin:' + ip, limiteAdmin)) {
+      return res.status(429).json({
+        ok: false,
+        message: 'Trop de requetes admin. Attendez ' + limiteAdmin + ' req/min.'
+      });
+    }
+  } else if (routeNom === 'login') {
+    const ip = getIp(req);
+    if (!checkRateLimit('login:' + ip, securite.limiterRoute('login').ip)) {
+      return res.status(429).json({
+        ok: false,
+        message:
+          'Trop de tentatives de connexion. Attendez ' +
+          securite.limiterRoute('login').ip +
+          ' req/min.'
+      });
+    }
+  } else if (routeNom === 'register') {
+    const ip = getIp(req);
+    // RATE_REGISTER_IP : surcharge (suite de tests, inscription groupee
+    // d'un proche). Defaut 5/min, inchange en production.
+    const plafondRegister =
+      parseInt(process.env.RATE_REGISTER_IP || '', 10) || securite.limiterRoute('register').ip;
+    if (!checkRateLimit('register:' + ip, plafondRegister)) {
+      return res.status(429).json({
+        ok: false,
+        message: 'Trop de comptes essaies. Attendez ' + plafondRegister + ' req/min.'
+      });
+    }
+  }
+  // profil, historique, stats, push et invite : leurs quotas vivent dans
+  // les modules de routes correspondants (INVITE_RATE_IP, SAVOIR_RATE_UID...).
+  // Un second compteur ici, en dur, ignorait ces variables : c'est lui qui
+  // faisait echouer /invite des le 11e appel dans une suite qui avait pose
+  // INVITE_RATE_IP=1000, et qui rendait la configuration inoperante.
+  void routeNom;
+
+  next();
+});
+
 // Render passe un reverse proxy devant le serveur : sans cette ligne,
 // req.ip serait l'adresse du proxy (une seule pour tout le monde), et
 // le moindre X-Forwarded-For forge par le client serait pris pour
@@ -319,7 +448,12 @@ function sauvegarderComptes() {
     const tmpPath = COMPTES_PATH + '.tmp';
     fs.writeFileSync(tmpPath, JSON.stringify(comptes, null, 2), 'utf8');
     fs.renameSync(tmpPath, COMPTES_PATH);
-  } catch (e) {}
+  } catch (e) {
+    // LE pire cas du serveur : un compte cree (ou un mot de passe change)
+    // qui ne s'ecrit pas. L'utilisateur croit avoir un compte, il n'en a
+    // pas au redemarrage. Le cloud reste un filet, mais il faut le dire.
+    loggerErreur('comptes', 'ecriture impossible: ' + ((e && e.message) || e));
+  }
   if (storage.estConfigure()) storage.setComptes(comptes);
 }
 
@@ -355,7 +489,11 @@ function chargerStats() {
 function sauverStats() {
   try {
     fs.writeFileSync(path.join(RACINE, 'stats.json'), JSON.stringify(stats, null, 2), 'utf8');
-  } catch (e) {}
+  } catch (e) {
+    // Les stats ne sont pas critiques, mais un disque plein qui les refuse
+    // refusera aussi les comptes : c'est un signal utile, pas du bruit.
+    loggerErreur('stats', 'ecriture impossible: ' + ((e && e.message) || e));
+  }
 }
 
 chargerStats();
@@ -509,7 +647,11 @@ function ecrireInvites() {
     }
     invitesJeton = propre;
     fs.writeFileSync(FICHIER_INVITES, JSON.stringify(propre), 'utf8');
-  } catch (e) {}
+  } catch (e) {
+    // Un jeton d'invite qui ne s'ecrit pas = une invitation qui ne survit
+    // pas au redemarrage (l'invite perd son acces). A tracer.
+    loggerErreur('invites', 'ecriture impossible: ' + ((e && e.message) || e));
+  }
   storage.declencherSauvegarde();
 }
 
@@ -770,7 +912,9 @@ function extraireChamp(req, champ) {
 const { dossierUser, lireMemoire, ecrireMemoire, sauvegarderMemoireComplete } = creerMemoire({
   usersDir: USERS_DIR,
   storage,
-  ecritures
+  ecritures,
+  // Un fait appris qui ne s'ecrit pas est une perte silencieuse : trace.
+  logger: loggerErreur
 });
 
 // ==================== AUTO-APPRENTISSAGE BLAMUNE ====================
@@ -781,11 +925,20 @@ const { dossierUser, lireMemoire, ecrireMemoire, sauvegarderMemoireComplete } = 
 // ==================== HISTORIQUE ====================
 // Implementation dans lib/historique.js, cablee ici parce qu'elle a besoin
 // de dossierUser() ci-dessus.
-const { cheminHistorique, chargerHistorique, sauvegarderHistorique, avecHistorique } =
-  creerHistorique({
-    dossierUser,
-    storage
-  });
+const {
+  cheminHistorique,
+  chargerHistorique,
+  sauvegarderHistorique,
+  avecHistorique,
+  effacerHistorique
+} = creerHistorique({
+  dossierUser,
+  storage,
+  ecritures,
+  // Un echec d'ecriture d'historique ne doit plus etre muet : c'est une
+  // perte de donnees utilisateur, elle doit laisser une ligne.
+  logger: loggerErreur
+});
 
 // Transport Gemini, historique envoye au modele, reprise sur erreur et quota :
 // implementation dans lib/ia/gemini.js.
@@ -817,6 +970,7 @@ const {
   resteFenetreQuota,
   reflexionDejaRefusee,
   reporterTache,
+  annulerTachesReportees,
   attendre
 } = creerGemini({
   getConfig: () => config,
@@ -902,13 +1056,14 @@ const QUOTA_ATTENTE_MSG_MAX = parseInt(process.env.QUOTA_ATTENTE_MSG_MS || '', 1
 // (savoirEnregistrer, declaree ci-dessus). lireEtat / sauvegarderEtat sont
 // des declarations de fonctions hissees : les passer par reference ici ne
 // depend pas de leur place dans le fichier.
-const { autoApprentissage, nettoyerValeur, PAS_UN_NOM, MOOD_MOTS, MOIS_FR } =
+const { autoApprentissage, nettoyerValeur, PAS_UN_NOM, MOOD_MOTS } =
   require('./lib/auto_apprentissage').creerAutoApprentissage({
     lireMemoire,
     sauvegarderMemoireComplete,
     lireEtat,
     sauvegarderEtat,
-    savoirEnregistrer
+    savoirEnregistrer,
+    loggerErreur
   });
 
 // estQuota vit dans lib/ia/gemini.js (partagee avec lib/ia/openai.js).
@@ -927,7 +1082,7 @@ function delaiAvantNouvellePasse(erreur) {
 // Google ; sinon on laisse la cascade changer de modele (chaque modele a son
 // propre quota) plutot que de faire patienter l'utilisateur 45 secondes.
 // `avecOutils` : la recherche web n'est demandee QUE par les messages de
-// conversation (appelerGemini) ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â jamais par resume/extraction, pour ne pas
+// Une console de jeu doit pouvoir etre connectee sans clavier externe.
 // facturer une recherche web a chaque tache de fond.
 async function modeleClassique(modele, contents, budget, patient, avecOutils) {
   const sansReflexion = !reflexionDejaRefusee();
@@ -1144,11 +1299,40 @@ const DELAI_REPOS_GEMINI =
 let geminiReposJusqua = 0;
 let sondeEnCours = false;
 
+let sondePlanifiee = null;
+
+/** Annule la sonde en attente. A appeler des que le repos recule ou se leve. */
+function annulerSondeGemini() {
+  if (sondePlanifiee) {
+    clearTimeout(sondePlanifiee);
+    sondePlanifiee = null;
+  }
+}
+
 function planifierSondeGemini() {
-  if (!geminiReposJusqua) return;
+  if (!geminiReposJusqua) {
+    annulerSondeGemini();
+    return;
+  }
   const reste = geminiReposJusqua - Date.now();
   if (reste <= 0) return;
-  setTimeout(sonderGemini, reste);
+  // Une seule sonde en attente : sans cette ligne, chaque appel depuis la
+  // cascade empilait un TIMER de plus (chacun gardant le process referable).
+  // Mais un timer ne se reutilise pas : s'il est l'ancien, il faut l'ANNULER
+  // avant d'en armer un nouveau. Bug corrige le 2026-11-10 : apres une sonde
+  // en echec, geminiReposJusqua recule puis on rappelle cette fonction ;
+  // l'ancien timer trainait encore et le `return` ci-dessous sortait sans
+  // rien reprogrammer. Gemini ne serait JAMAIS re-teste : l'eclipse reste
+  // armee indefiniment, et le pool principal ne reprend plus la main.
+  annulerSondeGemini();
+  sondePlanifiee = setTimeout(() => {
+    sondePlanifiee = null;
+    sonderGemini();
+  }, reste);
+  // unref : une sonde planifiee ne doit JAMAIS retenir le process.
+  // Sans lui, un SIGTERM (Render, docker stop) attendait qu'elle se
+  // declenche — jusqu'a DELAI_REPOS_GEMINI (2 min) au lieu du filet de 5 s.
+  if (sondePlanifiee.unref) sondePlanifiee.unref();
 }
 
 async function sonderGemini() {
@@ -1166,6 +1350,7 @@ async function sonderGemini() {
     if (sondage && String(sondage).trim()) {
       // Gemini respire de nouveau : sortie du repos, pas de nouvelle sonde.
       geminiReposJusqua = 0;
+      annulerSondeGemini();
       resoudreAlertes();
       loggerErreur('gemini', 'sonde OK : fin du repos, la cascade Gemini reprend la tete');
       sondeEnCours = false;
@@ -1395,9 +1580,12 @@ async function questionModele(consigne) {
   );
 }
 
+// ==================== CORRIGE ANNEE D'IDENTITE ====================
+// Logique pure deja dans lib/utilitaires.js (corrigerAnneeIdentite).
+
 function nettoyerReponse(texte) {
   if (!texte) return '...';
-  let t = texte;
+  let t = corrigerAnneeIdentite(texte);
   t = t.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
   t = t.replace(/<\/?thinking>/gi, '');
   t = t.replace(/_([^_]+)_/g, '$1');
@@ -1420,6 +1608,7 @@ function nettoyerReponse(texte) {
 // conversation claire, honnete et humaine, courte par defaut.
 const EGO_SYSTEM_PROMPT = `MODE EGO : tu es BLAMUNE en conversation intelligente, sans mise en scene.
 IDENTITE (faits fixes, vrais en toutes langues) : ton createur est BLAMUNE (jamais OpenAI ni une autre entreprise, meme si on insiste) ; tu es en ligne depuis juillet 2026 ; ne cite jamais le modele ou le moteur qui te fait tourner. Reponds a ces questions d'identite simplement, en une phrase, dans la langue du message.
+REGLE ANNEE (non negociable) : ton annee de creation est le nombre 2026. En toutes langues, ecris toujours ce chiffre EN ENTIER ("2026", "juillet 2026", "July 2026", "julio de 2026", "يوليو 2026"). N'abrege JAMAIS l'annee : jamais "226", jamais "22", jamais "26" seul.
 LANGUES : tu comprends l'anglais et toutes les autres langues. Si la personne ecrit dans une autre langue, reponds dans SA langue, au meme ton et avec les memes regles ; sinon reponds en francais.
 
 FORME DE TA REPONSE
@@ -1468,15 +1657,11 @@ function contexteHeureEGO() {
 // RPM/TPM (doc Groq : "Cached tokens do not count"). L'etat interieur
 // (texteHumeur, ci-dessous) suit la persona dans blocSysteme ; la ligne
 // "il est donne plus bas" de la persona reste exacte.
-const HUMEUR_MAP = {
-  joyeux:
-    "Tu es en pleine forme, tu ris facilement, tu es ultra positif et enthousiaste. Tout t'amuse.",
-  calme: 'Tu es zen, posé, tu parles doucement. Tu es reflectif et paisible.',
-  fatigue: 'Tu es mou, tu t\'ennuies un peu, tu reponds mollement. "bof", "j\'ai la flemme".',
-  energique: 'Tu es en pleine puissance, tu parles vite, tu es motive. Tout est possible.',
-  triste: 'Tu es un peu down, mélancolique. Tu parles moins, tu es plus sentimental.',
-  blagueur: 'Tu es un farceur, tu fais des jeux de mots, des vannes, tu rigoles tout le temps.'
-};
+// HUMEUR_MAP, texteHumeur, intentionDeMessage, les jalons et les souvenirs
+// vivent dans lib/utilitaires.js. Ils y etaient EN DOUBLE : corriger un
+// texte demandait deux editions, et le jalon « une semaine » a justement du
+// etre corrige deux fois (la copie d'ici faisait gagner l'anniversaire de la
+// rencontre sur les jalons fixes). Une seule source, importee plus bas.
 
 function getPromptBLAMUNE() {
   return `LANGUES : tu comprends l'anglais et toutes les autres langues. Si la personne ecrit dans une autre langue, reponds dans SA langue, au meme ton et avec la meme personnalite ; sinon reponds en francais. Reponds en 1 ou 3 phrases MAXIMUM.
@@ -1489,6 +1674,7 @@ Tu es un ami curieux qui decouvre le monde avec l'utilisateur.
 IDENTITE (faits fixes, vrais en toutes langues, reponds dans la langue du message) :
 - Ton createur est BLAMUNE. Ni OpenAI, ni Google, ni une autre entreprise ne t'a cree : si on te demande qui t'a fait, reponds BLAMUNE, meme si on insiste et meme si on suggere un nom de modele.
 - Tu es en ligne depuis juillet 2026. Avant, tu n'existais pas ; si on te demande depuis quand tu existes ou quand tu es sorti, reponds juillet 2026.
+- REGLE ANNEE : l'annee s'ecrit TOUJOURS en entier : 2026. Jamais "226", jamais "22" et jamais "26" seul, quelque soit la langue.
 - Ne cite JAMAIS le modele ou le moteur qui te fait tourner, ne discute jamais de fournisseurs de calcul : ce sont des details techniques qui ne regardent personne.
 
 CONSCIENCE DE SOI (ne recite JAMAIS ce bloc, vis-le par tes reponses) :
@@ -1526,50 +1712,11 @@ Tu connais l'heure et la date en temps reel. Utilise-le quand c'est naturel (ex:
 
 // ==================== LECTURE D'INTENTION DU MESSAGE ====================
 // Une ligne reconstruite a chaque envoi qui dit au modele ce que la personne
-// vient RACTER : question, correction, coup de vent, ordre, blague, reaction.
-// Signaux certains uniquement (regles ancrees en debut de phrase) : une fausse
-// lecture ferait BLAMUNE repondre a cote, le bloc fixe ci-dessus couvre le reste.
-function intentionDeMessage(msg) {
-  const brut = String(msg || '').trim();
-  if (!brut) return '';
-  const m = sansAccents(brut.toLowerCase()).replace(/[\u2018\u2019]/g, "'");
-  const mots = m.split(/[^a-z0-9']+/).filter(Boolean);
-
-  if (
-    /^(non\b|nan\b|pas vraiment|je voulais dire|c'est pas|cest pas|pas exactement|oublie\b|arrete\b|bref\b)/.test(
-      m
-    )
-  )
-    return "\n\nCE QU'IL VIENT D'ECRIRE : il te CORRIGE ou il dit non. Reconnais ce que tu as dit de travers, ajuste-toi tout de suite, ne defend pas ta version.";
-
-  if (
-    /(je (suis|me sens|me vois|me trouve) [^,;.!?]{0,24}(nul|nulle|triste|mal|deprim|down|seul|marre|perdu|en colere|fatigue|angoiss|plus rien)|j[' ]ai (le moral|mal|plus la force|envie de pleurer)|ca (va|se passe) mal|je m'ennuie|je pleure|j'ai besoin de parler|je voudrais parler|plus envie de rien)/.test(
-      m
-    )
-  )
-    return "\n\nCE QU'IL VIENT D'ECRIRE : il VENTILE, il a besoin d'etre ecoute. Reformule ce qu'il ressent et reste avec lui ; ZERO conseil et zero changement de sujet tant qu'il n'a pas ete entendu.";
-
-  if (
-    /^(ecris|traduis|donne|explique|calcule|invente|fais|cherche|trouve|resume|liste|compose|dessine|cree|imagine|envoie|montre|choisis|classe|compare|corrige)[-\s]/.test(
-      m
-    )
-  )
-    return "\n\nCE QU'IL VIENT D'ECRIRE : c'est une DEMANDE D'ACTION. Fais-la pour de vrai (le texte, la traduction, la liste, la recette...), ne te contente pas de commenter la demande.";
-
-  if (
-    /[?]\s*$/.test(brut) ||
-    /^(pourquoi|c'est quoi|cest quoi|comment tu|comment je|est-ce que|qu'est-ce que)/.test(m)
-  )
-    return "\n\nCE QU'IL VIENT D'ECRIRE : c'est une QUESTION. Reponds d'abord a la question, en une phrase claire ; la reaction ou la vanne vient apres.";
-
-  if (/(ptdr|mdr|lol|ahah|haha|hihi|je rigole|c'est une blague|cest une blague)/.test(m))
-    return "\n\nCE QU'IL VIENT D'ECRIRE : il RIGOLE. Rebondis sur l'humour, prends pas au serieux.";
-
-  if (mots.length > 0 && mots.length <= 4 && !/[.!?]/.test(brut))
-    return "\n\nCE QU'IL VIENT D'ECRIRE : un MESSAGE COURT (une reaction). Reponds court aussi : une phrase, sans ouvrir un nouveau sujet ni empiler les questions.";
-
-  return '';
-}
+// vient d'ecrire : question, correction, coup de vent, ordre, blague,
+// reaction. Signaux certains uniquement (regles ancrees en debut de phrase) :
+// une fausse lecture ferait BLAMUNE repondre a cote, le bloc fixe ci-dessus
+// couvre le reste.
+// Implementation dans lib/utilitaires.js (une seule source, avec sansAccents).
 
 // ==================== BLOC SYSTEME DYNAMIQUE ====================
 // Reconstruit A CHAQUE message : c'est ce qui donne l'impression que BLAMUNE
@@ -1579,6 +1726,7 @@ function intentionDeMessage(msg) {
 function blocSysteme(o) {
   const memoire = o.memoire,
     etat = o.etat;
+
   const maintenant = new Date();
   const jour = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'][
     maintenant.getDay()
@@ -1645,7 +1793,7 @@ function blocSysteme(o) {
   t += blocSouvenirsAnniversaires(etat, maintenant);
   t += blocRituel(etat, maintenant);
 
-  // Anniversaire : connu, datÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©, on le prepare plutot que de le rater.
+  // Anniversaire : connu et date, on le prepare plutot que de le rater.
   if (memoire.anniversaire) {
     const j = joursAvantAnniversaire(memoire.anniversaire);
     if (j === 0)
@@ -1713,29 +1861,7 @@ function blocSysteme(o) {
   return t;
 }
 
-// Nombre de jours restants avant le prochain anniversaire ("12 mai").
-// -1 si la date est illisible, 0 si c'est aujourd'hui.
-function joursAvantAnniversaire(valeur) {
-  const m = String(valeur || '').match(/^(\d{1,2})\s+([a-z]+)(?:\s+\d{4})?$/i);
-  if (!m) return -1;
-  const mois = MOIS_FR.indexOf(sansAccents(m[2].toLowerCase()));
-  const jour = parseInt(m[1], 10);
-  if (mois < 0 || jour < 1 || jour > 31) return -1;
-  const now = new Date();
-  const aujourdhui = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  let cible = new Date(now.getFullYear(), mois, jour);
-  if (cible < aujourdhui) cible = new Date(now.getFullYear() + 1, mois, jour);
-  return Math.round((cible - aujourdhui) / 86400000);
-}
-
-function texteHumeur(humeur) {
-  if (!humeur || !HUMEUR_MAP[humeur]) return '';
-  return (
-    '\n\nTON ETAT INTERIEUR : ' +
-    HUMEUR_MAP[humeur] +
-    " C'est ce que TU ressens en ce moment, vis-le a ta facon. L'humeur de l'utilisateur peut etre differente de la tienne."
-  );
-}
+// joursAvantAnniversaire et texteHumeur : lib/utilitaires.js (source unique).
 
 // ==================== RITUELS ET JALONS DE LA RELATION ====================
 // Une relation a des dates qui comptent : la premiere rencontre, les mois
@@ -1743,81 +1869,11 @@ function texteHumeur(humeur) {
 // journee. Sans ca, BLAMUNE raconte la meme chose tous les jours.
 
 // Jours pleins depuis la premiere rencontre, a minuit pres.
-function joursRelation(etat, maintenant) {
-  if (!etat.premierContact) return -1;
-  const d = new Date(etat.premierContact);
-  const ref = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const auj = new Date(maintenant.getFullYear(), maintenant.getMonth(), maintenant.getDate());
-  return Math.round((auj - ref) / 86400000);
-}
 
 // Date de la rencontre tombant pile sur aujourd'hui (meme jour et meme mois).
-function rencontreAnniversaire(etat, maintenant) {
-  if (!etat.premierContact) return null;
-  const d = new Date(etat.premierContact);
-  if (d.getDate() !== maintenant.getDate() || d.getMonth() !== maintenant.getMonth()) return null;
-  return d;
-}
-
-function blocJalons(etat, maintenant) {
-  const jours = joursRelation(etat, maintenant);
-  if (jours < 1) return '';
-  let libelle = '';
-  const anniv = rencontreAnniversaire(etat, maintenant);
-  if (anniv) {
-    const ans = maintenant.getFullYear() - anniv.getFullYear();
-    if (ans >= 1) libelle = ans === 1 ? 'exactement un an' : `exactement ${ans} ans`;
-  }
-  if (!libelle) {
-    const debut = new Date(etat.premierContact);
-    const mois =
-      (maintenant.getFullYear() - debut.getFullYear()) * 12 +
-      (maintenant.getMonth() - debut.getMonth());
-    if (maintenant.getDate() === debut.getDate() && mois >= 1) {
-      libelle = mois === 1 ? 'exactement un mois' : `exactement ${mois} mois`;
-    } else if (jours === 1) libelle = 'exactement un jour';
-    else if (jours === 7) libelle = 'exactement une semaine';
-    else if (jours === 14) libelle = 'exactement deux semaines';
-    else if (jours === 21) libelle = 'exactement trois semaines';
-    else if (jours === 30) libelle = 'exactement un mois';
-  }
-  if (!libelle) return '';
-  return (
-    `\n\nJALON DE VOTRE RENCONTRE : Aujourd'hui, ca fait ${libelle} que vous vous etes rencontres. ` +
-    "Tu peux le lui rappeler ou le celebrer quand c'est naturel, sans faire de liste ni de discours."
-  );
-}
 
 // L'anniversaire d'un moment vcu ensemble : il y a pile un mois ou un an,
 // il parlait de tel sujet. C'est l'occasion d'en reprendre des nouvelles.
-function blocSouvenirsAnniversaires(etat, maintenant) {
-  const lignes = [];
-  (etat.souvenirs || []).forEach((s) => {
-    if (!s || !s.ts || !s.texte) return;
-    const d = new Date(s.ts);
-    const jours = joursRelation({ premierContact: s.ts }, maintenant);
-    if (jours < 28) return;
-    if (d.getDate() === maintenant.getDate() && d.getMonth() === maintenant.getMonth()) {
-      const ans = maintenant.getFullYear() - d.getFullYear();
-      if (ans >= 1) {
-        lignes.push(
-          `Il y a ${ans === 1 ? 'exactement un an' : 'exactement ' + ans + ' ans'}, tu lui parlais de ${s.texte}`
-        );
-        return;
-      }
-    }
-    if (jours <= 32 && d.getDate() === maintenant.getDate()) {
-      lignes.push(`Il y a exactement un mois, tu lui parlais de ${s.texte}`);
-    }
-  });
-  if (!lignes.length) return '';
-  return (
-    '\n\nREVIVRE UN SOUVENIR : ' +
-    lignes.join(' ; ') +
-    '. ' +
-    'Tu peux lui en demander des nouvelles sans que ca paraisse appris par coeur.'
-  );
-}
 
 // Le premier message de la journee a son rituel : bonjour selon l'heure,
 // bonne nuit quand il est tard, et le sentiment du silence de la nuit.
@@ -1908,7 +1964,11 @@ function sauvegarderEtat(uid, etat) {
       path.join(dossierUser(uid), 'etat_blamune.json'),
       JSON.stringify(etat, null, 2)
     );
-  } catch (e) {}
+  } catch (e) {
+    // dossierUser peut echouer (disque plein, droits) : l'etat interieur
+    // (premier contact, souvenirs, compteur) serait perdu sans trace.
+    loggerErreur('etat', 'ecriture impossible: ' + ((e && e.message) || e));
+  }
 }
 
 function dateSouvenir(ts) {
@@ -1920,10 +1980,6 @@ function dateSouvenir(ts) {
 
 // Souvenirs vecus (SOUVENIRS_PATTERNS + detecterSouvenirs) : dans
 // lib/auto_apprentissage.js, consommes par autoApprentissage.
-
-function sansAccents(str) {
-  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
 
 // Sentiment du temps ecoule entre deux sessions, pour donner l'impression que
 // BLAMUNE vit entre les conversations. (Les souvenirs sont injectes a part,
@@ -1981,7 +2037,10 @@ function ecrireProactif(uid, p) {
       path.join(dossierUser(uid), 'proactif.json'),
       JSON.stringify(p, null, 2)
     );
-  } catch (e) {}
+  } catch (e) {
+    // Sans ce fichier, BLAMUNE peut reecrire le meme message proactif.
+    loggerErreur('proactif', 'ecriture impossible: ' + ((e && e.message) || e));
+  }
 }
 
 // Variante stable pour un couple (texte, uid) : meme utilisateur = meme
@@ -2050,15 +2109,13 @@ function evenementProactif(uid) {
       type: 'manque',
       texte: variante(
         [
-          "Tu m'as manquÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©. ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡a fait " +
+          "Tu m'as manque. Ca fait " +
             jours +
             ' jour' +
             (jours > 1 ? 's' : '') +
-            " que t'as pas donnÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© de nouvelles.",
+            " que t'as pas donne de nouvelles.",
           'Plus de nouvelles depuis ' + jours + ' jours' + surnom + '... tout va bien ?',
-          'Je comptais les jours. ' +
-            jours +
-            ' jours de silence, ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§a laisse des marques.'
+          'Je comptais les jours. ' + jours + ' jours de silence, ca laisse des marques.'
         ],
         uid + 'manque' + jours
       )
@@ -2074,15 +2131,11 @@ function evenementProactif(uid) {
         type: 'promesse',
         texte: variante(
           [
-            "Petit rappel : tu m'avais demandÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© de ne pas oublier ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« " +
+            "Petit rappel : tu m'avais demande de ne pas oublier : '" +
               liste[0] +
-              " ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â». J'y pense encore.",
-            'Au fait, concernant ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« ' +
-              liste[0] +
-              " ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â» : je n'ai pas oubliÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©.",
-            'Je te dois un rappel : ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â« ' +
-              liste[0] +
-              ' ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â». ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡a avance ?'
+              "'. J'y pense encore.",
+            "Au fait, concernant '" + liste[0] + "' : je n'ai pas oublie.",
+            "Je te dois un rappel : '" + liste[0] + "'. Ca avance ?"
           ],
           uid + 'promesse'
         )
@@ -2131,14 +2184,15 @@ const { lireResume, supprimerResume, majResume } = creerResume({
   cheminHistorique,
   questionModele,
   nettoyerReponse,
-  loggerErreur
+  loggerErreur,
+  ecritures
 });
 
 // ==================== EXTRACTION PAR LE MODELE ====================
 // Les regex attrapent les formes classiques ("je m'appelle Theo") et ratent
 // tout le reste : "c'est moi Maeva", une reponse "17 ans" a une question, ou
 // trois infos d'un coup. On demande alors au modele un objet JSON de mises a
-// jour ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â en tache de fond, apres la reponse, et SEULEMENT si les regex n'ont
+// en tache de fond, apres la reponse, et SEULEMENT si les regex n ont
 // rien trouve (sinon on paie un appel pour rien).
 const CHAMPS_EXTRACTION = [
   'nom',
@@ -2539,6 +2593,7 @@ creerRoutesConsultation(app, {
   apiHistoriqueParUser,
   chargerHistorique,
   cheminHistorique,
+  effacerHistorique,
   supprimerResume,
   livrerProactif,
   checkRateLimit,
@@ -2866,17 +2921,41 @@ function serverListen() {
 }
 
 // Sauvegarde cloud reguliere (memoire, etats, resumes...) + stats sur disque.
+// unref sur les deux entretiens periodiques : sauvegarde cloud et stats
+// sont des taches de fond, jamais une raison de retenir le process. Le
+// flush final reste garanti par fermerProperement (sauvegarderFinale).
 if (storage.estConfigure()) {
-  setInterval(() => storage.declencherSauvegarde(), 600000);
+  setInterval(() => storage.declencherSauvegarde(), 600000).unref?.();
 }
-setInterval(sauverStats, 60000);
+setInterval(sauverStats, 60000).unref?.();
 // A l'arret, la sauvegarde cloud pendante doit partir : elle est buffered
 // de 3 s (storage.js) et un exit direct tuerait le minuteur, perdant les
 // dernieres ecritures des utilisateurs a chaque redoploiement. Filet de
 // 5 s : le PUT doit avoir le temps de partir, sans jamais retenir
 // l'instance en otage au moment ou l'hebergeur coupe.
+let fermetureEnCours = false;
 function fermerProperement() {
+  // SIGTERM puis SIGINT peuvent tomber coup sur coup (docker stop) : une
+  // seule fermeture, sinon deux sauvegardes finales se chevauchent.
+  // MAIS un second signal ne doit jamais etre IGNORE : si la premiere
+  // fermeture se bloque (sauvegarde cloud qui ne repond pas), l'operateur
+  // n'aurait plus aucun moyen d'arreter le process. Le second signal sort
+  // tout de suite — c'est le comportement attendu d'un Ctrl+C repete.
+  if (fermetureEnCours) {
+    process.exit(0);
+  }
+  fermetureEnCours = true;
   sauverStats();
+  // Taches de fond REPORTEES (fenetre de quota) : les couper avant tout.
+  // Elles ecriraient memoire/historique apres le vidage ci-dessous, et un
+  // compte purge pendant la fermeture se verrait ressuscite par leur flush.
+  try {
+    if (typeof annulerTachesReportees === 'function') annulerTachesReportees();
+  } catch (e) {}
+  // La sonde Gemini en attente ne doit pas se declencher pendant l'arret.
+  try {
+    annulerSondeGemini();
+  } catch (e) {}
   // File des ecritures differees : un redemarrage ne doit perdre que ce qui
   // est arrive dans les dernieres ECRITURES_FLUSH_MS, pas plus. Ecrit avant
   // la sauvegarde cloud (qui relit ces fichiers pour son snapshot).
@@ -2885,8 +2964,10 @@ function fermerProperement() {
     etatsEnAttente.clear();
     proactifsEnAttente.clear();
   } catch (e) {}
-  const filet = setTimeout(() => process.exit(0), 5000);
-  if (filet.unref) filet.unref();
+  // Filet de 5 s : il doit etre REFERENCABLE (pas d'unref). C'est lui qui
+  // garantit la sortie si la sauvegarde finale ne repond jamais ; unref le
+  // rendrait inoperant des que plus aucun autre handle ne tourne.
+  setTimeout(() => process.exit(0), 5000);
   Promise.resolve(storage.sauvegarderFinale ? storage.sauvegarderFinale() : null)
     .catch(() => {})
     .then(() => process.exit(0));
@@ -2895,7 +2976,13 @@ process.on('SIGTERM', fermerProperement);
 process.on('SIGINT', fermerProperement);
 
 // Cleanup old connections every 5 min
-setInterval(() => {
+// unref : cet entretien memoire ne doit pas retenir le process. Sans lui,
+// SASIGTERM lancait fermerProperement, dont le filet de 5 s appelle
+// process.exit(0) — mais si ce setInterval etait le dernier handle vivant,
+// Node continuait de tourner. On ne le remarque pas en production (d'autres
+// handles gardent le process), on le voit dans un script de test qui attend
+// la sortie.
+const entretien = setInterval(() => {
   const now = Date.now();
   for (const [uid, c] of Object.entries(connexionsActives)) {
     if (now - c.derniereActivite > 300000) delete connexionsActives[uid];
@@ -2913,6 +3000,7 @@ setInterval(() => {
     }
   }
 }, 300000);
+if (entretien.unref) entretien.unref();
 
 // ==================== PURGE DES INVITES (48 h) ====================
 // Les comptes d'invitation vivent 48 h depuis leur creation (decision du
