@@ -2852,7 +2852,7 @@ function motDePasseAdminInitial() {
 }
 
 function serverListen() {
-  server.listen(PORT, () => {
+  server.listen(PORT, '0.0.0.0', () => {
     etat = 'pret';
     stats.demarrages++;
     // Un compte deja present n est JAMAIS ecrase : c'est ce qui permet de
