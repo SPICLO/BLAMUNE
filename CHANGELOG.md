@@ -1,5 +1,75 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-10 (JSONBin retire, purge des invites dans le KV)
+
+### Retrait
+
+- **Backend JSONBin.io supprime de `storage.js`** (source de bugs : bin
+  sature a 100 Ko sur le plan gratuit, PUT en 403, chaine de decouverte
+  du bin — listing, `.bin-id`, reprise auto — entierement dediee a
+  pallier cette limite). Cloudflare KV seul backend : meme cle unique
+  `blamune`, memes gardes (aucun PUT avant lecture, debouncing 3 s,
+  sauvegarde finale a l'arret), plus de plafond. Le faux JSONBin du test
+  d'integration devient un faux serveur KV ; `scripts/nettoyer_jsonbin.js`
+  supprime ; `render.yaml` et `.env.example` documentent les `CF_KV_*`.
+
+### Correction
+
+- **Les invites expirees (24 h) disparaissent maintenant du CLOUD au
+  moment de leur purge.** La ronde horaire appelait deja
+  `supprimerTout(uid)`, mais le SNAPSHOT cloud gardait une copie des
+  fichiers `users/inv_x/` du dossier tout juste efface : l'invite purgee
+  restait dans la sauvegarde jusqu'au prochain refresh spontane (a
+  defaut, indéfiniment si personne n'ecrivait). `supprimerTout()` retire
+  desormais les entrees `users/uid/` du snapshot en memoire ET remet le
+  compteur de reconstruction a zero : le PUT de purge repart avec un
+  snapshot propre, sur les deux modes (EGO et BLAMUNE).
+
+## [Non publié] - 2026-11-10 (stockage cloud : Cloudflare KV)
+
+### Ajout
+
+- **Nouveau backend de persistance : Cloudflare KV** (`storage.js`). Le bin
+  JSONBin gratuit sature a 100 Ko (le snapshot complet grossit a chaque
+  message) ; les donnees reelles, elles, font quelques Ko. Cloudflare KV
+  offre 1 Go gratuit et des valeurs jusqu'a 25 Mo : des annees de marge.
+  - Trois variables activent le backend (toutes requises, sinon repli
+    JSONBin puis mode local) : `CF_KV_ACCOUNT_ID`, `CF_KV_NAMESPACE_ID`,
+    `CF_KV_API_TOKEN` (jeton avec permission Workers KV Storage > Edit).
+    `CF_KV_API_URL` surchargeable pour les tests.
+  - Une seule cle (`blamune`) porte l'objet data complet — memes
+    semantics qu'un bin JSONBin : garde anti-ecrasement (aucun PUT avant
+    une lecture fructueuse ou un cloud vide confirme), debouncing 3 s,
+    sauvegarde finale a l'arret, reprise a dosage croissant en cas de
+    panne. Le minuteur de sauvegarde est desormais `unref` : il ne retient
+    plus le processus (un harnais sans serveur restait accroche).
+  - `etatSauvegarde()` expose le backend actif ; documentation complete
+    dans `.env.example`.
+  - `tests/storage_kv.test.js` : faux serveur KV local — configuration
+    partielle refusee, aller-retour GET/PUT entre deux instances, echec
+    de lecture = PUT ajourne. Suite : 304 tests unitaires verts.
+
+## [Non publié] - 2026-11-10 (reponse effacee puis « Serveur injoignable »)
+
+### Correction
+
+- **Chat en ligne : la reponse s'affichait puis etait effacee, remplacee par
+  « Serveur injoignable »** (mode BLAMUNE et mode EGO). Trois defauts du
+  client (`site/app.js`) se combinaient :
+  - `envoyer()` levait « Flux interrompu » meme quand la reponse COMPLETE
+    etait deja affichee (flux SSE coupe juste avant l'evenement `fin` :
+    micro-coupure, proxy, abort 120 s) — le texte recu est desormais accepte
+    comme reponse finale, statut retour a « En ligne » ;
+  - `finaliser()` supprimait la bulle affichee quand `fin` arrivait sans
+    reponse — le texte deja diffuse est desormais garde ;
+  - `charger()` (relance 500 ms apres chaque envoi) re-ecrivait tout le fil
+    avec un historique serveur encore plus court que l'ecran (serveur pas
+    fini d'ecrire, flush differe) : la reponse disparaissait. Tant qu'un
+    envoi date de moins de 10 s et que l'historique est plus court, le fil
+    n'est plus re-ecrit (re-essai 1,5 s, garde-fou anti-boucle). Un unique
+    echec isole de `/historique` ne crie plus « Serveur injoignable » :
+    seulement apres deux echecs consecutifs.
+
 ## [Non publié] - 2026-11-10 (correctifs signales par l'usage)
 
 ### Correction

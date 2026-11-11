@@ -14,6 +14,11 @@ var MAX_POLLS_DEMARRAGE = 40;
 var modeEnCours = false;
 var _chargerInterval = null;
 var dernierModeCharge = null;
+// Horodatage du dernier envoi : sert a charger() pour ne pas re-ecrire le
+// fil pendant que le serveur finit d'ecrire l'echange dans l'historique.
+var _dernierEnvoiMs = 0;
+// Nombre de reports consecutifs du re-rendu (garde-fou anti-boucle).
+var _chargerRetards = 0;
 
 var _chargerPending = false;
 var _animEntree = false;
@@ -1337,6 +1342,21 @@ async function charger() {
     var existants = c.querySelectorAll('.msg:not(.attente)');
     var nbExistants = existants.length;
     var nbHistorique = hist.length;
+    // CORRIGE : juste apres un envoi, l'historique du serveur peut etre
+    // encore PLUS COURT que ce qui est affiche (ecriture finie apres la
+    // reponse, flush differe). Re-rendre le fil a ce moment EFFACAIT la
+    // reponse que l'utilisateur venait de lire. Tant qu'un envoi date de
+    // moins de 10 s et que l'historique est plus court, on ne re-ecrit
+    // pas : on re-essaie tres vite. Au-dela (purge /oublie, autre
+    // appareil), la difference est legitime : on re-ecrit.
+    var envoiRecent = Date.now() - (_dernierEnvoiMs || 0) < 10000;
+    if (!modeChange && nbExistants > nbHistorique && envoiRecent && _chargerRetards < 3) {
+      _chargerRetards++;
+      chargerEnCours = false;
+      _chargerInterval = setTimeout(charger, 1500);
+      return;
+    }
+    _chargerRetards = 0;
     if (modeChange || nbExistants !== nbHistorique) {
       afficherFil(hist);
       if (nbHistorique === 0 && (j.etat === 'pret' || j.etat === 'demarrage')) {
@@ -1371,7 +1391,11 @@ async function charger() {
       _chargerInterval = setTimeout(charger, 100);
     }
     nbErreursConnexion++;
-    majStatut('horsligne', 'Serveur injoignable');
+    // CORRIGE : un seul echec isole de /historique (micro-coupure, 429
+    // passager) affichait aussitot « Serveur injoignable » alors que la
+    // conversation venait de fonctionner. On ne l'annonce qu'apres le
+    // second echec consecutive ; le premier est silencieux.
+    if (nbErreursConnexion >= 2) majStatut('horsligne', 'Serveur injoignable');
     if (nbErreursConnexion < 30)
       _chargerInterval = setTimeout(charger, Math.min(4000 + nbErreursConnexion * 1000, 30000));
   }
@@ -2143,6 +2167,7 @@ async function envoyer() {
   actionEnCours = true;
   desactiver(true);
   majStatut('pense');
+  _dernierEnvoiMs = Date.now();
   dernierMessageMoi = m || '';
   var msgNode = ajouterMessage('moi', m || '');
   if (imageChoisie) ajouterPhotoBubble(msgNode, imageChoisie);
@@ -2194,7 +2219,10 @@ async function envoyer() {
       if (j.etat === 'arrete' || j.etat === 'erreur') signalerArret();
       lireVoix(reps[0]);
     } else if (bulleBot) {
-      bulleBot.remove();
+      // CORRIGE : le serveur a envoye fin sans reponse, mais du texte est
+      // deja affiche a l'ecran. L'ancien code EFFACAIT la bulle : la
+      // reponse visible disparaissait sous les yeux de l'utilisateur. Le
+      // texte diffuse EST la reponse : on le garde tel quel.
       bulleBot = null;
     }
   }
@@ -2232,7 +2260,25 @@ async function envoyer() {
         recuFin = true;
         finaliser(d);
       });
-      if (!recuFin) throw new Error('Flux interrompu');
+      if (!recuFin) {
+        // CORRIGE : un flux coupe avant l'evenement fin (reseau, proxy,
+        // timeout) effacait le parcours normal meme quand la reponse
+        // COMPLETE etait deja affichee. Si du texte est arrive, il EST la
+        // reponse : on le garde, retour a l'etat en ligne. Sinon (rien
+        // recu du tout), seulement maintenant c'est un echec.
+        var texteFlux =
+          bulleBot ? ((bulleBot.querySelector('.bulle') || {}).textContent || '').trim() : '';
+        if (texteFlux) {
+          termine = true;
+          attente(false);
+          viderSiIntact();
+          majStatut('pret');
+          lireVoix(texteFlux);
+          bulleBot = null;
+        } else {
+          throw new Error('Flux interrompu');
+        }
+      }
     } else if (ct.indexOf('text/event-stream') >= 0) {
       // Flux annonce mais non lisible : on ne peut pas faire mieux que d'echouer.
       throw new Error('Flux non supporte par ce navigateur');

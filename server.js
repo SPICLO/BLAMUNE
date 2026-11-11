@@ -674,7 +674,7 @@ function enregistrerJetonInvite(uid, jeton) {
 // comptes, jetons d'invite, savoir, vocabulaire, stats et l'integralite de
 // users/ (memoire, historique, etat, resumes, extractions). Servie en
 // telechargement par /admin/backup, restauree par /admin/restore, et
-// poussee dans le cloud quand JSONBIN_API_KEY est defini.
+// poussee dans le cloud quand les CF_KV_* sont definies.
 // La source de verite du savoir (SQLite) est sauvegardee sous forme de DUMP
 // SQL dans l'entree "savoir.sql" (voir creerSauvegarde) : un fichier SQLite
 // est binaire et la sauvegarde applicative ne manipule que du texte. Le
@@ -694,14 +694,14 @@ const FICHIERS_RACINE = [
   // Vecteurs du savoir (phase 3, P3-4) : sans lui, une instance neuve
   // repaie TOUS les embeddings Gemini au premier boot (~13 min pour 1266
   // faits ; plus d'une heure a 10 000). Filtre par taille ci-dessous : il ne
-  // doit jamais pousser le payload JSONBin au-dela du plafond Pro (10 Mo).
+  // doit jamais approcher le plafond de 25 Mo par valeur KV.
   'cache_embeddings.json'
 ];
 const CLE_SAVOIR_SQL = 'savoir.sql';
 // Plafond du cache d'embeddings DANS LA SAUVEGARDE (et non sur disque) :
 // au-dela, on l'omet et le boot suivant re-vectorise. Le compromis est
-// documente ; il vaut mieux une re-vectorisation qu'un 413 de JSONBin qui
-// ferait echouer la sauvegarde ENTIERE (comptes compris).
+// documente ; il vaut mieux une re-vectorisation qu'une valeur KV
+// surdimensionnee qui ferait echouer la sauvegarde ENTIERE (comptes compris).
 const TAILLE_MAX_CACHE_EMBED =
   parseInt(process.env.SAUVEGARDE_EMBED_MAX || '', 10) || 5 * 1024 * 1024;
 // config.json (cle API) et logs/ ne quittent jamais le serveur.
@@ -2791,7 +2791,7 @@ storage
   .initialiser()
   .then((ok) => {
     if (ok) {
-      console.log('[BLAMUNE] Stockage cloud JSONBin.io active');
+      console.log('[BLAMUNE] Stockage cloud Cloudflare KV active');
       // Instance vierge (perte de disque, nouveau deploy) : on reconstitue
       // tout depuis la derniere sauvegarde cloud avant d'accepter du monde.
       const snapCloud = storage.getSauvegarde();
@@ -2814,7 +2814,7 @@ storage
         }
       }
     } else {
-      console.log('[BLAMUNE] Mode fichier local (pas de JSONBIN_API_KEY)');
+      console.log('[BLAMUNE] Mode fichier local (variables CF_KV_* absentes)');
     }
   })
   .catch((e) => console.log('[BLAMUNE] Erreur storage:', e.message))
@@ -2906,7 +2906,7 @@ function serverListen() {
     console.log(`[BLAMUNE] Provider: ${config.api_provider}, Model: ${config.api_model}`);
     console.log(`[BLAMUNE] API Key: ${config.api_key ? 'Configuree' : 'NON CONFIGUREE'}`);
     console.log(`[BLAMUNE] Banque de repli : ${savoir.tailleBanqueReplis()} situations`);
-    console.log(`[BLAMUNE] Cloud: ${storage.estConfigure() ? 'JSONBin.io' : 'Local'}`);
+    console.log(`[BLAMUNE] Cloud: ${storage.estConfigure() ? 'Cloudflare KV' : 'Local'}`);
 
     // Keep-alive : Render endort l instance apres ~15 min sans requete. Le
     // rappel ne part que si personne n est connecte ; le rappel EXTERNE du

@@ -27,7 +27,7 @@ function base(t) {
   t.after(() => {
     try {
       fs.rmSync(d, { recursive: true, force: true });
-    } catch (e) {}
+    } catch (e) { }
   });
   const db = new SavoirDB(d);
   t.after(() => db.fermer());
@@ -91,7 +91,7 @@ test('une base existante (sans colonne valide) migre sans perdre un fait', (t) =
   t.after(() => {
     try {
       fs.rmSync(d, { recursive: true, force: true });
-    } catch (e) {}
+    } catch (e) { }
   });
   // Schema d'AVANT P3-5 : pas de colonne `valide`.
   const { DatabaseSync } = require('node:sqlite');

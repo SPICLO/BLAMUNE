@@ -1151,62 +1151,45 @@ async function main() {
       await envoiFils(serveur2);
     }
 
-    // 16. Instance perdue + JSONBin : la nouvelle instance (disque vierge)
-    //        se reconstitue toute seule depuis le cloud. C'est exactement la
-    //        nuit ou Render remplace l'instance : rien ne doit se perdre.
-    const PORT_JSONBIN = librePort();
-    let binFaux = null; // { id, record }
-    let creationsBin = 0;
-    const fauxJsonbin = http.createServer((req, res) => {
+    // 16. Instance perdue + Cloudflare KV : la nouvelle instance (disque
+    //        vierge) se reconstitue toute seule depuis le cloud. C'est
+    //        exactement la nuit ou Render remplace l'instance : rien ne
+    //        doit se perdre.
+    const PORT_KV = librePort();
+    let kvValeur = null; // JSON stringifie (la valeur de la cle "blamune")
+    let putsKv = 0;
+    const fauxKv = http.createServer((req, res) => {
       let d = '';
       req.on('data', (c) => (d += c));
       req.on('end', () => {
-        const rep = (code, obj) => {
+        const rep = (code, corps) => {
           res.writeHead(code, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(obj));
+          res.end(corps);
         };
         const url = (req.url || '').split('?')[0];
-        // Vraie route de l API (reponse reelle : id dans "record").
-        const estListe = req.method === 'GET' && url.indexOf('/v3/c/uncategorized/bins') === 0;
-        if (estListe) {
-          const aCurseur = /^\/v3\/c\/uncategorized\/bins\/[^/]+$/.test(url);
-          if (binFaux && !aCurseur) {
-            return rep(200, [
-              { record: binFaux.id, private: true, createdAt: new Date().toISOString() }
-            ]);
-          }
-          return rep(200, []);
+        const estCle = /\/values\/blamune$/.test(url);
+        if (!estCle) return rep(404, '{"success":false,"errors":["route inconnue"]}');
+        if (req.method === 'PUT') {
+          putsKv++;
+          kvValeur = d;
+          return rep(200, '{"success":true}');
         }
-        if (req.method === 'POST' && url === '/v3/b') {
-          if (!d || d === '{}') return rep(400, { message: 'Bin cannot be blank' });
-          creationsBin++;
-          binFaux = { id: 'bin-test', record: JSON.parse(d) };
-          return rep(200, { id: binFaux.id });
+        if (req.method === 'GET') {
+          if (kvValeur === null) return rep(404, '{"success":false,"errors":[{"code":10009}]}');
+          return rep(200, kvValeur);
         }
-        const cheminBin = /^\/v3\/b\/([^/]+)$/.exec(url);
-        if (cheminBin && req.method === 'PUT') {
-          if (!binFaux || cheminBin[1] !== binFaux.id) return rep(404, { message: 'bin inconnu' });
-          try {
-            binFaux.record = JSON.parse(d || '{}');
-          } catch (e) {
-            return rep(400, { message: 'json invalide' });
-          }
-          return rep(200, { id: binFaux.id, success: true });
-        }
-        if (cheminBin && req.method === 'GET') {
-          if (!binFaux || cheminBin[1] !== binFaux.id) return rep(404, { message: 'bin inconnu' });
-          return rep(200, { record: binFaux.record });
-        }
-        rep(404, { message: 'route inconnue ' + req.method + ' ' + url });
+        rep(404, '{"success":false,"errors":["methode inconnue"]}');
       });
     });
-    await new Promise((r) => fauxJsonbin.listen(PORT_JSONBIN, '127.0.0.1', r));
+    await new Promise((r) => fauxKv.listen(PORT_KV, '127.0.0.1', r));
 
     const envCloud = Object.assign({}, env, {
-      JSONBIN_API_KEY: 'cle-de-test',
-      JSONBIN_API_URL: 'http://127.0.0.1:' + PORT_JSONBIN,
+      CF_KV_ACCOUNT_ID: 'compte-de-test',
+      CF_KV_NAMESPACE_ID: 'namespace-de-test',
+      CF_KV_API_TOKEN: 'jeton-de-test',
+      CF_KV_API_URL: 'http://127.0.0.1:' + PORT_KV,
       // Chaque sauvegarde reconstruit le snapshot : le test ne dort pas 60 s.
-      JSONBIN_SNAP_MIN_MS: '0'
+      STORAGE_SNAP_MIN_MS: '0'
     });
     const dataA = fs.mkdtempSync(path.join(os.tmpdir(), 'blamune-cloud-a-'));
     const dataB = fs.mkdtempSync(path.join(os.tmpdir(), 'blamune-cloud-b-'));
@@ -1237,12 +1220,19 @@ async function main() {
       );
       assert.strictEqual(envoye.status, 200, 'message envoye sur l instance A');
       await condition(
-        () => binFaux && binFaux.record && binFaux.record.sauvegarde,
+        () => {
+          try {
+            return !!(kvValeur && JSON.parse(kvValeur).sauvegarde);
+          } catch (e) {
+            return false;
+          }
+        },
         25000,
         'sauvegarde complete poussee dans le cloud'
       );
+      const recCloud = JSON.parse(kvValeur);
       assert(
-        binFaux.record.comptes && Object.keys(binFaux.record.comptes).length > 0,
+        recCloud.comptes && Object.keys(recCloud.comptes).length > 0,
         'comptes presents dans le cloud'
       );
       const etatLogin = await requete(portA, '/login', 'POST', 'pseudo=admin&mdp=' + MDP_ENCODED);
@@ -1307,14 +1297,24 @@ async function main() {
       );
       await condition(
         () => {
-          const rec = binFaux && binFaux.record;
-          if (!rec) return false;
-          const resteHisto = Object.keys(rec.historiques || {}).some(
-            (k) => k.indexOf(uidCible + '_') === 0
-          );
-          const resteMemo = !!(rec.memories && rec.memories[uidCible]);
-          const resteCompte = !!(rec.comptes && rec.comptes['ciblesupp']);
-          return !resteHisto && !resteMemo && !resteCompte;
+          if (!kvValeur) return false;
+          try {
+            const rec = JSON.parse(kvValeur);
+            const resteHisto = Object.keys(rec.historiques || {}).some(
+              (k) => k.indexOf(uidCible + '_') === 0
+            );
+            const resteMemo = !!(rec.memories && rec.memories[uidCible]);
+            const resteCompte = !!(rec.comptes && rec.comptes['ciblesupp']);
+            const resteSnap =
+              rec.sauvegarde &&
+              rec.sauvegarde.fichiers &&
+              Object.keys(rec.sauvegarde.fichiers).some(
+                (k) => k.indexOf('users/' + uidCible + '/') === 0
+              );
+            return !resteHisto && !resteMemo && !resteCompte && !resteSnap;
+          } catch (e) {
+            return false;
+          }
         },
         25000,
         'cloud: traces utilisateur purges apres suppression de compte'
@@ -1351,17 +1351,13 @@ async function main() {
           'X-UID': loginB.json.uid,
           'X-EGO': loginB.json.ego
         });
-        const decB = statsB.json && statsB.json.sauvegarde && statsB.json.sauvegarde.decouverte;
+        const sauveB = statsB.json && statsB.json.sauvegarde;
         assert(
-          decB && decB.source === 'liste' && decB.choisi === 'bin-test',
-          'bin retrouve par la vraie route de liste: ' + JSON.stringify(decB)
+          sauveB && sauveB.backend === 'kv' && sauveB.chargee === true,
+          'backend kv actif et charge sur la deuxieme instance: ' + JSON.stringify(sauveB)
         );
-        assert.strictEqual(
-          creationsBin,
-          1,
-          'aucun bin cree au second demarrage (creations=' + creationsBin + ')'
-        );
-        ok.push('cloud: bin retrouve par la liste reelle (pas de creation)');
+        assert.ok(putsKv >= 1, "l'instance A a pousse ses sauvegardes dans le KV");
+        ok.push('cloud: instance B reconstituee depuis le KV (aucune re-création)');
         const histoB = await requete(portB, '/historique', 'GET', null, {
           'X-UID': invCloud.json.uid,
           'X-Jeton': invCloud.json.jeton
@@ -1382,7 +1378,7 @@ async function main() {
       }
     } finally {
       await envoiFils(serveurA);
-      await new Promise((r) => fauxJsonbin.close(r));
+      await new Promise((r) => fauxKv.close(r));
       try {
         fs.rmSync(dataA, { recursive: true, force: true });
       } catch (e) {}

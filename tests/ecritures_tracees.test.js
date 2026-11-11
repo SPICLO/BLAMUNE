@@ -38,8 +38,8 @@ function collecteur() {
 
 const storageInactif = {
   estConfigure: () => false,
-  setHistorique: () => {},
-  setMemoire: () => {}
+  setHistorique: () => { },
+  setMemoire: () => { }
 };
 
 // --------------------------------------------------------------------
