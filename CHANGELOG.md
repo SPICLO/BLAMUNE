@@ -15,6 +15,14 @@
 
 ### Correction
 
+- **La purge d invite oublie aussi les ecritures differes d historique**
+  (`purgerRamUtilisateur`) : les cles `uid_mode` de la file d'ecritures
+  differees survivaient a la purge — un flush arriere tentait d'ouvrir le
+  fichier d'un dossier tout juste efface (ENOENT en log) et, selon le
+  timing, pouvait recreer le dossier purge. Verifie par sonde de bout en
+  bout (timers raccourcis + faux KV) : dossier efface, jeton mort (401),
+  cloud sans aucune trace (historiques, memoire, snapshot).
+
 - **Les invites expirees (24 h) disparaissent maintenant du CLOUD au
   moment de leur purge.** La ronde horaire appelait deja
   `supprimerTout(uid)`, mais le SNAPSHOT cloud gardait une copie des
