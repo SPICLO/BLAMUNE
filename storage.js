@@ -145,7 +145,15 @@ function kvRequete(methode, corps) {
         let detail = raw;
         try {
           const j = JSON.parse(raw);
-          detail = (j.errors && j.errors.map(String).join('; ')) || raw;
+          detail = (j.errors && j.errors.length
+            ? j.errors
+                .map((e) =>
+                  e && typeof e === 'object'
+                    ? (e.message ? e.message + ' (code ' + e.code + ')' : JSON.stringify(e))
+                    : String(e)
+                )
+                .join('; ')
+            : raw) || raw;
         } catch (e) {}
         reject(
           new Error(`${methode} KV -> HTTP ${res.statusCode}: ${detail.substring(0, 160)}`)
