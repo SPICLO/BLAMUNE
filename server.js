@@ -2244,6 +2244,12 @@ function purgerRamUtilisateur(uid) {
     ecritures.oublier('etat:' + uid);
     ecritures.oublier('memoire:' + uid);
     ecritures.oublier('proactif:' + uid);
+    // Historiques differes (lib/historique.js : cles "uid_mode"). Sans
+    // oublier, un flush arriere essayait d'ouvrir un fichier du dossier
+    // tout juste efface (ENOENT dans les logs) — et pouvait, selon le
+    // timing, recree le dossier purge.
+    ecritures.oublier(uid + '_1');
+    ecritures.oublier(uid + '_2');
     etatsEnAttente.delete(uid);
     proactifsEnAttente.delete(uid);
   } catch (e) {}
