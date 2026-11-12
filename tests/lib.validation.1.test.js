@@ -26,6 +26,33 @@ test('validerSend: accepte un message valide avec "message"', () => {
   assert.equal(result.mode, '1');
 });
 
+test('validerSend: accepte "stream" envoye en formulaire (le site envoie stream=1)', () => {
+  // Le site poste un formulaire urlencoded : express rend des chaines.
+  // Avant le correctif, ce corps repondait 400 et la page affichait
+  // « Serveur injoignable » alors que le serveur vivait.
+  const un = validerSend({ msg: 'bonjour', mode: '2', stream: '1' });
+  assert.ok(un.ok);
+  assert.equal(un.stream, true);
+
+  const vrai = validerSend({ msg: 'bonjour', stream: 'true' });
+  assert.ok(vrai.ok);
+  assert.equal(vrai.stream, true);
+
+  const zero = validerSend({ msg: 'bonjour', stream: '0' });
+  assert.ok(zero.ok);
+  assert.equal(zero.stream, false);
+
+  const faux = validerSend({ msg: 'bonjour', stream: 'false' });
+  assert.ok(faux.ok);
+  assert.equal(faux.stream, false);
+});
+
+test('validerSend: rejecte une valeur "stream" qui n est pas booleenne', () => {
+  const result = validerSend({ msg: 'bonjour', stream: 'peut-etre' });
+  assert.ok(!result.ok);
+  assert.ok(result.erreurs.some((e) => e.includes('stream')));
+});
+
 test('validerSend: rejecte un message vide', () => {
   const result = validerSend({ msg: '   ' });
   assert.ok(!result.ok);

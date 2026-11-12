@@ -1,5 +1,24 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-12 (site en ligne : chaque message repondait 400)
+
+### Correction
+
+- **Le chat du site en ligne repondait 400 「 "stream" doit etre un
+  boolean 」 a chaque message** (`lib/validation.js`). La page poste un
+  formulaire (`stream=1`), donc Express rend une CHAINE ; la validation
+  n'acceptait que le booleen JSON. Consequence visible : la page croyait
+  le serveur injoignable (`Serveur injoignable`) et basculait sur le
+  repli IA du navigateur, alors que le serveur vivait et repondait.
+  La validation accepte maintenant les deux formes : booleen (API JSON)
+  et chaine de formulaire (`1`/`true`/`on`, `0`/`false`/`off`), et
+  rejette seulement les valeurs non booleennes. Tests unitaires ajoutes
+  (`tests/lib.validation.1.test.js`) ; suite complete (306 tests unitaires
+  + integration) verte.
+- (Rappel du correctif precedent dans la meme journee : `bot.cpp` rebranche
+  `appelerEnLigne()` pour le bot Windows — sans effet sur Render, dont le
+  binaire Linux garde son repli local.)
+
 ## [Non publié] - 2026-11-12 (bot : l'IA recontacte le serveur en ligne)
 
 ### Correction
