@@ -1,5 +1,50 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-12 (verification fonctionnelle en ligne : bugs d'interface)
+
+### Correction
+
+- **Profil : trois champs etaient refuses en silence** (`site/app.js`). La
+  grille proposait `prenom`, `metier` et `gouts`, trois cles absentes de
+  `CHAMPS_MEMOIRE` (`lib/memoire.js`) : `/profil` repondait `ok:false`
+  « Champ inconnu » pendant que l'interface annoncait « Profil sauvegarde ».
+  La grille suit desormais les cles du serveur (`nom`, `age`, `ville`,
+  `travail`, `aime`, `anniversaire`) et `sauverProfil()` verifie le corps de
+  la reponse : un echec affiche un message dedie, traduit dans les 4 langues.
+- **Boutons du header invisibles** : `#btnDeconnexion`, `#btnNotifications`
+  et `#apercuPhoto` portent la classe `.cache` (`display:none !important`).
+  Les remettre en place par `style.display` ne suffisait pas — il faut retirer
+  la classe. Corrige dans `finaliserAffichageApp`, `initialiserNotifications`,
+  `choisirImage` et `retirerPhotoChoisie`.
+- **Badge « Mode invite » jamais affiche** : `.note-invite` vaut
+  `display:none` dans la feuille de style ; le vider en inline ne l'affichait
+  pas. Le mode invite pose maintenant `display:inline`.
+- **Selecteur de langue perdu apres connexion** : celui de l'ecran
+  d'authentification disparait avec l'ecran. Un `#choixLangueApp` est ajoute
+  dans `#menuMobile` (`site/index.html`, styles desktop et mobile) : la langue
+  reste changeable a tout moment, sans se deconnecter.
+- **Boutons du header non traduits** : `Mon profil`, `Rechercher`, `Export`,
+  `Notifications` et `Deconnexion` recoivent leur `data-i18n` ; le libelle du
+  bouton de theme se rafraichit sur `blamune:langue` ; les messages de
+  notifications (activation, refus, echec) passent par `T_()` et sont traduits
+  en anglais, espagnol et arabe.
+
+### Verification
+
+- Parcours en ligne verifies : invite, chat (reponse IA reelle), mode EGO
+  (reponse + mode persiste cote serveur), recherche (`EGO` -> 1,
+  `zzzz` -> 0, moins de 2 caracteres -> fil complet), export `.txt`,
+  `/journal.html` et `/journal`, theme clair/sombre persistant, envoi de photo
+  (le bot decrit l'image), 0 erreur console.
+- Inscription, connexion, historique, recherche, profil, oubli, deconnexion et
+  reconnexion verifies sur une instance locale isolee (`BLAMUNE_DATA_DIR`
+  temporaire) : 22/23 controles, le seul ecart etant un jeton `X-EGO`
+  volontairement persistant apres `/logout`.
+- Sur une origine neuve (sans ancien service worker) : Quitter/Deconnexion
+  visible, badge invite visible, bouton Notifications visible, apercu photo
+  affiche puis masque, 6 champs de profil acceptes, sauvegarde confirmee cote
+  serveur. Cache du service worker passe en `blamune-v21`.
+
 ## [Non publié] - 2026-11-12 (verification de l'installation PWA)
 
 ### Correction

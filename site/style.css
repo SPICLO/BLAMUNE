@@ -986,6 +986,20 @@ button:disabled {
   cursor: pointer;
 }
 
+/* Selecteur de langue de l'app (le select de l'ecran d'authentification
+   disparait avec l'ecran) : meme gabarit que .btn-petit. */
+.choix-langue-app {
+  margin-left: 0;
+  max-width: 112px;
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  color: var(--texte-doux);
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 /* Bouton "Installer" : la seule action du header en accent plein, pour
    qu'on la voie sans chercher. Même langage visuel que #btnIANav.actif. */
 .btn-installer {
@@ -1162,6 +1176,16 @@ button:disabled {
   }
   #menuMobile .btn-petit:active {
     background: var(--surface-2);
+  }
+  #menuMobile .choix-langue-app {
+    width: 100%;
+    max-width: none;
+    padding: 12px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--surface-2);
+    color: var(--texte);
+    font-size: 13.5px;
   }
   /* La regle-ID #btnIANav (bordures, padding, marge) cede devant le
      panneau ; l'eclair suit simplement le dosage des lignes. */

@@ -241,6 +241,7 @@
               class="btn-petit"
               title="Voir ce que BLAMUNE enregistre sur toi (et l'oublier)"
               data-i18n-title="Voir ce que BLAMUNE enregistre sur toi (et l'oublier)"
+              data-i18n="Mon profil"
               type="button"
             >
               Mon profil
@@ -250,6 +251,7 @@
               class="btn-petit"
               title="Rechercher dans l'historique"
               data-i18n-title="Rechercher dans l'historique"
+              data-i18n="Rechercher"
               type="button"
             >
               Rechercher
@@ -259,6 +261,7 @@
               class="btn-petit cache"
               title="Recevoir les messages de BLAMUNE hors du site"
               data-i18n-title="Recevoir les messages de BLAMUNE hors du site"
+              data-i18n="Notifications"
               type="button"
             >
               Notifications
@@ -281,6 +284,7 @@
               class="btn-petit"
               title="Exporter l'historique (fichier texte, il reste chez toi)"
               data-i18n-title="Exporter l'historique (fichier texte, il reste chez toi)"
+              data-i18n="Export"
               type="button"
             >
               Export
@@ -304,11 +308,27 @@
             >
               Clair
             </button>
+            <!-- Langue de l'interface : le select de l'ecran d'authentification
+                 disparait avec l'ecran de connexion. Celui-ci permet de changer
+                 de langue a tout moment, sans se deconnecter. -->
+            <select
+              id="choixLangueApp"
+              class="choix-langue-app"
+              title="Langue"
+              data-i18n-title="Langue"
+              aria-label="Langue"
+            >
+              <option value="fr">Français</option>
+              <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="ar">العربية</option>
+            </select>
             <button
               id="btnDeconnexion"
               class="btn-petit cache"
               title="Deconnexion"
               data-i18n-title="Deconnexion"
+              data-i18n="Deconnexion"
               type="button"
             >
               Deconnexion

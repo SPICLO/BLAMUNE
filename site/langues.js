@@ -61,11 +61,20 @@
       "Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil.":
         'In the browser menu: Install app or Add to Home Screen.',
       'Application installee.': 'App installed.',
+      'Activer les notifications': 'Enable notifications',
+      'Notifications OK': 'Notifications on',
+      'Notifications activees : BLAMUNE pourra t ecrire meme quand le site est ferme.':
+        'Notifications enabled: BLAMUNE can write to you even when the site is closed.',
+      'Notifications refusees — active-les dans les reglages du site si tu changes d avis.':
+        'Notifications denied — enable them in the site settings if you change your mind.',
+      "Les notifications n'ont pas pu s activer sur cet appareil.":
+        'Notifications could not be enabled on this device.',
       /* ecran profil */
       'Ce que BLAMUNE sait de toi': 'What BLAMUNE knows about you',
       Enregistrer: 'Save',
       'Tout oublier': 'Forget everything',
       'Profil sauvegarde.': 'Profile saved.',
+      "Certains champs n'ont pas pu etre enregistres.": 'Some fields could not be saved.',
       'Profil oublie.': 'Profile forgotten.',
       'Charger le profil...': 'Loading profile...',
       'Rien, pour le moment. BLAMUNE apprend en te parlant.':
@@ -170,10 +179,19 @@
       "Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil.":
         'En el menu del navegador: Instalar aplicacion o Anadir a pantalla de inicio.',
       'Application installee.': 'Aplicacion instalada.',
+      'Activer les notifications': 'Activar notificaciones',
+      'Notifications OK': 'Notificaciones activadas',
+      'Notifications activees : BLAMUNE pourra t ecrire meme quand le site est ferme.':
+        'Notificaciones activadas: BLAMUNE podra escribirte incluso con el sitio cerrado.',
+      'Notifications refusees — active-les dans les reglages du site si tu changes d avis.':
+        'Notificaciones rechazadas — activalas en los ajustes del sitio si cambias de opinion.',
+      "Les notifications n'ont pas pu s activer sur cet appareil.":
+        'No se pudieron activar las notificaciones en este dispositivo.',
       'Ce que BLAMUNE sait de toi': 'Lo que BLAMUNE sabe de ti',
       Enregistrer: 'Guardar',
       'Tout oublier': 'Olvidar todo',
       'Profil sauvegarde.': 'Perfil guardado.',
+      "Certains champs n'ont pas pu etre enregistres.": 'Algunos campos no se pudieron guardar.',
       'Profil oublie.': 'Perfil olvidado.',
       'Charger le profil...': 'Cargando el perfil...',
       'Rien, pour le moment. BLAMUNE apprend en te parlant.':
@@ -272,10 +290,19 @@
       "Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil.":
         'في قائمة المتصفح: تثبيت التطبيق أو إضافة إلى الشاشة الرئيسية.',
       'Application installee.': 'تم تثبيت التطبيق.',
+      'Activer les notifications': 'تفعيل الإشعارات',
+      'Notifications OK': 'الإشعارات مفعلة',
+      'Notifications activees : BLAMUNE pourra t ecrire meme quand le site est ferme.':
+        'تم تفعيل الإشعارات: يمكن لـ BLAMUNE أن يكتب لك حتى عندما يكون الموقع مغلقا.',
+      'Notifications refusees — active-les dans les reglages du site si tu changes d avis.':
+        'تم رفض الإشعارات — فعلها من إعدادات الموقع إذا غيرت رأيك.',
+      "Les notifications n'ont pas pu s activer sur cet appareil.":
+        'تعذر تفعيل الإشعارات على هذا الجهاز.',
       'Ce que BLAMUNE sait de toi': 'ما يعرفه BLAMUNE عنك',
       Enregistrer: 'حفظ',
       'Tout oublier': 'نسيان كل شيء',
       'Profil sauvegarde.': 'تم حفظ الملف.',
+      "Certains champs n'ont pas pu etre enregistres.": 'تعذر حفظ بعض الحقول.',
       'Profil oublie.': 'تم نسيان الملف.',
       'Charger le profil...': 'جار تحميل الملف...',
       'Rien, pour le moment. BLAMUNE apprend en te parlant.':

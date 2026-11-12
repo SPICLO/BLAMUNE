@@ -68,6 +68,71 @@ test('installation PWA : textes disponibles dans les 4 langues', () => {
   }
 });
 
+test('profil : les champs proposes par le site existent cote serveur', () => {
+  // Regression : l'interface proposait prenom/metier/gouts, trois cles que
+  // /profil refuse (« Champ inconnu ») tout en affichant « Profil sauvegarde ».
+  const app = lire('site/app.js');
+  const blocUi = app.match(/var CHAMPS_PROFIL = \[([\s\S]*?)\];/);
+  assert.ok(blocUi, 'CHAMPS_PROFIL introuvable');
+  const clesUi = [...blocUi[1].matchAll(/cle:\s*'([^']+)'/g)].map((m) => m[1]);
+  assert.ok(clesUi.length >= 5, 'grille de profil trop petite');
+  const blocServeur = lire('lib/memoire.js').match(/const CHAMPS_MEMOIRE = \[([\s\S]*?)\];/);
+  assert.ok(blocServeur, 'CHAMPS_MEMOIRE introuvable');
+  // Les commentaires contiennent des apostrophes (« l'utilisateur ») : on les
+  // retire avant d'extraire les cles, sinon le motif attrape des bouts de
+  // commentaire a la place des noms de champs.
+  const sansCommentaires = blocServeur[1].replace(/\/\/[^\n]*/g, '');
+  const clesServeur = [...sansCommentaires.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  const inconnus = clesUi.filter((c) => !clesServeur.includes(c));
+  assert.deepStrictEqual(inconnus, [], 'champs refuses par /profil : ' + inconnus.join(', '));
+});
+
+test('interface : les elements masques par .cache sont geres par la classe', () => {
+  // .cache vaut display:none !important : vider style.display ne reaffiche
+  // rien. Ce test garde la lecon (boutons Quitter/Notifications et apercu
+  // photo etaient invisibles en production).
+  const app = lire('site/app.js');
+  for (const attendu of [
+    "btnDeconnexion.classList.remove('cache')",
+    "btn.classList.remove('cache')",
+    "ap.classList.remove('cache')",
+    "ap.classList.add('cache')"
+  ]) {
+    assert.ok(app.includes(attendu), 'gestion par classe manquante : ' + attendu);
+  }
+});
+
+test('langue : le selecteur reste disponible une fois connecte', () => {
+  const html = lire('site/index.html');
+  assert.ok(html.includes('id="choixLangueApp"'), "selecteur de langue de l'app absent");
+  assert.ok(
+    /<select[\s\S]{0,200}id="choixLangueApp"/.test(html),
+    'choixLangueApp doit etre un select'
+  );
+  const app = lire('site/app.js');
+  assert.ok(app.includes("brancher('choixLangueApp')"), 'selecteur non branche dans app.js');
+  // Les actions du header doivent porter leur cle de traduction : sans
+  // data-i18n, elles restaient en francais apres un changement de langue.
+  for (const cle of ['Mon profil', 'Rechercher', 'Export', 'Notifications', 'Journal']) {
+    assert.ok(html.includes('data-i18n="' + cle + '"'), 'data-i18n manquant pour : ' + cle);
+  }
+});
+
+test('profil : le message d echec de sauvegarde est traduit', () => {
+  const langues = lire('site/langues.js');
+  const cle = "Certains champs n'ont pas pu etre enregistres.";
+  const occurrences = langues.split(cle).length - 1;
+  assert.ok(occurrences >= 3, 'traduction manquante pour : ' + cle);
+});
+
+test('notifications : libelles du bouton traduits dans les 4 langues', () => {
+  const langues = lire('site/langues.js');
+  for (const cle of ['Activer les notifications', 'Notifications OK']) {
+    const occurrences = langues.split(cle).length - 1;
+    assert.ok(occurrences >= 3, 'traduction manquante pour : ' + cle);
+  }
+});
+
 test('config.json.example : modele aligne sur le defaut du serveur', () => {
   const ex = JSON.parse(lire('config.json.example'));
   assert.strictEqual(ex.api_model, 'gemini-3.5-flash');

@@ -248,13 +248,22 @@ function finaliserAffichageApp() {
   var btnDeconnexion = document.getElementById('btnDeconnexion');
   if (pseudo) {
     if (noteInvite) noteInvite.style.display = 'none';
-    if (btnDeconnexion) btnDeconnexion.style.display = '';
   } else {
-    if (noteInvite) noteInvite.style.display = '';
-    if (btnDeconnexion) {
-      btnDeconnexion.style.display = '';
-      btnDeconnexion.textContent = 'Quitter';
-    }
+    // .note-invite vaut display:none dans la feuille : vider le style inline
+    // ne l'afficherait pas, il faut poser explicitement une valeur.
+    if (noteInvite) noteInvite.style.display = 'inline';
+  }
+  // #btnDeconnexion porte la classe .cache (display:none !important) : il
+  // faut RETIRER la classe, pas seulement vider le style inline — sinon le
+  // bouton restait invisible pour tout le monde (invite comme connecte).
+  if (btnDeconnexion) {
+    var cleDeco = pseudo ? 'Deconnexion' : 'Quitter';
+    // La cle de traduction suit le profil : le selecteur de langue reecrit
+    // ensuite le libelle dans la langue active.
+    btnDeconnexion.setAttribute('data-i18n', cleDeco);
+    btnDeconnexion.textContent = T_(cleDeco);
+    btnDeconnexion.title = T_(cleDeco);
+    btnDeconnexion.classList.remove('cache');
   }
   charger();
   // Sonde proactif : uniquement pour un compte enregistre (les invites n'ont
@@ -1602,11 +1611,10 @@ async function actualiserEtatIA() {
 // promesses) n'arrivent jamais ici : /profil ne les livre pas.
 var CHAMPS_PROFIL = [
   { cle: 'nom', etiquette: 'Nom' },
-  { cle: 'prenom', etiquette: 'Prenom' },
   { cle: 'age', etiquette: 'Age' },
   { cle: 'ville', etiquette: 'Ville' },
-  { cle: 'metier', etiquette: 'Metier' },
-  { cle: 'gouts', etiquette: 'Gouts' },
+  { cle: 'travail', etiquette: 'Metier' },
+  { cle: 'aime', etiquette: 'Gouts' },
   { cle: 'anniversaire', etiquette: 'Anniversaire (JJ-MM)' }
 ];
 
@@ -1703,12 +1711,13 @@ async function sauverProfil() {
   var liste = document.getElementById('listeProfil');
   if (!liste) return;
   var champs = liste.querySelectorAll('.profil-champ');
+  var echecs = 0;
   try {
     for (var i = 0; i < champs.length; i++) {
       var inp = champs[i];
       var cle = (inp.id || '').replace(/^prof_/, '');
       if (!cle) continue;
-      await fetch('/profil', {
+      var r = await fetch('/profil', {
         method: 'POST',
         headers: Object.assign(
           { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -1716,8 +1725,20 @@ async function sauverProfil() {
         ),
         body: 'champ=' + encodeURIComponent(cle) + '&valeur=' + encodeURIComponent(inp.value.trim())
       });
+      // Le serveur repond 200 avec ok:false pour un champ qu'il ne connait
+      // pas : sans ce controle, l'interface annoncait « sauvegarde » alors
+      // que le champ etait ignore (bug des champs prenom/metier/gouts).
+      var j = null;
+      try {
+        j = await r.json();
+      } catch (e) {}
+      if (!r.ok || (j && j.ok === false)) echecs++;
     }
-    afficherToastDeco(T_('Profil sauvegarde.'), 'ok');
+    if (echecs) {
+      afficherToastDeco(T_("Certains champs n'ont pas pu etre enregistres."));
+    } else {
+      afficherToastDeco(T_('Profil sauvegarde.'), 'ok');
+    }
   } catch (e) {
     afficherToastDeco(T_('Profil indisponible pour le moment.'));
   }
@@ -1770,16 +1791,19 @@ async function initialiserNotifications() {
     var cfg = await rc.json();
     if (!cfg || cfg.ok === false || !cfg.actif || !cfg.cle) return;
     // Le bouton est masque par defaut dans index.html (feature eteinte) :
-    // la config OK est le seul endroit qui le demasque.
-    btn.style.display = '';
+    // la config OK est le seul endroit qui le demasque. On retire la classe
+    // .cache (display:none !important) : un style inline ne la battrait pas.
+    btn.classList.remove('cache');
     var reg = (await navigator.serviceWorker.getRegistration()) || null;
     var sub = reg ? await reg.pushManager.getSubscription() : null;
     if (sub) {
-      btn.textContent = 'Notifications OK';
+      btn.setAttribute('data-i18n', 'Notifications OK');
+      btn.textContent = T_('Notifications OK');
       btn.disabled = true;
       return;
     }
-    btn.textContent = 'Activer les notifications';
+    btn.setAttribute('data-i18n', 'Activer les notifications');
+    btn.textContent = T_('Activer les notifications');
     btn.addEventListener('click', async function () {
       try {
         var permission =
@@ -1788,7 +1812,9 @@ async function initialiserNotifications() {
             : 'granted';
         if (permission !== 'granted') {
           ajouterInfo(
-            'Notifications refusees — active-les dans les reglages du site si tu changes d avis.'
+            T_(
+              'Notifications refusees — active-les dans les reglages du site si tu changes d avis.'
+            )
           );
           return;
         }
@@ -1804,16 +1830,17 @@ async function initialiserNotifications() {
         });
         var reponse = await envoi.json();
         if (reponse.ok) {
-          btn.textContent = 'Notifications OK';
+          btn.setAttribute('data-i18n', 'Notifications OK');
+          btn.textContent = T_('Notifications OK');
           btn.disabled = true;
           ajouterInfo(
-            'Notifications activees : BLAMUNE pourra t ecrire meme quand le site est ferme.'
+            T_('Notifications activees : BLAMUNE pourra t ecrire meme quand le site est ferme.')
           );
         } else {
           ajouterInfo('L abonnement a ete refuse : ' + (reponse.message || 'raison inconnue'));
         }
       } catch (e) {
-        ajouterInfo("Les notifications n'ont pas pu s activer sur cet appareil.");
+        ajouterInfo(T_("Les notifications n'ont pas pu s activer sur cet appareil."));
       }
     });
   } catch (e) {}
@@ -1930,7 +1957,9 @@ function retirerPhotoChoisie() {
   imageChoisie = null;
   var ap = document.getElementById('apercuPhoto');
   var f = document.getElementById('fichierImage');
-  if (ap) ap.style.display = 'none';
+  // .cache est en display:none !important : on repasse par la classe pour
+  // que l'apercu se masque vraiment (un style inline ne suffit pas).
+  if (ap) ap.classList.add('cache');
   if (f) f.value = '';
 }
 
@@ -1977,7 +2006,9 @@ function choisirImage(fichier) {
       var apNom = document.getElementById('apercuPhotoNom');
       if (apImg) apImg.src = dataUrl;
       if (apNom) apNom.textContent = fichier.name || 'photo.jpg';
-      if (ap) ap.style.display = 'flex';
+      // L'apercu est cache par la classe .cache (display:none !important) :
+      // il faut la retirer, sinon l'aperçu restait invisible.
+      if (ap) ap.classList.remove('cache');
       var z = document.getElementById('zone');
       if (z) z.focus();
     };
@@ -2553,6 +2584,11 @@ function appliquerTheme(nom) {
   var b = document.getElementById('btnTheme');
   if (!b) return;
   appliquerTheme(localStorage.getItem('blamune_theme') || 'sombre');
+  // Le libelle est pose en JS (pas de data-i18n) : on le rafraichit quand la
+  // langue change, sinon il reste dans l'ancienne langue jusqu'au clic.
+  window.addEventListener('blamune:langue', function () {
+    appliquerTheme(localStorage.getItem('blamune_theme') || 'sombre');
+  });
   b.addEventListener('click', function () {
     var suivant = localStorage.getItem('blamune_theme') === 'clair' ? 'sombre' : 'clair';
     localStorage.setItem('blamune_theme', suivant);
