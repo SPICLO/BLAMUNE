@@ -153,6 +153,7 @@ function requeteBrute(port, chemin, entetes) {
     ['/admin/admin.js', 'GET', 'js', 'asset du panneau admin'],
     ['/', 'GET', 'html', 'accueil du site'],
     ['/app.js', 'GET', 'js', 'asset du site'],
+    ['/manifest.json', 'GET', 'manifest', 'manifeste PWA (type installabilite)'],
     ['/nexiste_pas', 'GET', '404', 'catcher : page inconnue'],
     ['/protection.ps1', 'GET', 'bloque', 'extension sensible refusee'],
     ['/savoir.db', 'GET', 'bloque', 'base refusee']
@@ -166,6 +167,7 @@ function requeteBrute(port, chemin, entetes) {
     if (attendu === 'json') bon = r.type.includes('application/json');
     else if (attendu === 'html') bon = r.type.includes('text/html');
     else if (attendu === 'js') bon = r.type.includes('javascript');
+    else if (attendu === 'manifest') bon = r.type.includes('application/manifest+json');
     else if (attendu === '404') bon = r.code === 404 && /introuvable/i.test(r.corps);
     else if (attendu === 'bloque') bon = r.code === 404 && /Non autorise/i.test(r.corps);
     if (bon) {

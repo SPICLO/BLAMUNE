@@ -1,5 +1,28 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-12 (verification de l'installation PWA)
+
+### Correction
+
+- **Le manifeste est servi en `application/manifest+json`** (`lib/routes/statique.js`) :
+  `manifest.json` partait en `application/json`. Chrome l'accepte, mais le
+  type recommande par la specification est `application/manifest+json` ;
+  s'en ecarter peut faire echouer l'installation sur d'autres navigateurs
+  ou outils. Les `.webmanifest` ont aussi leur type. Verifie par le smoke
+  test (`/manifest.json` -> type manifeste, 70/70 controles).
+
+### Verification
+
+- Installation de bout en bout verifiee en ligne : manifeste complet
+  (nom, `start_url`, `scope`, `display: standalone`, icones 192/512),
+  toutes les icones et tous les fichiers du service worker en 200, service
+  worker actif et controlant la page, cache `blamune-v18` complet (pages
+  HTML comprises, donc demarrage hors ligne), bouton Installer qui ouvre
+  l'aide quand aucun prompt natif n'existe, detection « deja installee »
+  (`navigator.standalone` simule) vrai, 0 erreur console.
+- Lighthouse sur https://blamune.onrender.com : accessibilite 100,
+  bonnes pratiques 100, SEO 100, aucun echec.
+
 ## [Non publié] - 2026-11-12 (application installable : bouton Installer)
 
 ### Ajout
