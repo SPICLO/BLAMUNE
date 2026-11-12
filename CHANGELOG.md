@@ -1,5 +1,22 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-12 (bot : l'IA recontacte le serveur en ligne)
+
+### Correction
+
+- **Le bot C++ appelle a nouveau la version en ligne** (`bot.cpp`).
+  Depuis la coupe de `ebf928f` (1er oct.), l'appel `appelerEnLigne()`
+  existait mais n'etait plus declenche par la boucle principale : le bot
+  repondait donc 100 % en local (personnalite, savoir, blocs) et le
+  « serveur injoignable » etait en fait un appel jamais emis. Retour au
+  flux d'origine (commit `78a7da9`) : personnalite locale d'abord, puis
+  question factuelle connue de savoir.txt (immediate, gratuite), puis
+  l'appel en ligne — si le reseau, le quota ou le serveur tombe, les
+  blocs locaux suivants reprennent sans rien laisser paraitre. Verifie
+  en reel : invite + `/send` sur blamune.onrender.com repondent
+  (reinvitation sur 401 comprise), reponse affichee avec la marque
+  `[confiance:...]`.
+
 ## [Non publié] - 2026-11-10 (JSONBin retire, purge des invites dans le KV)
 
 ### Retrait
