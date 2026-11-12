@@ -16,7 +16,7 @@
 - Installation de bout en bout verifiee en ligne : manifeste complet
   (nom, `start_url`, `scope`, `display: standalone`, icones 192/512),
   toutes les icones et tous les fichiers du service worker en 200, service
-  worker actif et controlant la page, cache `blamune-v18` complet (pages
+  worker actif et controlant la page, cache `blamune-v19` complet (pages
   HTML comprises, donc demarrage hors ligne), bouton Installer qui ouvre
   l'aide quand aucun prompt natif n'existe, detection « deja installee »
   (`navigator.standalone` simule) vrai, 0 erreur console.
@@ -37,7 +37,7 @@
   - une fois installee (`display-mode: standalone` ou `navigator.standalone`),
     le bouton disparait ; `appinstalled` affiche « Application installee. ».
   - Textes traduits dans les 4 langues (`site/langues.js`), cache du service
-    worker passe en `blamune-v18`.
+    worker passe en `blamune-v19`.
   - Tests unitaires ajoutes (`tests/unit.test.js`) : presence du bouton, de
     l'aide, des evenements et des traductions. Verifie dans le navigateur
     local : bouton rendu, aide ouverte/fermee, service worker actif scope `/`,
