@@ -1,5 +1,25 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-12 (application installable : bouton Installer)
+
+### Ajout
+
+- **Bouton « Installer » dans le header** (`site/index.html`, `site/app.js`,
+  `site/style.css`) : le site etait deja une PWA installable (manifest.json,
+  service worker, icones 192/512), mais rien ne le disait au visiteur.
+  - Chrome/Edge/Android : `beforeinstallprompt` est capture et le bouton
+    ouvre la vraie boite d'installation native ;
+  - iOS (qui n'emet pas cet evenement) : le bouton est visible et ouvre le
+    mode d'emploi « Partager → Sur l'ecran d'accueil » ;
+  - une fois installee (`display-mode: standalone` ou `navigator.standalone`),
+    le bouton disparait ; `appinstalled` affiche « Application installee. ».
+  - Textes traduits dans les 4 langues (`site/langues.js`), cache du service
+    worker passe en `blamune-v18`.
+  - Tests unitaires ajoutes (`tests/unit.test.js`) : presence du bouton, de
+    l'aide, des evenements et des traductions. Verifie dans le navigateur
+    local : bouton rendu, aide ouverte/fermee, service worker actif scope `/`,
+    0 erreur console.
+
 ## [Non publié] - 2026-11-12 (site en ligne : chaque message repondait 400)
 
 ### Correction
@@ -14,7 +34,7 @@
   et chaine de formulaire (`1`/`true`/`on`, `0`/`false`/`off`), et
   rejette seulement les valeurs non booleennes. Tests unitaires ajoutes
   (`tests/lib.validation.1.test.js`) ; suite complete (306 tests unitaires
-  + integration) verte.
+  - integration) verte.
 - (Rappel du correctif precedent dans la meme journee : `bot.cpp` rebranche
   `appelerEnLigne()` pour le bot Windows — sans effet sur Render, dont le
   binaire Linux garde son repli local.)

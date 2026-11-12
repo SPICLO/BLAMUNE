@@ -2266,8 +2266,9 @@ async function envoyer() {
         // COMPLETE etait deja affichee. Si du texte est arrive, il EST la
         // reponse : on le garde, retour a l'etat en ligne. Sinon (rien
         // recu du tout), seulement maintenant c'est un echec.
-        var texteFlux =
-          bulleBot ? ((bulleBot.querySelector('.bulle') || {}).textContent || '').trim() : '';
+        var texteFlux = bulleBot
+          ? ((bulleBot.querySelector('.bulle') || {}).textContent || '').trim()
+          : '';
         if (texteFlux) {
           termine = true;
           attente(false);
@@ -2626,6 +2627,93 @@ function exporterHistorique() {
   b.addEventListener('click', function () {
     window.open('/journal.html', '_blank', 'noopener');
   });
+})();
+
+// ---------------- APPLICATION INSTALLABLE (PWA) ----------------
+// Le site est deja une PWA (manifest.json + sw.js + icones) : le
+// navigateur sait l'installer, mais rien ne le dit au visiteur. Ce bloc
+// rend l'installation visible et explicite :
+//  - Chrome/Edge/Android emettent beforeinstallprompt : on garde
+//    l'evenement et le bouton ouvre la vraie boite d'installation ;
+//  - iOS n'emet rien : le bouton affiche le mode d'emploi (Partager ->
+//    Sur l'ecran d'accueil) ;
+//  - une fois installee (display-mode: standalone), le bouton disparait.
+function installationDejaFaite() {
+  return (
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+    window.navigator.standalone === true
+  );
+}
+
+function estIOS() {
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
+(function initInstallation() {
+  var bouton = document.getElementById('btnInstaller');
+  if (!bouton) return;
+  var promptDiffere = null;
+
+  function montrerBouton() {
+    if (!installationDejaFaite()) bouton.classList.remove('cache');
+  }
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    // Sans preventDefault, Chrome affiche sa propre banniere et le
+    // bouton perd la main sur le declenchement.
+    e.preventDefault();
+    promptDiffere = e;
+    montrerBouton();
+  });
+
+  window.addEventListener('appinstalled', function () {
+    promptDiffere = null;
+    bouton.classList.add('cache');
+    afficherToastDeco(T_('Application installee.'), 'ok');
+  });
+
+  function ouvrirAide() {
+    var aide = document.getElementById('aideInstallation');
+    if (!aide) return;
+    var texte = document.getElementById('aideInstallationTexte');
+    if (texte) {
+      texte.textContent = estIOS()
+        ? T_("Sur iPhone : bouton Partager, puis Sur l'ecran d'accueil.")
+        : T_(
+            "Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil."
+          );
+    }
+    aide.classList.remove('cache');
+  }
+
+  var fermer = document.getElementById('btnFermerAideInstallation');
+  if (fermer) {
+    fermer.addEventListener('click', function () {
+      var aide = document.getElementById('aideInstallation');
+      if (aide) aide.classList.add('cache');
+    });
+  }
+
+  bouton.addEventListener('click', async function () {
+    if (promptDiffere) {
+      promptDiffere.prompt();
+      var choix = null;
+      try {
+        choix = await promptDiffere.userChoice;
+      } catch (e) {}
+      promptDiffere = null;
+      if (choix && choix.outcome === 'accepted') bouton.classList.add('cache');
+      return;
+    }
+    // Pas de prompt natif : mode d'emploi (iOS surtout, ou navigateur
+    // qui n'expose pas encore l'API).
+    ouvrirAide();
+  });
+
+  if (estIOS()) montrerBouton();
 })();
 
 window.addEventListener('load', async function () {

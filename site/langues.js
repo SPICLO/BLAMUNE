@@ -53,6 +53,14 @@
       'Mode invite': 'Guest mode',
       'Mon profil': 'My profile',
       Fermer: 'Close',
+      Installer: 'Install',
+      "Installer l'application sur cet appareil": 'Install the app on this device',
+      'Installer BLAMUNE': 'Install BLAMUNE',
+      "Sur iPhone : bouton Partager, puis Sur l'ecran d'accueil.":
+        'On iPhone: Share button, then Add to Home Screen.',
+      "Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil.":
+        'In the browser menu: Install app or Add to Home Screen.',
+      'Application installee.': 'App installed.',
       /* ecran profil */
       'Ce que BLAMUNE sait de toi': 'What BLAMUNE knows about you',
       Enregistrer: 'Save',
@@ -154,6 +162,14 @@
       'Mode invite': 'Modo invitado',
       'Mon profil': 'Mi perfil',
       Fermer: 'Cerrar',
+      Installer: 'Instalar',
+      "Installer l'application sur cet appareil": 'Instalar la aplicacion en este dispositivo',
+      'Installer BLAMUNE': 'Instalar BLAMUNE',
+      "Sur iPhone : bouton Partager, puis Sur l'ecran d'accueil.":
+        'En iPhone: boton Compartir y luego Anadir a pantalla de inicio.',
+      "Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil.":
+        'En el menu del navegador: Instalar aplicacion o Anadir a pantalla de inicio.',
+      'Application installee.': 'Aplicacion instalada.',
       'Ce que BLAMUNE sait de toi': 'Lo que BLAMUNE sabe de ti',
       Enregistrer: 'Guardar',
       'Tout oublier': 'Olvidar todo',
@@ -248,6 +264,14 @@
       'Mode invite': 'وضع الزائر',
       'Mon profil': 'ملفي الشخصي',
       Fermer: 'اغلاق',
+      Installer: 'تثبيت',
+      "Installer l'application sur cet appareil": 'ثبت التطبيق على هذا الجهاز',
+      'Installer BLAMUNE': 'تثبيت BLAMUNE',
+      "Sur iPhone : bouton Partager, puis Sur l'ecran d'accueil.":
+        'على iPhone: زر المشاركة ثم إضافة إلى الشاشة الرئيسية.',
+      "Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil.":
+        'في قائمة المتصفح: تثبيت التطبيق أو إضافة إلى الشاشة الرئيسية.',
+      'Application installee.': 'تم تثبيت التطبيق.',
       'Ce que BLAMUNE sait de toi': 'ما يعرفه BLAMUNE عنك',
       Enregistrer: 'حفظ',
       'Tout oublier': 'نسيان كل شيء',

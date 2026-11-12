@@ -39,6 +39,35 @@ test('manifest.json : chaque icone declaree existe sur le disque', () => {
   }
 });
 
+test('installation PWA : bouton Installer + aide iOS branches dans la page', () => {
+  const html = lire('site/index.html');
+  assert.ok(html.includes('id="btnInstaller"'), 'bouton Installer absent');
+  assert.ok(html.includes('id="aideInstallation"'), "boite d'aide a l'installation absente");
+  // Les deux libelles doivent passer par le systeme de traduction.
+  assert.ok(html.includes('data-i18n="Installer"'), 'libelle Installer non traduit');
+  const app = lire('site/app.js');
+  assert.ok(app.includes('beforeinstallprompt'), 'beforeinstallprompt non capture');
+  assert.ok(app.includes("'appinstalled'"), 'evenement appinstalled non ecoute');
+  assert.ok(app.includes('display-mode: standalone'), 'detection standalone absente');
+});
+
+test('installation PWA : textes disponibles dans les 4 langues', () => {
+  const langues = lire('site/langues.js');
+  const cles = [
+    'Installer:',
+    "Installer l'application sur cet appareil",
+    'Installer BLAMUNE',
+    "Sur iPhone : bouton Partager, puis Sur l'ecran d'accueil.",
+    'Application installee.'
+  ];
+  for (const cle of cles) {
+    // La cle francaise sert de repli : elle doit exister dans les 3
+    // dictionnaires traduits (en, es, ar), donc au moins 3 fois.
+    const occurrences = langues.split(cle).length - 1;
+    assert.ok(occurrences >= 3, 'traduction manquante pour : ' + cle);
+  }
+});
+
 test('config.json.example : modele aligne sur le defaut du serveur', () => {
   const ex = JSON.parse(lire('config.json.example'));
   assert.strictEqual(ex.api_model, 'gemini-3.5-flash');

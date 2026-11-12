@@ -263,6 +263,19 @@
             >
               Notifications
             </button>
+            <!-- Installation PWA : visible seulement quand le navigateur
+                 propose l'installation (ou sur iOS, ou l'ajout a l'ecran
+                 d'accueil se fait par le menu Partager). -->
+            <button
+              id="btnInstaller"
+              class="btn-petit btn-installer cache"
+              title="Installer l'application sur cet appareil"
+              data-i18n-title="Installer l'application sur cet appareil"
+              data-i18n="Installer"
+              type="button"
+            >
+              Installer
+            </button>
             <button
               id="btnExport"
               class="btn-petit"
@@ -443,6 +456,31 @@
           </svg>
         </button>
       </footer>
+    </div>
+
+    <!-- Aide a l'installation : iOS n'emet pas beforeinstallprompt, mais
+         « Partager → Sur l'ecran d'accueil » installe quand meme la PWA.
+         La boite s'ouvre depuis le bouton Installer quand aucun prompt
+         natif n'est disponible. -->
+    <div
+      id="aideInstallation"
+      class="aide-installation cache"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="aideInstallationTitre"
+    >
+      <div class="aide-boite">
+        <strong id="aideInstallationTitre" data-i18n="Installer BLAMUNE">Installer BLAMUNE</strong>
+        <p
+          id="aideInstallationTexte"
+          data-i18n="Sur iPhone : bouton Partager, puis Sur l'ecran d'accueil."
+        >
+          Sur iPhone : bouton Partager, puis Sur l'ecran d'accueil.
+        </p>
+        <button id="btnFermerAideInstallation" class="btn-petit" type="button" data-i18n="Fermer">
+          Fermer
+        </button>
+      </div>
     </div>
 
     <script defer src="langues.js"></script>
