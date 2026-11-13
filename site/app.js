@@ -2669,10 +2669,11 @@ function exporterHistorique() {
 // Le site est deja une PWA (manifest.json + sw.js + icones) : le
 // navigateur sait l'installer, mais rien ne le dit au visiteur. Ce bloc
 // rend l'installation visible et explicite :
-//  - Chrome/Edge/Android emettent beforeinstallprompt : on garde
-//    l'evenement et le bouton ouvre la vraie boite d'installation ;
-//  - iOS n'emet rien : le bouton affiche le mode d'emploi (Partager ->
-//    Sur l'ecran d'accueil) ;
+//  - le bouton est TOUJOURS visible tant que l'app n'est pas installee ;
+//  - si Chrome/Edge/Android emettent beforeinstallprompt, il ouvre la
+//    vraie boite d'installation ;
+//  - sinon (iOS, Android sans evenement, navigateur integre) il affiche un
+//    mode d'emploi adapte a l'appareil ;
 //  - une fois installee (display-mode: standalone), le bouton disparait.
 function installationDejaFaite() {
   return (
@@ -2688,6 +2689,45 @@ function estIOS() {
   );
 }
 
+function estAndroid() {
+  return /Android/i.test(navigator.userAgent || '');
+}
+
+// Navigateurs internes (Instagram, Facebook, WhatsApp, TikTok...) : ils
+// affichent la page mais n'exposent NI l'installation PWA ni « Sur l'ecran
+// d'accueil ». C'est la cause n°1 du « impossible de l'installer sur mon
+// telephone » : la personne a ouvert le lien depuis une application.
+function estNavigateurIntegre() {
+  return /(Instagram|FBAN|FBAV|FB_IAB|Messenger|Line\/|WhatsApp|Twitter|TikTok|Snapchat|LinkedInApp|Pinterest)/i.test(
+    navigator.userAgent || ''
+  );
+}
+
+// Mode d'emploi adapte a l'appareil, affiche quand aucune boite native
+// n'est disponible. Sans lui, l'utilisateur n'a aucune piste.
+function texteAideInstallation() {
+  var ua = navigator.userAgent || '';
+  if (estNavigateurIntegre()) {
+    return T_(
+      'Ouvre ce lien dans Chrome (Android) ou Safari (iPhone) : le navigateur integre a une application ne peut pas installer BLAMUNE.'
+    );
+  }
+  if (estIOS()) {
+    if (/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)) {
+      return T_(
+        "Sur iPhone, seul Safari installe l'application : ouvre cette page dans Safari, bouton Partager, puis Sur l'ecran d'accueil."
+      );
+    }
+    return T_("Sur iPhone : bouton Partager, puis Sur l'ecran d'accueil.");
+  }
+  if (estAndroid()) {
+    return T_(
+      "Dans Chrome : menu ⋮ en haut a droite, puis Installer l'application (ou Ajouter a l'ecran d'accueil)."
+    );
+  }
+  return T_("Dans la barre d'adresse : icone Installer, ou menu ⋮ puis Installer BLAMUNE.");
+}
+
 (function initInstallation() {
   var bouton = document.getElementById('btnInstaller');
   if (!bouton) return;
@@ -2696,6 +2736,12 @@ function estIOS() {
   function montrerBouton() {
     if (!installationDejaFaite()) bouton.classList.remove('cache');
   }
+
+  // Le bouton est visible MEME sans beforeinstallprompt : sur telephone cet
+  // evenement n'arrive pas toujours (premiere visite, navigateur integre,
+  // Firefox). Le masquer laissait l'utilisateur sans aucun moyen de
+  // decouvrir l'installation — d'ou le « on ne peut pas le telecharger ».
+  montrerBouton();
 
   window.addEventListener('beforeinstallprompt', function (e) {
     // Sans preventDefault, Chrome affiche sa propre banniere et le
@@ -2715,15 +2761,19 @@ function estIOS() {
     var aide = document.getElementById('aideInstallation');
     if (!aide) return;
     var texte = document.getElementById('aideInstallationTexte');
-    if (texte) {
-      texte.textContent = estIOS()
-        ? T_("Sur iPhone : bouton Partager, puis Sur l'ecran d'accueil.")
-        : T_(
-            "Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil."
-          );
-    }
+    if (texte) texte.textContent = texteAideInstallation();
     aide.classList.remove('cache');
   }
+
+  // La langue peut changer pendant que l'aide est ouverte : on la reecrit
+  // dans la langue active.
+  window.addEventListener('blamune:langue', function () {
+    var aide = document.getElementById('aideInstallation');
+    var texte = document.getElementById('aideInstallationTexte');
+    if (aide && texte && !aide.classList.contains('cache')) {
+      texte.textContent = texteAideInstallation();
+    }
+  });
 
   var fermer = document.getElementById('btnFermerAideInstallation');
   if (fermer) {
@@ -2744,12 +2794,10 @@ function estIOS() {
       if (choix && choix.outcome === 'accepted') bouton.classList.add('cache');
       return;
     }
-    // Pas de prompt natif : mode d'emploi (iOS surtout, ou navigateur
-    // qui n'expose pas encore l'API).
+    // Pas de prompt natif : mode d'emploi adapte a l'appareil (iOS, Android
+    // sans evenement, navigateur integre, ordinateur).
     ouvrirAide();
   });
-
-  if (estIOS()) montrerBouton();
 })();
 
 window.addEventListener('load', async function () {

@@ -133,6 +133,47 @@ test('notifications : libelles du bouton traduits dans les 4 langues', () => {
   }
 });
 
+test('installation : le bouton est visible sans beforeinstallprompt', () => {
+  // Regression : sur telephone, beforeinstallprompt n'arrive pas toujours
+  // (premiere visite, navigateur integre). Le bouton restait alors cache et
+  // l'utilisateur concluait « on ne peut pas le telecharger ».
+  const app = lire('site/app.js');
+  assert.ok(app.includes('montrerBouton();'), 'montrerBouton jamais appele');
+  const avantEvenement = app.indexOf("addEventListener('beforeinstallprompt'");
+  const appelInitial = app.indexOf('montrerBouton();');
+  assert.ok(
+    appelInitial !== -1 && appelInitial < avantEvenement,
+    'montrerBouton doit etre appele a l initialisation, avant l evenement'
+  );
+  for (const attendu of ['estNavigateurIntegre', 'texteAideInstallation', 'estAndroid']) {
+    assert.ok(app.includes(attendu), 'detection manquante : ' + attendu);
+  }
+});
+
+test('installation : chaque mode d emploi est traduit dans les 4 langues', () => {
+  const langues = lire('site/langues.js');
+  const cles = [
+    'Ouvre ce lien dans Chrome (Android) ou Safari (iPhone) : le navigateur integre a une application ne peut pas installer BLAMUNE.',
+    "Sur iPhone, seul Safari installe l'application : ouvre cette page dans Safari, bouton Partager, puis Sur l'ecran d'accueil.",
+    "Dans Chrome : menu ⋮ en haut a droite, puis Installer l'application (ou Ajouter a l'ecran d'accueil).",
+    "Dans la barre d'adresse : icone Installer, ou menu ⋮ puis Installer BLAMUNE."
+  ];
+  for (const cle of cles) {
+    const occurrences = langues.split(cle).length - 1;
+    assert.ok(occurrences >= 3, 'traduction manquante pour : ' + cle);
+  }
+});
+
+test('installation : le texte d aide n est pas fige par data-i18n', () => {
+  // Le mode d'emploi depend de l'appareil et est ecrit en JS. Un data-i18n
+  // sur ce paragraphe le reecrirait a chaque changement de langue et
+  // effacerait le message adapte (navigateur integre, Android, ordinateur).
+  const html = lire('site/index.html');
+  const bloc = html.match(/<p[^>]*id="aideInstallationTexte"[^>]*>/);
+  assert.ok(bloc, 'paragraphe aideInstallationTexte introuvable');
+  assert.ok(!bloc[0].includes('data-i18n='), 'aideInstallationTexte ne doit pas porter data-i18n');
+});
+
 test('config.json.example : modele aligne sur le defaut du serveur', () => {
   const ex = JSON.parse(lire('config.json.example'));
   assert.strictEqual(ex.api_model, 'gemini-3.5-flash');

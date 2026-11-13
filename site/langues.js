@@ -61,6 +61,14 @@
       "Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil.":
         'In the browser menu: Install app or Add to Home Screen.',
       'Application installee.': 'App installed.',
+      'Ouvre ce lien dans Chrome (Android) ou Safari (iPhone) : le navigateur integre a une application ne peut pas installer BLAMUNE.':
+        'Open this link in Chrome (Android) or Safari (iPhone): an in-app browser cannot install BLAMUNE.',
+      "Sur iPhone, seul Safari installe l'application : ouvre cette page dans Safari, bouton Partager, puis Sur l'ecran d'accueil.":
+        'On iPhone, only Safari can install the app: open this page in Safari, tap Share, then Add to Home Screen.',
+      "Dans Chrome : menu ⋮ en haut a droite, puis Installer l'application (ou Ajouter a l'ecran d'accueil).":
+        'In Chrome: menu ⋮ at the top right, then Install app (or Add to Home screen).',
+      "Dans la barre d'adresse : icone Installer, ou menu ⋮ puis Installer BLAMUNE.":
+        'In the address bar: Install icon, or menu ⋮ then Install BLAMUNE.',
       'Activer les notifications': 'Enable notifications',
       'Notifications OK': 'Notifications on',
       'Notifications activees : BLAMUNE pourra t ecrire meme quand le site est ferme.':
@@ -179,6 +187,14 @@
       "Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil.":
         'En el menu del navegador: Instalar aplicacion o Anadir a pantalla de inicio.',
       'Application installee.': 'Aplicacion instalada.',
+      'Ouvre ce lien dans Chrome (Android) ou Safari (iPhone) : le navigateur integre a une application ne peut pas installer BLAMUNE.':
+        'Abre este enlace en Chrome (Android) o Safari (iPhone): el navegador integrado en una aplicacion no puede instalar BLAMUNE.',
+      "Sur iPhone, seul Safari installe l'application : ouvre cette page dans Safari, bouton Partager, puis Sur l'ecran d'accueil.":
+        'En iPhone, solo Safari instala la aplicacion: abre esta pagina en Safari, boton Compartir y luego Anadir a pantalla de inicio.',
+      "Dans Chrome : menu ⋮ en haut a droite, puis Installer l'application (ou Ajouter a l'ecran d'accueil).":
+        'En Chrome: menu ⋮ arriba a la derecha, luego Instalar aplicacion (o Anadir a pantalla de inicio).',
+      "Dans la barre d'adresse : icone Installer, ou menu ⋮ puis Installer BLAMUNE.":
+        'En la barra de direcciones: icono Instalar, o menu ⋮ y luego Instalar BLAMUNE.',
       'Activer les notifications': 'Activar notificaciones',
       'Notifications OK': 'Notificaciones activadas',
       'Notifications activees : BLAMUNE pourra t ecrire meme quand le site est ferme.':
@@ -290,6 +306,14 @@
       "Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil.":
         'في قائمة المتصفح: تثبيت التطبيق أو إضافة إلى الشاشة الرئيسية.',
       'Application installee.': 'تم تثبيت التطبيق.',
+      'Ouvre ce lien dans Chrome (Android) ou Safari (iPhone) : le navigateur integre a une application ne peut pas installer BLAMUNE.':
+        'افتح هذا الرابط في Chrome (أندرويد) أو Safari (آيفون): المتصفح المدمج في تطبيق لا يستطيع تثبيت BLAMUNE.',
+      "Sur iPhone, seul Safari installe l'application : ouvre cette page dans Safari, bouton Partager, puis Sur l'ecran d'accueil.":
+        'على آيفون، Safari وحده يستطيع تثبيت التطبيق: افتح هذه الصفحة في Safari، ثم زر المشاركة، ثم إضافة إلى الشاشة الرئيسية.',
+      "Dans Chrome : menu ⋮ en haut a droite, puis Installer l'application (ou Ajouter a l'ecran d'accueil).":
+        'في Chrome: قائمة ⋮ أعلى اليمين، ثم تثبيت التطبيق (أو إضافة إلى الشاشة الرئيسية).',
+      "Dans la barre d'adresse : icone Installer, ou menu ⋮ puis Installer BLAMUNE.":
+        'في شريط العنوان: أيقونة التثبيت، أو قائمة ⋮ ثم تثبيت BLAMUNE.',
       'Activer les notifications': 'تفعيل الإشعارات',
       'Notifications OK': 'الإشعارات مفعلة',
       'Notifications activees : BLAMUNE pourra t ecrire meme quand le site est ferme.':

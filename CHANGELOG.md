@@ -1,5 +1,43 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-12 (installation sur telephone : bouton toujours visible)
+
+### Correction
+
+- **« On ne peut pas le telecharger sur telephone »** (`site/app.js`). Le
+  bouton `Installer` restait cache tant que le navigateur n'emettait pas
+  `beforeinstallprompt`. Cet evenement est loin d'etre garanti : il n'arrive
+  pas a la premiere visite, jamais dans un navigateur integre (Instagram,
+  Facebook, WhatsApp, TikTok) et jamais sur iOS ou Firefox. Le visiteur
+  n'avait donc aucun moyen de decouvrir l'installation. Le bouton est
+  desormais visible des le chargement, tant que l'application n'est pas
+  installee (`display-mode: standalone` detecte), et il disparait apres une
+  installation reussie (`appinstalled`).
+- **Mode d'emploi adapte a l'appareil** (`texteAideInstallation`). Quand
+  aucune boite native n'est disponible, le bouton affiche une consigne
+  utile au lieu d'un texte pense pour iPhone :
+  navigateur integre -> rouvrir dans Chrome ou Safari ;
+  iPhone -> Partager puis « Sur l'ecran d'accueil » ;
+  iPhone sous Chrome/Firefox/Edge -> passer par Safari ;
+  Android -> menu ⋮ puis « Installer l'application » ;
+  ordinateur -> icone dans la barre d'adresse ou menu ⋮.
+  Le texte suit la langue active (`blamune:langue`), y compris si l'aide est
+  deja ouverte. Les 5 consignes sont traduites en anglais, espagnol et arabe.
+- `#aideInstallationTexte` ne porte plus de `data-i18n` : le selecteur de
+  langue aurait ecrase la consigne adaptee a l'appareil a chaque changement.
+- Cache du service worker passe en `blamune-v22` pour que les visiteurs
+  reguliers recoivent le nouveau `app.js` au premier rechargement.
+
+### Verification
+
+- Sur une origine neuve (port neuf, sans ancien service worker) : bouton
+  `Installer` visible sans aucun `beforeinstallprompt`, clic -> mode d'emploi,
+  fermeture, reouverture, 0 erreur console.
+- Consignes verifiees en simulant les UA : Android, iPhone Safari, iPhone
+  Chrome, navigateur integre Instagram, ordinateur ; texte francais et
+  anglais. Traduction presente dans les 4 langues (test unitaire).
+- `npm run lint` 0 erreur, unites 316/316, integration 58/58.
+
 ## [Non publié] - 2026-11-12 (verification fonctionnelle en ligne : bugs d'interface)
 
 ### Correction
