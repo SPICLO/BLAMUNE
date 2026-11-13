@@ -1621,17 +1621,39 @@ var CHAMPS_PROFIL = [
 function ouvrirProfil() {
   var z = document.getElementById('zoneProfil');
   if (!z) return;
-  z.style.display = 'flex';
+  // La classe .ouvert porte l'affichage ET le declenchement de
+  // l'animation d'entree (cascade des lignes, see CSS) : on ne pose plus
+  // display:flex en style inline, sinon aucun fondu ne pourrait suivre.
+  z.hidden = false;
+  z.classList.add('ouvert');
   chargerProfil();
 }
 
 function fermerProfil() {
   var z = document.getElementById('zoneProfil');
-  if (z) z.style.display = 'none';
+  if (!z) return;
+  z.classList.remove('ouvert');
+  z.hidden = true;
+  var bouton = document.getElementById('btnProfil');
+  if (bouton) bouton.focus();
 }
 
 function T_(c) {
   return window.I18N ? window.I18N.t(c) : c;
+}
+
+// "motsFavoris" -> "Mots favoris", "aimePas" -> "Aime pas".
+// Les cles du bot sont en camelCase sans accents : on coupe avant chaque
+// majuscule, on met la premiere lettre en capitale. Le resultat passe
+// ensuite par T_() : si une traduction existe, elle gagne.
+function humaniserCle(cle) {
+  var mots = String(cle || '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (!mots) return '';
+  return mots.charAt(0).toUpperCase() + mots.slice(1);
 }
 
 async function chargerProfil() {
@@ -1649,6 +1671,16 @@ async function chargerProfil() {
     var profil = (j && j.profil) || {};
     liste.textContent = '';
     var connu = false;
+    var nbConnus = 0;
+    // Une valeur n'est "connue" que si sa forme TEXTE est non vide.
+    // Certains champs du serveur sont des tableaux (motsFavoris) : un
+    // tableau vide est truthy en JS, mais String([]) === '' — sans ce
+    // test, le badge annoncait "1 souvenir" devant des champs vides.
+    function valeurTexte(v) {
+      if (v === null || v === undefined) return '';
+      if (Array.isArray(v)) return v.filter(Boolean).join(', ');
+      return String(v);
+    }
     CHAMPS_PROFIL.forEach(function (c) {
       var ligne = document.createElement('div');
       ligne.className = 'profil-ligne';
@@ -1661,8 +1693,11 @@ async function chargerProfil() {
       inp.id = 'prof_' + c.cle;
       inp.className = 'profil-champ';
       inp.maxLength = 200;
-      inp.value = String(profil[c.cle] || '');
-      if (profil[c.cle]) connu = true;
+      inp.value = valeurTexte(profil[c.cle]);
+      if (inp.value) {
+        connu = true;
+        nbConnus++;
+      }
       ligne.appendChild(lab);
       ligne.appendChild(inp);
       liste.appendChild(ligne);
@@ -1681,17 +1716,23 @@ async function chargerProfil() {
       var lab = document.createElement('label');
       lab.className = 'profil-label';
       lab.setAttribute('for', 'prof_' + c);
-      lab.textContent = c;
+      // Cle brute du bot (motsFavoris, aimePas...) : on l'humanise pour
+      // l'affichage ("motsFavoris" -> "Mots favoris"), la cle technique
+      // reste dans l'id du champ et dans le POST.
+      lab.textContent = T_(humaniserCle(c));
+      lab.title = c;
       var inp = document.createElement('input');
       inp.type = 'text';
       inp.id = 'prof_' + c;
       inp.className = 'profil-champ';
       inp.maxLength = 200;
-      inp.value = String(profil[c] || '');
+      inp.value = valeurTexte(profil[c]);
+      if (inp.value) nbConnus++;
       ligne.appendChild(lab);
       ligne.appendChild(inp);
       liste.appendChild(ligne);
     });
+    majCompteProfil(nbConnus);
     if (!connu && !Object.keys(profil).length) {
       var vide = document.createElement('p');
       vide.className = 'profil-note';
@@ -1700,12 +1741,47 @@ async function chargerProfil() {
     }
   } catch (e) {
     liste.textContent = '';
+    majCompteProfil(-1);
     var err = document.createElement('p');
     err.className = 'profil-note';
     err.textContent = T_('Profil indisponible pour le moment.');
     liste.appendChild(err);
   }
 }
+
+// Badge "n souvenir(s)" du panneau : n < 0 = indisponible, 0 = rien encore.
+// Le badge est cree par JS (pas de data-i18n) : on memorise le nombre sur
+// l'element pour pouvoir le retraduire quand la langue change.
+function majCompteProfil(n) {
+  var el = document.getElementById('compteProfil');
+  if (!el) return;
+  el.dataset.nb = String(n);
+  if (n < 0) {
+    el.textContent = '';
+    el.classList.remove('profil-compte-plein');
+    return;
+  }
+  if (!n) {
+    el.textContent = T_('Aucun souvenir');
+    el.classList.remove('profil-compte-plein');
+    return;
+  }
+  el.textContent = n + ' ' + T_(n > 1 ? 'souvenirs' : 'souvenir');
+  el.classList.add('profil-compte-plein');
+}
+
+// Changement de langue : le badge et les libelles du profil sont poses par
+// JS, donc hors du balayage [data-i18n] de langues.js. On les refait ici.
+// Le nombre est relu depuis le DOM (dataset.nb) : si le panneau n'a jamais
+// ete charge, il n'y a rien a retraduire et on ne declenche pas de requete.
+window.addEventListener('blamune:langue', function () {
+  var el = document.getElementById('compteProfil');
+  if (el && el.dataset.nb !== undefined && el.dataset.nb !== '') {
+    majCompteProfil(Number(el.dataset.nb));
+  }
+  var liste = document.getElementById('listeProfil');
+  if (liste && liste.querySelector('.profil-champ')) chargerProfil();
+});
 
 async function sauverProfil() {
   var liste = document.getElementById('listeProfil');
@@ -1717,13 +1793,20 @@ async function sauverProfil() {
       var inp = champs[i];
       var cle = (inp.id || '').replace(/^prof_/, '');
       if (!cle) continue;
+      // Le serveur refuse une valeur vide (`ecrireMemoire` renvoie false) :
+      // envoyer les champs vides faisait echouer la sauvegarde et affichait
+      // « Certains champs n'ont pas pu etre enregistres » des que le profil
+      // n'etait pas entierement rempli. Un champ vide n'a rien a envoyer ;
+      // pour tout effacer, le bouton « Tout oublier » existe.
+      var valeur = String(inp.value || '').trim();
+      if (!valeur) continue;
       var r = await fetch('/profil', {
         method: 'POST',
         headers: Object.assign(
           { 'Content-Type': 'application/x-www-form-urlencoded' },
           authHeaders()
         ),
-        body: 'champ=' + encodeURIComponent(cle) + '&valeur=' + encodeURIComponent(inp.value.trim())
+        body: 'champ=' + encodeURIComponent(cle) + '&valeur=' + encodeURIComponent(valeur)
       });
       // Le serveur repond 200 avec ok:false pour un champ qu'il ne connait
       // pas : sans ce controle, l'interface annoncait « sauvegarde » alors
@@ -1734,10 +1817,34 @@ async function sauverProfil() {
       } catch (e) {}
       if (!r.ok || (j && j.ok === false)) echecs++;
     }
+    var bouton = document.getElementById('btnProfilSauver');
+    if (bouton) {
+      bouton.classList.remove('profil-flash', 'profil-flash-err');
+      // Reflow force : rejouer l'animation sur un second clic immediat.
+      void bouton.offsetWidth;
+      bouton.classList.add(echecs ? 'profil-flash-err' : 'profil-flash');
+      setTimeout(function () {
+        bouton.classList.remove('profil-flash', 'profil-flash-err');
+      }, 900);
+    }
     if (echecs) {
       afficherToastDeco(T_("Certains champs n'ont pas pu etre enregistres."));
     } else {
       afficherToastDeco(T_('Profil sauvegarde.'), 'ok');
+      // Le badge compte ce qui est REELLEMENT enregistre : sans ce
+      // recalcul il restait fige sur l'etat d'ouverture du panneau
+      // ("Aucun souvenir" devant deux champs tout juste sauvegardes).
+      var remplis = 0;
+      for (var k = 0; k < champs.length; k++) {
+        if (String(champs[k].value || '').trim()) remplis++;
+      }
+      majCompteProfil(remplis);
+      var compte = document.getElementById('compteProfil');
+      if (compte) {
+        compte.classList.remove('profil-pop');
+        void compte.offsetWidth;
+        compte.classList.add('profil-pop');
+      }
     }
   } catch (e) {
     afficherToastDeco(T_('Profil indisponible pour le moment.'));
@@ -2562,11 +2669,94 @@ function lireVoix(texte) {
 // serveur, il s'applique des le premier rendu, ecran de connexion compris.
 // Le <meta name="theme-color"> suit : c'est lui qui colore la barre du
 // navigateur mobile (PWA).
-function appliquerTheme(nom) {
+//
+// Tant que l'utilisateur n'a PAS clique sur le bouton, on suit la
+// preference du systeme (prefers-color-scheme) : c'est ce qu'attend un
+// visiteur qui a regle son OS en clair. Des qu'il choisit, son choix
+// gagne et n'est plus jamais ecrase par le systeme.
+var COULEUR_THEME = { clair: '#eef2f9', sombre: '#0b1020' };
+var THEME_ANIM_MS = 420;
+var themeAnimMinuterie = null;
+
+function themePrefere() {
+  var choisi = localStorage.getItem('blamune_theme');
+  if (choisi === 'clair' || choisi === 'sombre') return choisi;
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      return 'clair';
+    }
+  } catch (e) {}
+  return 'sombre';
+}
+
+function mouvementReduit() {
+  try {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  } catch (e) {
+    return false;
+  }
+}
+
+// L'onde circulaire : un seul element #themeOnde, cree a la demande et
+// reutilise. Elle part du bouton clique et recouvre l'ecran de la couleur
+// d'arrivee, ce qui masque l'instant ou les variables basculent.
+function jouerOndeTheme(nom, origine) {
+  if (mouvementReduit() || document.documentElement.classList.contains('console')) return;
+  var onde = document.getElementById('themeOnde');
+  if (!onde) {
+    onde = document.createElement('div');
+    onde.id = 'themeOnde';
+    onde.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(onde);
+  }
+  var x = origine && origine.x;
+  var y = origine && origine.y;
+  if (typeof x !== 'number' || typeof y !== 'number') {
+    x = window.innerWidth / 2;
+    y = window.innerHeight / 2;
+  }
+  onde.style.left = x + 'px';
+  onde.style.top = y + 'px';
+  onde.style.setProperty('--couleur-arrivee', COULEUR_THEME[nom] || COULEUR_THEME.sombre);
+  // Reflow force : rejouer l'animation sur deux clics rapproches.
+  onde.classList.remove('onde-active');
+  void onde.offsetWidth;
+  onde.classList.add('onde-active');
+  setTimeout(function () {
+    onde.classList.remove('onde-active');
+  }, 700);
+}
+
+// anime=false : premier rendu, changement de langue, restauration au
+// login. Aucune transition ne doit jouer dans ces cas-la (sinon l'ecran
+// de connexion "flashe" au chargement).
+function appliquerTheme(nom, anime, origine) {
   var clair = nom === 'clair';
-  document.documentElement.setAttribute('data-theme', clair ? 'clair' : 'sombre');
+  var racine = document.documentElement;
+  var avant = racine.getAttribute('data-theme');
+  var change = anime && avant && avant !== (clair ? 'clair' : 'sombre');
+
+  if (change) {
+    // 1. On arme la transition AVANT de changer la variable, sinon le
+    //    navigateur calcule deja la nouvelle couleur sans interpoler.
+    racine.classList.add('theme-anim');
+    jouerOndeTheme(clair ? 'clair' : 'sombre', origine);
+    var b0 = document.getElementById('btnTheme');
+    if (b0) {
+      b0.classList.remove('theme-vire-clair', 'theme-vire-sombre');
+      void b0.offsetWidth;
+      b0.classList.add(clair ? 'theme-vire-clair' : 'theme-vire-sombre');
+    }
+    if (themeAnimMinuterie) clearTimeout(themeAnimMinuterie);
+    themeAnimMinuterie = setTimeout(function () {
+      racine.classList.remove('theme-anim');
+      themeAnimMinuterie = null;
+    }, THEME_ANIM_MS);
+  }
+
+  racine.setAttribute('data-theme', clair ? 'clair' : 'sombre');
   var meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', clair ? '#eef2f9' : '#0b1020');
+  if (meta) meta.setAttribute('content', clair ? COULEUR_THEME.clair : COULEUR_THEME.sombre);
   var b = document.getElementById('btnTheme');
   if (b) {
     var T = window.I18N
@@ -2583,18 +2773,31 @@ function appliquerTheme(nom) {
 (function initBoutonTheme() {
   var b = document.getElementById('btnTheme');
   if (!b) return;
-  appliquerTheme(localStorage.getItem('blamune_theme') || 'sombre');
+  appliquerTheme(themePrefere(), false);
   // Le libelle est pose en JS (pas de data-i18n) : on le rafraichit quand la
   // langue change, sinon il reste dans l'ancienne langue jusqu'au clic.
   window.addEventListener('blamune:langue', function () {
-    appliquerTheme(localStorage.getItem('blamune_theme') || 'sombre');
+    appliquerTheme(themePrefere(), false);
   });
   b.addEventListener('click', function () {
-    var suivant = localStorage.getItem('blamune_theme') === 'clair' ? 'sombre' : 'clair';
+    var suivant = themePrefere() === 'clair' ? 'sombre' : 'clair';
     localStorage.setItem('blamune_theme', suivant);
     sauverProfilLocal('theme', suivant);
-    appliquerTheme(suivant);
+    // L'onde part du centre du bouton : c'est de la que l'oeil regarde.
+    // (Clic souris comme clavier : le bouton a toujours un rect.)
+    var r = b.getBoundingClientRect();
+    appliquerTheme(suivant, true, { x: r.left + r.width / 2, y: r.top + r.height / 2 });
   });
+  // Suivi du systeme : uniquement tant qu'aucun choix explicite n'existe.
+  try {
+    var mq = window.matchMedia('(prefers-color-scheme: light)');
+    var surSysteme = function () {
+      if (localStorage.getItem('blamune_theme')) return;
+      appliquerTheme(themePrefere(), true);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', surSysteme);
+    else if (mq.addListener) mq.addListener(surSysteme);
+  } catch (e) {}
 })();
 
 // ---------------- EXPORT DE L'HISTORIQUE ----------------
@@ -2807,7 +3010,8 @@ window.addEventListener('load', async function () {
   }
   // Theme DES LA PREMIERE SECONDE : l'ecran de connexion aussi est colore,
   // et on ne re-render pas au brusque passage sombre->clair au login.
-  appliquerTheme(localStorage.getItem('blamune_theme') || 'sombre');
+  // anime=false : au chargement, aucune transition ne doit jouer.
+  appliquerTheme(themePrefere(), false);
   // Avant la premiere requete : une invitation sans jeton tente de le
   // retrouver (nonce de /invite), sinon elle sera refusee — plus de
   // "mode legacy" (correctif A).

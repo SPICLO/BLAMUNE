@@ -87,6 +87,24 @@ test('profil : les champs proposes par le site existent cote serveur', () => {
   assert.deepStrictEqual(inconnus, [], 'champs refuses par /profil : ' + inconnus.join(', '));
 });
 
+test('profil : la sauvegarde n envoie pas de champ vide', () => {
+  // Regression : « Enregistrer » envoyait les 7 champs, vides compris.
+  // /profil refuse une valeur vide (`ecrireMemoire` renvoie ok:false), donc
+  // sauvegarder un profil incomplet affichait « Certains champs n'ont pas
+  // pu etre enregistres » et laissait le badge de comptage fige.
+  const app = lire('site/app.js');
+  const debut = app.indexOf('async function sauverProfil');
+  const fin = app.indexOf('async function oublierProfil');
+  assert.ok(debut !== -1 && fin > debut, 'sauverProfil introuvable');
+  const bloc = app.slice(debut, fin);
+  assert.ok(bloc.includes('if (!valeur) continue;'), 'les champs vides doivent etre ignores');
+  assert.ok(
+    bloc.includes("encodeURIComponent(cle) + '&valeur=' + encodeURIComponent(valeur)"),
+    'la valeur filtree doit etre envoyee a /profil'
+  );
+  assert.ok(bloc.includes('majCompteProfil(remplis)'), 'le badge doit suivre la sauvegarde');
+});
+
 test('interface : les elements masques par .cache sont geres par la classe', () => {
   // .cache vaut display:none !important : vider style.display ne reaffiche
   // rien. Ce test garde la lecon (boutons Quitter/Notifications et apercu

@@ -29,7 +29,7 @@
     <link rel="icon" type="image/png" href="icon-192.png?v=16" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png?v=16" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="stylesheet" href="style.css?v=16" />
+    <link rel="stylesheet" href="style.css?v=17" />
     <!-- Open Graph -->
     <meta property="og:title" content="BLAMUNE - Chat IA" />
     <meta
@@ -354,24 +354,54 @@
       <!-- PROFIL (Mon profil) : ce que BLAMUNE a retenu de toi. Panneau
            repliable, comme la recherche : lecture par /profil (GET),
            correction champ par champ (POST), oubli total (DELETE). -->
-      <div id="zoneProfil" class="zone-repliable">
+      <div
+        id="zoneProfil"
+        class="zone-repliable zone-profil"
+        role="dialog"
+        aria-modal="false"
+        aria-labelledby="titreProfil"
+      >
         <div class="profil-boite">
           <div class="profil-tete">
-            <strong data-i18n="Ce que BLAMUNE sait de toi">Ce que BLAMUNE sait de toi</strong>
-            <button id="btnFermerProfil" class="btn-petit" type="button" data-i18n="Fermer">
-              Fermer
+            <div class="profil-titres">
+              <strong id="titreProfil" data-i18n="Ce que BLAMUNE sait de toi"
+                >Ce que BLAMUNE sait de toi</strong
+              >
+              <span id="compteProfil" class="profil-compte" aria-live="polite"></span>
+            </div>
+            <button
+              id="btnFermerProfil"
+              class="profil-fermer"
+              type="button"
+              aria-label="Fermer"
+              data-i18n-title="Fermer"
+              title="Fermer"
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M6 6l12 12M18 6 6 18"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
             </button>
           </div>
           <div id="listeProfil" class="profil-liste">
             <p class="profil-note" data-i18n="Charger le profil...">Charger le profil...</p>
           </div>
           <div class="profil-pied">
-            <button id="btnProfilSauver" class="btn-petit" type="button" data-i18n="Enregistrer">
+            <button
+              id="btnProfilSauver"
+              class="profil-btn profil-sauver"
+              type="button"
+              data-i18n="Enregistrer"
+            >
               Enregistrer
             </button>
             <button
               id="btnProfilOublier"
-              class="btn-petit profil-oublier"
+              class="profil-btn profil-oublier"
               type="button"
               data-i18n="Tout oublier"
             >

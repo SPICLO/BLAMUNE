@@ -1,5 +1,54 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-12 (panneau profil, badge de souvenirs, theme fluide)
+
+### Ajout
+
+- **Panneau « Mon profil » habille** (`site/style.css`, `site/index.html`).
+  Les classes generees par `app.js` (`.profil-boite`, `.profil-ligne`,
+  `.profil-champ`, `.profil-pied`) n'etaient pas stylees : le panneau
+  affichait des inputs nus colles les uns aux autres, illisible en mode
+  clair. Il reprend le langage de l'en-tete (verre depoli, accent
+  cyan/emeraude), avec ouverture animee en cascade (`.zone-profil.ouvert`),
+  bouton de fermeture icone, pied « Enregistrer » / « Tout oublier » et
+  adaptation aux petits ecrans (label au-dessus du champ).
+- **Badge « n souvenir(s) »** (`#compteProfil`) : compte les champs
+  reellement remplis, passe a l'accent des qu'il y a un souvenir, anime au
+  changement, et se retraduit quand la langue change (le badge est cree par
+  JS, donc hors du balayage `data-i18n`).
+- **Cles techniques humanisees** : les champs libres du bot s'affichent en
+  « Mots favoris » au lieu de `motsFavoris` ; la cle brute reste dans l'id
+  du champ et dans le POST (via `humaniserCle`).
+- **Theme au choix du systeme** (`app.js`) : tant que le visiteur n'a pas
+  clique, `prefers-color-scheme` decide (un OS en clair n'ouvre plus un
+  site noir). Des qu'il choisit, son choix gagne et n'est plus ecrase. La
+  bascule joue une onde circulaire depuis le bouton (`#themeOnde`), avec
+  transition des variables, et respecte `prefers-reduced-motion`.
+
+### Correction
+
+- **Sauvegarde du profil en echec des qu'un champ etait vide** (`app.js`).
+  « Enregistrer » envoyait les 7 champs, vides compris ; `ecrireMemoire`
+  refuse une valeur vide (`ok:false`). Un profil incomplet affichait donc
+  « Certains champs n'ont pas pu etre enregistres » et le badge restait
+  fige. Les champs vides ne sont plus envoyes (pour tout effacer,
+  « Tout oublier ») et le badge est recalcule apres chaque sauvegarde.
+- Cache du service worker passe en `blamune-v23`, feuille de style appelee
+  en `style.css?v=17` : les visiteurs reguliers recoivent le nouveau
+  panneau au premier rechargement.
+
+### Verification
+
+- Instance locale isolee (`BLAMUNE_DATA_DIR` temporaire), origine neuve :
+  panneau ouvert/ferme, 7 champs, sauvegarde de `ville` et `aime` (badge
+  « 2 souvenirs » immediat), reouverture, libelles et badge retraduits en
+  anglais, oubli total, 0 erreur console.
+- Theme : bascule sombre -> clair -> sombre, `meta theme-color` suit, onde
+  jouee, retour au sombre ; aucune erreur console.
+- Header a 1000 px : 9 boutons visibles (Installer compris), 0
+  chevauchement, 0 debordement horizontal.
+- Lint 0 erreur, unites 317/317, integration 58/58.
+
 ## [Non publié] - 2026-11-12 (installation sur telephone : bouton toujours visible)
 
 ### Correction

@@ -2056,3 +2056,610 @@ html.console .auth-box::before {
   padding: 40px;
   color: #9fb3c8;
 }
+
+/* =====================================================================
+   PANNEAU "MON PROFIL" (#zoneProfil)
+   ---------------------------------------------------------------------
+   app.js genere .profil-boite / .profil-tete / .profil-ligne /
+   .profil-label / .profil-champ / .profil-pied, mais AUCUNE de ces
+   classes n'etait stylee : le panneau s'affichait en inputs nus colles
+   les uns aux autres, sans fond ni bordure, illisible en mode clair.
+   Ce bloc habille le tout avec le meme langage que l'en-tete (verre
+   depoli, accent cyan/emeraude) et ajoute une animation d'ouverture
+   en cascade, sans rien changer au comportement du formulaire.
+
+   L'ouverture passe par la classe .ouvert (posee par ouvrirProfil) :
+   display reste none tant qu'elle manque, ce qui permet a la fois de
+   garder .zone-repliable generique et de declarer les keyframes une
+   seule fois (elles ne jouent qu'au moment ou l'affichage apparait).
+   ===================================================================== */
+
+.zone-profil {
+  flex: 0 0 auto;
+  padding: 0 14px 10px;
+  background: var(--vitro);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  border-bottom: 1px solid rgb(var(--blanc) / 0.06);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22);
+  z-index: 1;
+}
+
+.zone-profil.ouvert {
+  display: flex;
+  animation: profilEntree 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes profilEntree {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- La carte --- */
+.profil-boite {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Sur grand ecran une carte pleine largeur (1250px) etale des champs
+     de saisie vides sur toute la page : on borne et on centre. */
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 16px;
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgb(var(--blanc) / 0.04);
+}
+
+/* --- Tete : titre + badge de comptage + fermeture --- */
+.profil-tete {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.profil-titres {
+  /* Titre et badge sur UNE ligne : le badge se pose a droite du titre
+     et passe a la ligne seulement si la place manque (flex-wrap). */
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.profil-tete strong {
+  color: var(--texte);
+  font-size: 14px;
+  line-height: 1.3;
+  letter-spacing: 0.15px;
+}
+
+.profil-compte {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  color: var(--texte-faible);
+  font-size: 11px;
+  line-height: 1.2;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--bordure);
+  background: var(--surface-2);
+  white-space: nowrap;
+  transition:
+    color 0.25s ease,
+    background 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.profil-compte:empty {
+  display: none;
+}
+
+/* Des qu'un souvenir existe, le badge prend l'accent : repere visuel
+   immediat, coherent avec la pilule EGO/BLAMUNE. */
+.profil-compte.profil-compte-plein {
+  color: var(--sur-accent);
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 2px 12px rgba(56, 189, 248, 0.35);
+}
+
+.profil-compte.profil-pop {
+  animation: profilPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes profilPop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.profil-fermer {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--bordure);
+  color: var(--texte-doux);
+  transition:
+    transform 0.18s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.profil-fermer svg {
+  width: 16px;
+  height: 16px;
+}
+
+.profil-fermer:hover {
+  color: var(--texte);
+  background: rgb(var(--blanc) / 0.14);
+  transform: rotate(90deg);
+}
+
+.profil-fermer:active {
+  transform: rotate(90deg) scale(0.9);
+}
+
+/* --- Liste des champs --- */
+.profil-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Le badge du titre comptait pour un "enfant" de la liste quand on
+     scrollait : max-height exprime en vh, pas en % du parent flex. */
+  max-height: min(46vh, 340px);
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--blanc) / 0.14) transparent;
+}
+
+.profil-liste::-webkit-scrollbar {
+  width: 6px;
+}
+
+.profil-liste::-webkit-scrollbar-thumb {
+  background: rgb(var(--blanc) / 0.12);
+  border-radius: 8px;
+}
+
+.profil-ligne {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0;
+  /* Chaque ligne arrive une apres l'autre : la cascade donne le
+     sentiment que le profil "se charge" et guide l'oeil vers le bas. */
+  animation: profilLigne 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.profil-ligne:nth-child(1) {
+  animation-delay: 0.02s;
+}
+.profil-ligne:nth-child(2) {
+  animation-delay: 0.05s;
+}
+.profil-ligne:nth-child(3) {
+  animation-delay: 0.08s;
+}
+.profil-ligne:nth-child(4) {
+  animation-delay: 0.11s;
+}
+.profil-ligne:nth-child(5) {
+  animation-delay: 0.14s;
+}
+.profil-ligne:nth-child(6) {
+  animation-delay: 0.17s;
+}
+.profil-ligne:nth-child(7) {
+  animation-delay: 0.2s;
+}
+.profil-ligne:nth-child(n + 8) {
+  animation-delay: 0.23s;
+}
+
+@keyframes profilLigne {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.profil-label {
+  color: var(--texte-doux);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  /* Un long libelle libre (cle memoire du bot) ne doit jamais casser la
+     grille : il se tronque proprement, la valeur reste lisible. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profil-champ {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 11px;
+  border-radius: 9px;
+  border: 1px solid var(--bordure);
+  background: var(--surface-2);
+  color: var(--texte);
+  font-family: inherit;
+  font-size: 13.5px;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.profil-champ::placeholder {
+  color: var(--texte-faible);
+}
+
+.profil-champ:hover {
+  border-color: rgb(var(--blanc) / 0.16);
+}
+
+.profil-champ:focus {
+  border-color: rgba(56, 189, 248, 0.6);
+  background: rgb(var(--blanc) / 0.1);
+  box-shadow:
+    0 0 0 3px rgba(56, 189, 248, 0.14),
+    0 0 16px rgba(56, 189, 248, 0.08);
+}
+
+.profil-champ:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- Note / etat vide --- */
+.profil-note {
+  margin: 2px 0 4px;
+  color: var(--texte-faible);
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: center;
+  animation: profilLigne 0.3s ease both;
+}
+
+/* --- Pied : Enregistrer (accent) + Tout oublier (danger discret) --- */
+.profil-pied {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bordure);
+}
+
+.profil-btn {
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.profil-btn:active {
+  transform: scale(0.95);
+}
+
+/* Action principale : meme accent plein que "Installer" et la pilule. */
+.profil-sauver {
+  color: var(--sur-accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 3px 14px rgba(56, 189, 248, 0.32);
+}
+
+.profil-sauver:hover {
+  box-shadow: 0 6px 22px rgba(56, 189, 248, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Confirmation visuelle au clic : le bouton pulse en vert.
+   profil-flash-err joue la meme pulsation en rouge (echec serveur). */
+.profil-sauver.profil-flash {
+  animation: profilFlashOk 0.8s ease;
+}
+
+.profil-sauver.profil-flash-err {
+  animation: profilFlashErr 0.8s ease;
+}
+
+@keyframes profilFlashOk {
+  0%,
+  100% {
+    box-shadow: 0 3px 14px rgba(56, 189, 248, 0.32);
+  }
+  40% {
+    box-shadow:
+      0 0 0 4px rgba(52, 211, 153, 0.35),
+      0 6px 24px rgba(52, 211, 153, 0.6);
+    filter: brightness(1.12);
+  }
+}
+
+@keyframes profilFlashErr {
+  0%,
+  100% {
+    box-shadow: 0 3px 14px rgba(56, 189, 248, 0.32);
+  }
+  40% {
+    box-shadow:
+      0 0 0 4px rgba(248, 113, 113, 0.35),
+      0 6px 24px rgba(248, 113, 113, 0.55);
+    filter: brightness(1.1);
+  }
+}
+
+/* Action destructrice : fantome au repos, rouge au survol seulement
+   (on ne crie pas "supprime" en permanence dans l'interface). */
+.profil-oublier {
+  color: var(--danger);
+  background: transparent;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.profil-oublier:hover {
+  color: #fff;
+  background: var(--danger);
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(248, 113, 113, 0.4);
+  transform: translateY(-1px);
+}
+
+/* --- Mode clair : surfaces re-choisies, pas inversees --- */
+[data-theme='clair'] .zone-profil {
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.1);
+}
+
+[data-theme='clair'] .profil-boite {
+  box-shadow:
+    0 8px 28px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 #fff;
+}
+
+[data-theme='clair'] .profil-champ {
+  background: #fff;
+}
+
+[data-theme='clair'] .profil-champ:hover {
+  border-color: rgba(2, 132, 199, 0.35);
+}
+
+[data-theme='clair'] .profil-champ:focus {
+  background: #fff;
+  border-color: rgba(2, 132, 199, 0.65);
+  box-shadow:
+    0 0 0 3px rgba(2, 132, 199, 0.15),
+    0 0 16px rgba(2, 132, 199, 0.08);
+}
+
+[data-theme='clair'] .profil-fermer:hover {
+  background: rgba(15, 23, 42, 0.08);
+}
+
+/* --- Petits ecrans : label au-dessus du champ, panneau plus haut --- */
+@media (max-width: 600px) {
+  .zone-profil {
+    padding: 0 8px 8px;
+  }
+  .profil-boite {
+    padding: 10px 11px 12px;
+    border-radius: 14px;
+  }
+  .profil-ligne {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .profil-label {
+    font-size: 12px;
+  }
+  .profil-liste {
+    max-height: min(50vh, 300px);
+  }
+  .profil-pied {
+    justify-content: stretch;
+  }
+  .profil-btn {
+    flex: 1 1 0;
+    text-align: center;
+    /* 44px : cible tactile recommandee. */
+    padding: 11px 12px;
+  }
+}
+
+/* =====================================================================
+   BASCULE CLAIR / SOMBRE (#btnTheme)
+   ---------------------------------------------------------------------
+   Avant : appliquerTheme() posait data-theme et tout l'ecran changeait de
+   couleur d'un coup, sans aucune transition. Deux mouvements ajoutes ici,
+   sans toucher aux couleurs elles-memes (elles vivent deja dans les
+   variables de :root et [data-theme='clair']) :
+
+   1. FONDU DES SURFACES — html.theme-anim pose une courte transition sur
+      les proprietes de couleur des elements qui changent vraiment. La
+      classe n'existe que pendant ~420 ms : la retirer ensuite evite de
+      payer un cout de transition sur chaque interaction ordinaire.
+      body n'est PAS inclus : son background est un degrade multi-couches
+      dont le rendu interpole mal (effet de saccade) ; le voile #themeOnde
+      (point 2) couvre deja toute la page pendant le changement.
+
+   2. ONDE CIRCULAIRE — un cercle part du bouton clique et recouvre
+      l'ecran de la couleur d'arrivee. Le navigateur n'a donc jamais
+      "une moitie claire, une moitie sombre" le temps du fondu.
+   ===================================================================== */
+
+html.theme-anim,
+html.theme-anim *,
+html.theme-anim *::before,
+html.theme-anim *::after {
+  transition:
+    background-color 0.4s ease,
+    border-color 0.4s ease,
+    color 0.4s ease,
+    fill 0.4s ease,
+    stroke 0.4s ease,
+    box-shadow 0.4s ease !important;
+}
+
+/* Le bouton lui-meme : petit retour tactile, independant de la transition
+   globale pour rester net. */
+#btnTheme {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.25s ease,
+    color 0.25s ease,
+    border-color 0.25s ease;
+}
+
+#btnTheme:hover {
+  color: var(--texte);
+  border-color: rgb(var(--blanc) / 0.2);
+}
+
+#btnTheme:active {
+  transform: scale(0.93);
+}
+
+/* Rotation legere du libelle au moment du changement (poses en alternance
+   par app.js : theme-vire-clair / theme-vire-sombre). */
+#btnTheme.theme-vire-clair {
+  animation: themeVireClair 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#btnTheme.theme-vire-sombre {
+  animation: themeVireSombre 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes themeVireClair {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(0.94) rotate(-4deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes themeVireSombre {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(0.94) rotate(4deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+/* --- L'onde : un seul element reutilise, positionne en fixed --- */
+#themeOnde {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9998;
+  /* La couleur d'arrivee est posee par app.js (--couleur-arrivee). */
+  background: var(--couleur-arrivee, #0b1020);
+  transform: scale(0);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+#themeOnde.onde-active {
+  animation: ondeTheme 0.62s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes ondeTheme {
+  0% {
+    transform: scale(0);
+    opacity: 0.92;
+  }
+  55% {
+    opacity: 0.92;
+  }
+  100% {
+    /* 260vmax : couvre n'importe quel ecran depuis n'importe quel point,
+       y compris en 4K depuis un coin oppose. */
+    transform: scale(260vmax);
+    opacity: 0;
+  }
+}
+
+/* --- Respect de prefers-reduced-motion ---------------------------------
+   La regle globale du fichier coupe TOUT a 0.01 ms. Ici on est plus
+   precis : pas d'onde, pas de rotation, pas de fondu — le theme doit
+   changer instantanement, c'est tout ce que ces personnes demandent. */
+@media (prefers-reduced-motion: reduce) {
+  html.theme-anim,
+  html.theme-anim *,
+  html.theme-anim *::before,
+  html.theme-anim *::after {
+    transition: none !important;
+  }
+  #themeOnde {
+    display: none !important;
+  }
+  #btnTheme.theme-vire-clair,
+  #btnTheme.theme-vire-sombre {
+    animation: none !important;
+  }
+}
+
+/* --- Console (Xbox/PS/Switch) : le scale 260vmax saccade sur GPU faible */
+html.console #themeOnde {
+  display: none !important;
+}
