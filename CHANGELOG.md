@@ -1,5 +1,20 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-14 (inscription de nouveau accessible)
+
+### Correction
+
+- **Impossible de creer un compte** (`site/app.js`, `site/index.html`).
+  Le formulaire d'inscription porte la classe `.cache`
+  (`display: none !important`) depuis le retrait des styles inline (CSP).
+  La bascule connexion <-> inscription ne faisait que vider
+  `style.display`, impuissant face a un `!important` : le clic sur
+  « Creer un compte » masquait bien le formulaire de connexion, mais
+  n'affichait jamais celui d'inscription. La bascule et `afficherAuth`
+  utilisent desormais `.cache` (`classList.add/remove`) comme le reste du
+  site. Cache du service worker passe en `blamune-v24` pour que les
+  visiteurs reguliers recoivent le correctif au premier rechargement.
+
 ## [Non publié] - 2026-11-12 (panneau profil, badge de souvenirs, theme fluide)
 
 ### Ajout

@@ -378,8 +378,18 @@ function afficherAuth() {
   var login = document.getElementById('authFormLogin');
   var reg = document.getElementById('authFormRegister');
   if (boite) boite.classList.remove('large');
-  if (reg) reg.style.display = 'none';
-  if (login) login.style.display = '';
+  // Masquage par la classe .cache (display:none !important), pas par un
+  // style inline : depuis la suppression des styles inline (CSP), un
+  // `style.display = ''` ne peut plus rendre visible un element qui porte
+  // encore .cache. C'est ce qui bloquait l'inscription.
+  if (reg) {
+    reg.classList.add('cache');
+    reg.style.display = '';
+  }
+  if (login) {
+    login.classList.remove('cache');
+    login.style.display = '';
+  }
   if (ecranAuth) ecranAuth.style.display = '';
   if (appContenu) appContenu.style.display = 'none';
 }
@@ -643,7 +653,7 @@ function basculerForm(vers) {
   if (!login || !reg) return;
   var depuis = vers === 'register' ? login : reg;
   var cible = vers === 'register' ? reg : login;
-  if (depuis.style.display === 'none') return;
+  if (depuis.classList.contains('cache')) return;
   swapEnCours = true;
   majEchec(false);
 
@@ -658,8 +668,8 @@ function basculerForm(vers) {
   swapT1 = setTimeout(function () {
     swapT1 = null;
     depuis.classList.remove('sortie-swap');
-    depuis.style.display = 'none';
-    cible.style.display = '';
+    depuis.classList.add('cache');
+    cible.classList.remove('cache');
     forcerReflow(cible);
     cible.classList.add('entree-swap');
     swapT2 = setTimeout(function () {

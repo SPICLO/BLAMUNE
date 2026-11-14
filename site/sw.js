@@ -1,5 +1,5 @@
 // BLAMUNE Service Worker - offline cache + notifications push
-const CACHE = 'blamune-v23';
+const CACHE = 'blamune-v24';
 const ASSETS = [
   '/',
   '/index.html',

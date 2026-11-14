@@ -120,6 +120,26 @@ test('interface : les elements masques par .cache sont geres par la classe', () 
   }
 });
 
+test("interface : l'inscription s'affiche via .cache, jamais par style.display", () => {
+  // Regression du 2026-11-14 : le formulaire d'inscription porte .cache
+  // (display:none !important). La bascule ne vidait que style.display :
+  // la connexion disparaissait, l'inscription ne venait jamais.
+  const app = lire('site/app.js');
+  const debut = app.indexOf('function basculerForm');
+  const fin = app.indexOf('function initAuth');
+  assert.ok(debut !== -1 && fin > debut, 'basculerForm introuvable');
+  const bloc = app.slice(debut, fin);
+  assert.ok(bloc.includes("depuis.classList.contains('cache')"), 'etat de depart lu par classe');
+  assert.ok(bloc.includes("depuis.classList.add('cache')"), 'forme sortante masquee par classe');
+  assert.ok(bloc.includes("cible.classList.remove('cache')"), 'forme entrante affichee par classe');
+  assert.ok(!bloc.includes('depuis.style.display'), 'style.display ne bat pas un .cache !important');
+  assert.ok(!bloc.includes('cible.style.display'), 'style.display ne bat pas un .cache !important');
+
+  const auth = app.slice(app.indexOf('function afficherAuth'), app.indexOf('async function authRegister'));
+  assert.ok(auth.includes("reg.classList.add('cache')"), 'inscription masquee par classe au retour');
+  assert.ok(auth.includes("login.classList.remove('cache')"), 'connexion affichee par classe au retour');
+});
+
 test('langue : le selecteur reste disponible une fois connecte', () => {
   const html = lire('site/index.html');
   assert.ok(html.includes('id="choixLangueApp"'), "selecteur de langue de l'app absent");
