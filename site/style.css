@@ -1000,6 +1000,20 @@ button:disabled {
   cursor: pointer;
 }
 
+/* Meme gabarit pour le selecteur de langue de l'ecran d'accueil : sans
+   cela il gardait le blanc natif du navigateur au milieu d'une carte
+   sombre (et il flotte maintenant dans le coin de la carte). */
+#choixLangue {
+  max-width: 112px;
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  color: var(--texte-doux);
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 /* Bouton "Installer" : la seule action du header en accent plein, pour
    qu'on la voie sans chercher. Même langage visuel que #btnIANav.actif. */
 .btn-installer {
@@ -1370,6 +1384,9 @@ button:disabled {
   justify-content: center;
   z-index: 1000;
   overflow-y: auto;
+  /* Encoche et barre home : la carte reste dans la zone utile. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
 }
 
 /* Voile rouge : apparait quand la connexion / l'inscription echoue.
@@ -1713,6 +1730,137 @@ button:disabled {
   color: var(--texte-faible);
   font-size: 11px;
   margin: 8px 0 0;
+}
+
+/* ==================== CARTE D'AUTHENTIFICATION COMPACTE ==================== */
+/* Le contenu complet (logo, accroche, formulaire, invitation, installation,
+   langue) depassait la hauteur d'un telephone : la connexion et surtout
+   l'inscription demandaient de defiler. On resserre les espacements par
+   paliers et on sort le selecteur de langue du flux, pour que les DEUX
+   formulaires tiennent a l'ecran sans barre de defilement. */
+@media (max-width: 600px), (max-height: 800px) {
+  #ecranAuth .auth-box,
+  #ecranAuth .auth-box.large {
+    padding: 20px 18px;
+  }
+  #ecranAuth .auth-box.large {
+    max-width: min(94vw, 460px);
+  }
+  #ecranAuth .auth-avatar {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 10px;
+  }
+  #ecranAuth .auth-box h2 {
+    font-size: 19px;
+    margin-bottom: 2px;
+  }
+  #ecranAuth .auth-sous {
+    font-size: 12px;
+    line-height: 1.35;
+    margin-bottom: 14px;
+  }
+  #ecranAuth .auth-form {
+    gap: 9px;
+  }
+  #ecranAuth .auth-form input {
+    padding: 11px 14px;
+  }
+  #ecranAuth .auth-btn {
+    padding: 11px 12px;
+    font-size: 14px;
+  }
+  #ecranAuth .auth-box.large .auth-btn {
+    font-size: 15px;
+  }
+  #ecranAuth .auth-err {
+    min-height: 15px;
+    font-size: 12px;
+  }
+  #ecranAuth .auth-switch {
+    font-size: 12px;
+    margin-top: 2px;
+  }
+  #ecranAuth .auth-sep {
+    margin: 10px 0;
+  }
+  #ecranAuth .auth-note {
+    font-size: 10.5px;
+    margin-top: 5px;
+  }
+  #ecranAuth .auth-install {
+    min-height: 42px;
+    margin-top: 10px;
+  }
+  /* Langue : hors du flux, dans le coin. inset-inline-end suit le sens
+     d'ecriture (a gauche en arabe). */
+  #ecranAuth #authLangue {
+    position: absolute;
+    top: 10px;
+    inset-inline-end: 12px;
+    margin: 0;
+    z-index: 2;
+  }
+  #ecranAuth #authLangue select {
+    font-size: 12px;
+    padding: 3px 8px;
+  }
+}
+
+/* Ecran court (telephone compact, fenetre peu haute) : le logo et
+   l'accroche s'effacent avant les actions. */
+@media (max-height: 700px) {
+  #ecranAuth .auth-box,
+  #ecranAuth .auth-box.large {
+    padding: 14px 16px;
+  }
+  #ecranAuth .auth-avatar {
+    width: 44px;
+    height: 44px;
+    margin-bottom: 8px;
+  }
+  #ecranAuth .auth-box h2 {
+    font-size: 17px;
+  }
+  #ecranAuth .auth-sous {
+    display: none;
+  }
+  #ecranAuth .auth-form {
+    gap: 7px;
+  }
+  #ecranAuth .auth-sep {
+    margin: 8px 0;
+  }
+  #ecranAuth .auth-note {
+    margin-top: 3px;
+  }
+  #ecranAuth #authLangue {
+    top: 8px;
+    inset-inline-end: 10px;
+  }
+}
+
+/* Ecran tres court (clavier ouvert, paysage) : on ne retire jamais un
+   bouton, seulement les textes d'accompagnement. */
+@media (max-height: 580px) {
+  #ecranAuth .auth-box,
+  #ecranAuth .auth-box.large {
+    padding: 12px 14px;
+  }
+  #ecranAuth .auth-avatar {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 6px;
+  }
+  #ecranAuth .auth-box h2 {
+    font-size: 16px;
+  }
+  #ecranAuth .auth-sep {
+    margin: 6px 0;
+  }
+  #ecranAuth #authPrincipal > p.auth-note:not(#authLangue) {
+    display: none;
+  }
 }
 
 /* ==================== ANIMATIONS CONNEXION / DECONNEXION ==================== */

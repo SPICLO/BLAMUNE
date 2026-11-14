@@ -302,6 +302,36 @@ test('installation : les nouvelles cles sont traduites dans les 4 langues', () =
   }
 });
 
+test("auth : les deux formulaires tiennent sans ascenseur", () => {
+  // Mesure du 2026-11-14 : la carte d'inscription faisait 799 px de haut
+  // sur un telephone et 781 px sur une fenetre courte — l'ascenseur
+  // apparaissait avant meme les boutons du bas.
+  const css = lire('site/style.css');
+  assert.ok(
+    css.includes('@media (max-width: 600px), (max-height: 800px)'),
+    'palier compact absent'
+  );
+  assert.ok(css.includes('@media (max-height: 700px)'), 'palier ecran court absent');
+  assert.ok(css.includes('@media (max-height: 580px)'), 'palier tres court absent');
+  assert.ok(
+    /@media \(max-height: 700px\) \{[\s\S]*?\.auth-sous \{\s*display: none;/.test(css),
+    "l'accroche doit s'effacer sur un ecran court"
+  );
+  assert.ok(
+    css.includes('padding: env(safe-area-inset-top)'),
+    'zones sures (encoche) non respectees'
+  );
+
+  const html = lire('site/index.html');
+  assert.strictEqual(html.split('id="authLangue"').length - 1, 1, 'un seul bloc langue');
+  assert.strictEqual(html.split('id="choixLangue"').length - 1, 1, 'un seul selecteur de langue');
+  assert.ok(html.includes('id="authLangue"'), 'selecteur de langue introuvable');
+  assert.ok(
+    html.indexOf('id="authLangue"') > html.indexOf('id="btnInstallerAccueil"'),
+    'la langue doit rester en bas de la carte'
+  );
+});
+
 test('config.json.example : modele aligne sur le defaut du serveur', () => {
   const ex = JSON.parse(lire('config.json.example'));
   assert.strictEqual(ex.api_model, 'gemini-3.5-flash');

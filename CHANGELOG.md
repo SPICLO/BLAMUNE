@@ -1,5 +1,21 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-14 (connexion et inscription sans ascenseur)
+
+### Correction
+
+- **Les deux formulaires tiennent à l'écran** (`site/style.css`) : la
+  carte dépassait la hauteur d'un téléphone (799 px pour l'inscription,
+  781 px sur une fenêtre courte). Trois paliers resserrent les
+  espacements (`max-width: 600px` / `max-height: 800px`, puis 700 px,
+  puis 580 px), l'accroche s'efface avant les actions et le sélecteur de
+  langue sort du flux dans le coin de la carte.
+- `#ecranAuth` respecte les zones sûres (encoche, barre home).
+- Le sélecteur de langue reprend le gabarit sombre de l'application au
+  lieu du blanc natif du navigateur.
+- Traduction manquante du champ « Choisis un mot de passe » (en/es/ar).
+- Cache du service worker en `blamune-v26`.
+
 ## [Non publié] - 2026-11-14 (installation visible avant connexion)
 
 ### Ajout
