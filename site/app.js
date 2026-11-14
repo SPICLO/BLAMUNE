@@ -2882,12 +2882,23 @@ function exporterHistorique() {
 // Le site est deja une PWA (manifest.json + sw.js + icones) : le
 // navigateur sait l'installer, mais rien ne le dit au visiteur. Ce bloc
 // rend l'installation visible et explicite :
-//  - le bouton est TOUJOURS visible tant que l'app n'est pas installee ;
-//  - si Chrome/Edge/Android emettent beforeinstallprompt, il ouvre la
-//    vraie boite d'installation ;
+//  - une entree « Installer BLAMUNE » existe AVANT la connexion, sur
+//    l'ecran d'accueil, et une autre dans le menu apres connexion ;
+//  - les deux passent par le MEME parcours (demanderInstallation) ;
+//  - si Chrome/Edge/Android emettent beforeinstallprompt, ce parcours
+//    ouvre la vraie boite d'installation ;
 //  - sinon (iOS, Android sans evenement, navigateur integre) il affiche un
-//    mode d'emploi adapte a l'appareil ;
-//  - une fois installee (display-mode: standalone), le bouton disparait.
+//    mode d'emploi adapte a l'appareil, avec « Ouvrir dans Chrome » sur
+//    Android et le visuel Partager sur iPhone ;
+//  - une fois installee (display-mode: standalone), les entrees
+//    disparaissent ;
+//  - fermer l'aide vaut refus : l'entree d'accueil se tait 7 jours, mais
+//    celle du menu reste disponible.
+var CLE_REFUS_INSTALL = 'blamune_install_refus';
+var REFUS_INSTALL_JOURS = 7;
+var installPromptDiffere = null;
+var dernierFocusAide = null;
+
 function installationDejaFaite() {
   return (
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
@@ -2916,11 +2927,59 @@ function estNavigateurIntegre() {
   );
 }
 
+// Chrome Custom Tabs (lien ouvert depuis une application Android, sans
+// WebView complete) : le user-agent est celui de Chrome, impossible a
+// distinguer autrement que par le referrer « android-app:// ».
+function estOngletIntegreAndroid() {
+  return estAndroid() && /^android-app:\/\//.test(document.referrer || '');
+}
+
+// Refus d'installation memorise 7 jours : sans cela, la meme demande
+// revient a chaque visite et devient du harcelement.
+function refusInstallRecent() {
+  try {
+    var quand = parseInt(window.localStorage.getItem(CLE_REFUS_INSTALL), 10);
+    if (!quand || isNaN(quand)) return false;
+    return Date.now() - quand < REFUS_INSTALL_JOURS * 24 * 60 * 60 * 1000;
+  } catch (e) {
+    return false;
+  }
+}
+
+function memoriserRefusInstall() {
+  try {
+    window.localStorage.setItem(CLE_REFUS_INSTALL, String(Date.now()));
+  } catch (e) {
+    // Navigation privee ou stockage refuse : on continue sans memoire.
+  }
+}
+
+function oublierRefusInstall() {
+  try {
+    window.localStorage.removeItem(CLE_REFUS_INSTALL);
+  } catch (e) {}
+}
+
+// Lien intent:// : depuis un onglet integre Android, ouvre la page dans
+// Chrome (le seul navigateur Android qui expose le prompt d'installation).
+function lienOuvrirChrome() {
+  var schema = location.protocol === 'https:' ? 'https' : 'http';
+  return (
+    'intent://' +
+    location.host +
+    location.pathname +
+    location.search +
+    '#Intent;scheme=' +
+    schema +
+    ';package=com.android.chrome;end'
+  );
+}
+
 // Mode d'emploi adapte a l'appareil, affiche quand aucune boite native
 // n'est disponible. Sans lui, l'utilisateur n'a aucune piste.
 function texteAideInstallation() {
   var ua = navigator.userAgent || '';
-  if (estNavigateurIntegre()) {
+  if (estNavigateurIntegre() || estOngletIntegreAndroid()) {
     return T_(
       'Ouvre ce lien dans Chrome (Android) ou Safari (iPhone) : le navigateur integre a une application ne peut pas installer BLAMUNE.'
     );
@@ -2941,15 +3000,114 @@ function texteAideInstallation() {
   return T_("Dans la barre d'adresse : icone Installer, ou menu ⋮ puis Installer BLAMUNE.");
 }
 
-(function initInstallation() {
-  var bouton = document.getElementById('btnInstaller');
-  if (!bouton) return;
-  var promptDiffere = null;
+// Un seul etat pour les deux entrees : installee = tout disparait ;
+// refus recent = seul le CTA d'accueil se tait (le menu reste).
+function montrerBouton() {
+  var installee = installationDejaFaite();
+  var refus = refusInstallRecent();
+  var menu = document.getElementById('btnInstaller');
+  var accueil = document.getElementById('btnInstallerAccueil');
+  if (menu) menu.classList.toggle('cache', installee);
+  if (accueil) accueil.classList.toggle('cache', installee || refus);
+}
 
-  function montrerBouton() {
-    if (!installationDejaFaite()) bouton.classList.remove('cache');
+// Piege de focus + fermeture par Echap, pendant que la boite est ouverte.
+function surToucheAide(e) {
+  if (e.key === 'Escape' || e.key === 'Esc') {
+    e.preventDefault();
+    fermerAideInstallation(true);
+    return;
+  }
+  if (e.key !== 'Tab') return;
+  var aide = document.getElementById('aideInstallation');
+  if (!aide) return;
+  var noeuds = aide.querySelectorAll('a[href], button:not([disabled])');
+  var visibles = [];
+  for (var i = 0; i < noeuds.length; i++) {
+    if (!noeuds[i].classList.contains('cache')) visibles.push(noeuds[i]);
+  }
+  if (visibles.length < 2) return;
+  var premier = visibles[0];
+  var dernier = visibles[visibles.length - 1];
+  if (e.shiftKey && document.activeElement === premier) {
+    e.preventDefault();
+    dernier.focus();
+  } else if (!e.shiftKey && document.activeElement === dernier) {
+    e.preventDefault();
+    premier.focus();
+  }
+}
+
+function ouvrirAideInstallation() {
+  var aide = document.getElementById('aideInstallation');
+  if (!aide) return;
+  var texte = document.getElementById('aideInstallationTexte');
+  if (texte) texte.textContent = texteAideInstallation();
+
+  // Visuel « Partager -> Sur l'ecran d'accueil » : iPhone Safari seulement.
+  var safariIOS = estIOS() && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(navigator.userAgent || '');
+  var ios = document.getElementById('aideIOS');
+  if (ios) ios.classList.toggle('cache', !safariIOS);
+
+  // « Ouvrir dans Chrome » : Android uniquement (iOS n'a pas d'intent).
+  var chrome = document.getElementById('btnOuvrirChrome');
+  if (chrome) {
+    if (estAndroid()) {
+      chrome.href = lienOuvrirChrome();
+      chrome.classList.remove('cache');
+    } else {
+      chrome.classList.add('cache');
+    }
   }
 
+  dernierFocusAide = document.activeElement;
+  aide.classList.remove('cache');
+  var fermerX = document.getElementById('btnFermerAideInstallationX');
+  if (fermerX) fermerX.focus();
+  document.addEventListener('keydown', surToucheAide);
+}
+
+function fermerAideInstallation(memoriser) {
+  var aide = document.getElementById('aideInstallation');
+  if (!aide || aide.classList.contains('cache')) return;
+  aide.classList.add('cache');
+  document.removeEventListener('keydown', surToucheAide);
+  if (memoriser) {
+    memoriserRefusInstall();
+    montrerBouton();
+  }
+  var focus = dernierFocusAide;
+  dernierFocusAide = null;
+  if (focus && typeof focus.focus === 'function' && !focus.classList.contains('cache')) {
+    try {
+      focus.focus();
+    } catch (e) {}
+  }
+}
+
+// Parcours unique : prompt natif si disponible, sinon mode d'emploi.
+async function demanderInstallation() {
+  var prompt = installPromptDiffere;
+  if (prompt) {
+    // Un prompt ne se rejoue pas : on le consomme avant l'attente.
+    installPromptDiffere = null;
+    try {
+      prompt.prompt();
+      var choix = await prompt.userChoice;
+      if (choix && choix.outcome === 'accepted') {
+        oublierRefusInstall();
+        montrerBouton();
+      }
+      return;
+    } catch (e) {
+      // Prompt casse (deja consomme, navigateur capricieux) : on retombe
+      // sur le mode d'emploi plutot que de laisser un clic sans effet.
+    }
+  }
+  ouvrirAideInstallation();
+}
+
+(function initInstallation() {
   // Le bouton est visible MEME sans beforeinstallprompt : sur telephone cet
   // evenement n'arrive pas toujours (premiere visite, navigateur integre,
   // Firefox). Le masquer laissait l'utilisateur sans aucun moyen de
@@ -2957,59 +3115,57 @@ function texteAideInstallation() {
   montrerBouton();
 
   window.addEventListener('beforeinstallprompt', function (e) {
-    // Sans preventDefault, Chrome affiche sa propre banniere et le
-    // bouton perd la main sur le declenchement.
+    // Sans preventDefault, Chrome affiche sa propre banniere et le bouton
+    // perd la main sur le declenchement.
     e.preventDefault();
-    promptDiffere = e;
+    installPromptDiffere = e;
     montrerBouton();
   });
 
   window.addEventListener('appinstalled', function () {
-    promptDiffere = null;
-    bouton.classList.add('cache');
+    installPromptDiffere = null;
+    oublierRefusInstall();
+    montrerBouton();
     afficherToastDeco(T_('Application installee.'), 'ok');
   });
 
-  function ouvrirAide() {
-    var aide = document.getElementById('aideInstallation');
-    if (!aide) return;
-    var texte = document.getElementById('aideInstallationTexte');
-    if (texte) texte.textContent = texteAideInstallation();
-    aide.classList.remove('cache');
+  var boutons = [
+    document.getElementById('btnInstallerAccueil'),
+    document.getElementById('btnInstaller')
+  ];
+  for (var i = 0; i < boutons.length; i++) {
+    if (boutons[i]) boutons[i].addEventListener('click', demanderInstallation);
   }
 
-  // La langue peut changer pendant que l'aide est ouverte : on la reecrit
-  // dans la langue active.
-  window.addEventListener('blamune:langue', function () {
-    var aide = document.getElementById('aideInstallation');
-    var texte = document.getElementById('aideInstallationTexte');
-    if (aide && texte && !aide.classList.contains('cache')) {
-      texte.textContent = texteAideInstallation();
-    }
-  });
-
+  var fermerX = document.getElementById('btnFermerAideInstallationX');
   var fermer = document.getElementById('btnFermerAideInstallation');
+  if (fermerX) {
+    fermerX.addEventListener('click', function () {
+      fermerAideInstallation(true);
+    });
+  }
   if (fermer) {
     fermer.addEventListener('click', function () {
-      var aide = document.getElementById('aideInstallation');
-      if (aide) aide.classList.add('cache');
+      fermerAideInstallation(true);
     });
   }
 
-  bouton.addEventListener('click', async function () {
-    if (promptDiffere) {
-      promptDiffere.prompt();
-      var choix = null;
-      try {
-        choix = await promptDiffere.userChoice;
-      } catch (e) {}
-      promptDiffere = null;
-      if (choix && choix.outcome === 'accepted') bouton.classList.add('cache');
-      return;
+  var aide = document.getElementById('aideInstallation');
+  if (aide) {
+    // Clic sur le voile = fermeture, comme une feuille mobile.
+    aide.addEventListener('click', function (e) {
+      if (e.target === aide) fermerAideInstallation(true);
+    });
+  }
+
+  // La langue peut changer pendant que l'aide est ouverte : on la reecrit
+  // dans la langue active (le mode d'emploi depend de l'appareil).
+  window.addEventListener('blamune:langue', function () {
+    var boite = document.getElementById('aideInstallation');
+    var texte = document.getElementById('aideInstallationTexte');
+    if (boite && texte && !boite.classList.contains('cache')) {
+      texte.textContent = texteAideInstallation();
     }
-    // Pas de prompt natif : mode d'emploi adapte a l'appareil (iOS, Android
-    // sans evenement, navigateur integre, ordinateur).
-    ouvrirAide();
   });
 })();
 

@@ -56,6 +56,11 @@
       Installer: 'Install',
       "Installer l'application sur cet appareil": 'Install the app on this device',
       'Installer BLAMUNE': 'Install BLAMUNE',
+      'Ouvrir dans Chrome': 'Open in Chrome',
+      "Acces direct depuis ton ecran d'accueil, comme une app.":
+        'Direct access from your home screen, like an app.',
+      Partager: 'Share',
+      "Sur l'ecran d'accueil": 'Add to Home Screen',
       "Sur iPhone : bouton Partager, puis Sur l'ecran d'accueil.":
         'On iPhone: Share button, then Add to Home Screen.',
       "Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil.":
@@ -193,6 +198,11 @@
       Installer: 'Instalar',
       "Installer l'application sur cet appareil": 'Instalar la aplicacion en este dispositivo',
       'Installer BLAMUNE': 'Instalar BLAMUNE',
+      'Ouvrir dans Chrome': 'Abrir en Chrome',
+      "Acces direct depuis ton ecran d'accueil, comme une app.":
+        'Acceso directo desde tu pantalla de inicio, como una app.',
+      Partager: 'Compartir',
+      "Sur l'ecran d'accueil": 'Anadir a pantalla de inicio',
       "Sur iPhone : bouton Partager, puis Sur l'ecran d'accueil.":
         'En iPhone: boton Compartir y luego Anadir a pantalla de inicio.',
       "Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil.":
@@ -322,6 +332,11 @@
       Installer: 'تثبيت',
       "Installer l'application sur cet appareil": 'ثبت التطبيق على هذا الجهاز',
       'Installer BLAMUNE': 'تثبيت BLAMUNE',
+      'Ouvrir dans Chrome': 'افتح في Chrome',
+      "Acces direct depuis ton ecran d'accueil, comme une app.":
+        'وصول مباشر من الشاشة الرئيسية، مثل تطبيق.',
+      Partager: 'مشاركة',
+      "Sur l'ecran d'accueil": 'إضافة إلى الشاشة الرئيسية',
       "Sur iPhone : bouton Partager, puis Sur l'ecran d'accueil.":
         'على iPhone: زر المشاركة ثم إضافة إلى الشاشة الرئيسية.',
       "Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil.":

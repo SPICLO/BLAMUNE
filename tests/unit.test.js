@@ -212,6 +212,96 @@ test('installation : le texte d aide n est pas fige par data-i18n', () => {
   assert.ok(!bloc[0].includes('data-i18n='), 'aideInstallationTexte ne doit pas porter data-i18n');
 });
 
+test("installation : l'entree existe AVANT la connexion", () => {
+  // Le bouton Installer vivait dans #appContenu (display:none avant
+  // connexion) : mesure sur le site en ligne, il faisait 0x0 px sur
+  // l'ecran d'accueil. Un visiteur ne pouvait donc pas installer sans
+  // creer un compte, ni meme savoir que c'etait possible.
+  const html = lire('site/index.html');
+  const invite = html.indexOf('id="btnInvite"');
+  const cta = html.indexOf('id="btnInstallerAccueil"');
+  const app = html.indexOf('id="appContenu"');
+  assert.ok(invite !== -1 && cta !== -1, "CTA d'installation d'accueil absent");
+  assert.ok(
+    cta > invite && cta < app,
+    "le CTA doit etre dans l'ecran d'accueil, apres « Continuer en tant qu'invite »"
+  );
+
+  const ouverture = html.slice(html.lastIndexOf('<button', cta), html.indexOf('>', cta) + 1);
+  assert.ok(!ouverture.includes('data-i18n='), 'le bouton ne doit pas porter data-i18n (il effacerait l icone)');
+  const bouton = html.slice(cta, html.indexOf('</button>', cta));
+  assert.ok(bouton.includes('<svg'), 'icone du bouton absente');
+  assert.ok(
+    bouton.includes('<span data-i18n="Installer BLAMUNE">'),
+    'le libelle doit etre traduit dans un span'
+  );
+});
+
+test('installation : un seul parcours pour les deux boutons', () => {
+  const app = lire('site/app.js');
+  assert.ok(app.includes('async function demanderInstallation'), 'parcours partage absent');
+  assert.ok(app.includes("getElementById('btnInstallerAccueil')"), 'CTA accueil non branche');
+  assert.ok(app.includes("getElementById('btnInstaller')"), 'bouton du menu non branche');
+  const debut = app.indexOf('function initInstallation');
+  const fin = app.indexOf("addEventListener('load'");
+  const bloc = app.slice(debut, fin > debut ? fin : app.length);
+  assert.ok(
+    bloc.includes("addEventListener('click', demanderInstallation)"),
+    'les deux entrees doivent appeler demanderInstallation'
+  );
+  assert.ok(bloc.includes('installPromptDiffere = e;'), 'beforeinstallprompt non memorise');
+});
+
+test('installation : Android sans prompt propose Ouvrir dans Chrome', () => {
+  const app = lire('site/app.js');
+  assert.ok(app.includes("'intent://'"), 'lien intent absent');
+  assert.ok(app.includes('package=com.android.chrome'), 'paquet Chrome absent');
+  assert.ok(app.includes('^android-app:\\/\\/'), 'Chrome Custom Tabs non detectees');
+  assert.ok(app.includes("getElementById('btnOuvrirChrome')"), 'bouton Ouvrir dans Chrome non branche');
+});
+
+test('installation : un refus est memorise 7 jours', () => {
+  const app = lire('site/app.js');
+  assert.ok(
+    app.includes("var CLE_REFUS_INSTALL = 'blamune_install_refus';"),
+    'cle de refus absente'
+  );
+  assert.ok(app.includes('var REFUS_INSTALL_JOURS = 7;'), 'duree de 7 jours absente');
+  assert.ok(
+    app.includes('REFUS_INSTALL_JOURS * 24 * 60 * 60 * 1000'),
+    'conversion en millisecondes absente'
+  );
+  const debut = app.indexOf('function fermerAideInstallation');
+  const fin = app.indexOf('async function demanderInstallation');
+  const bloc = app.slice(debut, fin > debut ? fin : app.length);
+  assert.ok(bloc.includes('memoriserRefusInstall();'), 'la fermeture doit memoriser le refus');
+  assert.ok(bloc.includes('montrerBouton();'), 'les entrees doivent se rafraichir');
+});
+
+test("installation : la boite d'aide est accessible au clavier", () => {
+  const html = lire('site/index.html');
+  const app = lire('site/app.js');
+  assert.ok(/id="aideInstallation"[\s\S]{0,220}aria-modal="true"/.test(html), 'aria-modal manquant');
+  assert.ok(html.includes('aria-describedby="aideInstallationTexte"'), 'description non reliee');
+  assert.ok(html.includes('id="btnFermerAideInstallationX"'), 'bouton fermer visible absent');
+  assert.ok(app.includes("e.key === 'Escape'"), 'fermeture par Echap absente');
+  assert.ok(app.includes("e.key !== 'Tab'"), 'piege de Tab absent');
+});
+
+test('installation : les nouvelles cles sont traduites dans les 4 langues', () => {
+  const langues = lire('site/langues.js');
+  const cles = [
+    'Ouvrir dans Chrome',
+    "Acces direct depuis ton ecran d'accueil, comme une app.",
+    'Partager',
+    "Sur l'ecran d'accueil"
+  ];
+  for (const cle of cles) {
+    const occurrences = langues.split(cle).length - 1;
+    assert.ok(occurrences >= 3, 'traduction manquante pour : ' + cle);
+  }
+});
+
 test('config.json.example : modele aligne sur le defaut du serveur', () => {
   const ex = JSON.parse(lire('config.json.example'));
   assert.strictEqual(ex.api_model, 'gemini-3.5-flash');

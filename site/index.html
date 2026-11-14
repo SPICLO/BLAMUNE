@@ -165,6 +165,43 @@
           <p class="auth-note" data-i18n="L'invite ne sauvegarde pas tes messages.">
             L'invite ne sauvegarde pas tes messages.
           </p>
+
+          <!-- Installation : visible AVANT la connexion. C'est ici qu'un
+               visiteur qui arrive sur la page decide d'installer BLAMUNE ;
+               l'entree du menu (apres connexion) reste en second recours.
+               Le libelle est dans un <span> : langues.js ecrit
+               textContent, ce qui effacerait l'icone SVG si le
+               data-i18n etait sur le bouton. -->
+          <button
+            id="btnInstallerAccueil"
+            class="auth-btn auth-install"
+            type="button"
+            title="Installer BLAMUNE"
+            data-i18n-title="Installer BLAMUNE"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M12 3v12" />
+              <path d="m7 10 5 5 5-5" />
+              <path d="M5 21h14" />
+            </svg>
+            <span data-i18n="Installer BLAMUNE">Installer BLAMUNE</span>
+          </button>
+          <p
+            class="auth-note auth-install-note"
+            data-i18n="Acces direct depuis ton ecran d'accueil, comme une app."
+          >
+            Acces direct depuis ton ecran d'accueil, comme une app.
+          </p>
+
           <p class="auth-note">
             <select id="choixLangue" aria-label="Langue">
               <option value="fr">Français</option>
@@ -509,21 +546,89 @@
     </div>
 
     <!-- Aide a l'installation : iOS n'emet pas beforeinstallprompt, mais
-         « Partager → Sur l'ecran d'accueil » installe quand meme la PWA.
-         La boite s'ouvre depuis le bouton Installer quand aucun prompt
-         natif n'est disponible. -->
+         « Partager -> Sur l'ecran d'accueil » installe quand meme la PWA.
+         La boite s'ouvre depuis les boutons Installer quand aucun prompt
+         natif n'est disponible. Sur Android sans prompt, elle propose
+         « Ouvrir dans Chrome » via un lien intent://. -->
     <div
       id="aideInstallation"
       class="aide-installation cache"
       role="dialog"
       aria-modal="true"
       aria-labelledby="aideInstallationTitre"
+      aria-describedby="aideInstallationTexte"
     >
-      <div class="aide-boite">
-        <strong id="aideInstallationTitre" data-i18n="Installer BLAMUNE">Installer BLAMUNE</strong>
+      <div class="aide-boite" role="document">
+        <div class="aide-entete">
+          <strong id="aideInstallationTitre" data-i18n="Installer BLAMUNE">Installer BLAMUNE</strong>
+          <button
+            id="btnFermerAideInstallationX"
+            class="aide-fermer"
+            type="button"
+            title="Fermer"
+            data-i18n-title="Fermer"
+            aria-label="Fermer"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
         <p id="aideInstallationTexte">
           Dans le menu du navigateur : Installer l'application ou Ajouter a l'ecran d'accueil.
         </p>
+        <!-- Visuel iPhone : le texte seul se lit mal ; on montre les deux
+             icones du chemin Partager -> Sur l'ecran d'accueil. -->
+        <div id="aideIOS" class="aide-ios cache" aria-hidden="true">
+          <span class="aide-ios-etape">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              focusable="false"
+            >
+              <path d="M12 3v12" />
+              <path d="m8 7 4-4 4 4" />
+              <path d="M6 11H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1" />
+            </svg>
+            <span data-i18n="Partager">Partager</span>
+          </span>
+          <span class="aide-ios-fleche" aria-hidden="true">&rarr;</span>
+          <span class="aide-ios-etape">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              focusable="false"
+            >
+              <rect x="4" y="4" width="16" height="16" rx="3" />
+              <path d="M12 8v8M8 12h8" />
+            </svg>
+            <span data-i18n="Sur l'ecran d'accueil">Sur l'ecran d'accueil</span>
+          </span>
+        </div>
+        <a
+          id="btnOuvrirChrome"
+          class="auth-btn aide-chrome cache"
+          href="https://blamune.onrender.com/"
+          rel="noopener"
+        >
+          <span data-i18n="Ouvrir dans Chrome">Ouvrir dans Chrome</span>
+        </a>
         <button id="btnFermerAideInstallation" class="btn-petit" type="button" data-i18n="Fermer">
           Fermer
         </button>

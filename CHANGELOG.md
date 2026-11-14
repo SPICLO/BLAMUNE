@@ -1,5 +1,32 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-14 (installation visible avant connexion)
+
+### Ajout
+
+- **« Installer BLAMUNE » sur l'ecran d'accueil** (`site/index.html`,
+  `site/style.css`) : un visiteur peut installer la PWA sans creer de
+  compte. L'entree disparait une fois l'application installee.
+- **Parcours d'installation unique** (`site/app.js`) : l'entree de
+  l'accueil et celle du menu appellent la meme fonction.
+  `beforeinstallprompt` est memorise des son emission ; sinon une feuille
+  d'aide s'ouvre.
+- **Aide adaptee au contexte** : « Ouvrir dans Chrome » sur Android via un
+  lien `intent://...;package=com.android.chrome;end`, detection des Chrome
+  Custom Tabs (`android-app://`), visuel Partager puis Sur l'ecran
+  d'accueil sur iPhone Safari, message dedie aux navigateurs integres.
+- **Refus memorise 7 jours** : fermer l'aide masque l'entree d'accueil
+  (`blamune_install_refus`) sans retirer celle du menu.
+- **Accessibilite** : feuille glissante sur telephone, focus place puis
+  restaure, piege de Tab, fermeture par Echap, cibles de 44 px.
+
+### Technique
+
+- Nouvelles cles de traduction (`Ouvrir dans Chrome`, `Partager`,
+  `Sur l'ecran d'accueil`, accroche d'installation) en anglais, espagnol
+  et arabe.
+- Cache du service worker passe en `blamune-v25`.
+
 ## [Non publié] - 2026-11-14 (inscription de nouveau accessible)
 
 ### Correction
