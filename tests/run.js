@@ -704,6 +704,52 @@ async function main() {
     const loginSeed = await requete(PORT_APP, '/login', 'POST', 'pseudo=admin&mdp=' + MDP_ENCODED);
     assert(loginSeed.json && loginSeed.json.ok, 'login admin pour /admin/etat');
     const hAdmin = { 'X-UID': loginSeed.json.uid, 'X-EGO': loginSeed.json.ego };
+
+    // 5bis-a. SESSION PERSISTANTE : l'application installee ne doit pas
+    // redemander le mot de passe parce que l'ego de 24 h a expire. Le jeton
+    // long rendu par /login suffit seul ; la deconnexion le revoque ; un
+    // compte n'a pas besoin de redonner son mot de passe pour en obtenir
+    // un (mise a niveau de l'ego) ; une invite n'y a jamais droit.
+    const jetonSession = loginSeed.json.session;
+    assert(
+      /^v1\.[0-9a-f]{18}\.[0-9a-f]{64}$/.test(jetonSession || ''),
+      'session longue attendue a la connexion, recu: ' + String(jetonSession).substring(0, 24)
+    );
+    const hSession = { 'X-Session': jetonSession };
+    const histSession = await requete(PORT_APP, '/historique', 'GET', null, hSession);
+    assert.strictEqual(histSession.status, 200, 'session seule acceptee: HTTP ' + histSession.status);
+    const histSessionBricole = await requete(PORT_APP, '/historique', 'GET', null, {
+      'X-Session': jetonSession.slice(0, -1) + (jetonSession.endsWith('0') ? '1' : '0')
+    });
+    assert.strictEqual(
+      histSessionBricole.status,
+      401,
+      'session alteree refusee: HTTP ' + histSessionBricole.status
+    );
+    const histSessionVide = await requete(PORT_APP, '/historique', 'GET', null, {
+      'X-Session': 'v1.' + '0'.repeat(18) + '.' + '0'.repeat(64)
+    });
+    assert.strictEqual(histSessionVide.status, 401, 'session inventee refusee');
+    // Mise a niveau : l'ego seul (client d'avant cette version) obtient une
+    // session sans mot de passe.
+    const majSession = await requete(PORT_APP, '/session', 'POST', '', hAdmin);
+    assert(
+      majSession.json && majSession.json.ok && /^v1\./.test(majSession.json.session || ''),
+      'mise a niveau ego -> session attendue'
+    );
+    // Une invite n'a pas de session longue.
+    const sessionInvite = await requete(PORT_APP, '/session', 'POST', '', h);
+    assert.strictEqual(sessionInvite.status, 401, 'une invite ne doit pas obtenir de session');
+    // La deconnexion revoque CE jeton : il ne rouvre plus l'application.
+    await requete(PORT_APP, '/logout', 'POST', '', hSession);
+    const histApresDeco = await requete(PORT_APP, '/historique', 'GET', null, hSession);
+    assert.strictEqual(
+      histApresDeco.status,
+      401,
+      'session revoquee encore acceptee: HTTP ' + histApresDeco.status
+    );
+    ok.push('session persistante (verification, mise a niveau, revocation, invite refusee)');
+
     const ilYa7 = Date.now() - 7 * 86400000;
     await poserEtat(PORT_APP, dirUid, hAdmin, {
       premierContact: ilYa7,

@@ -57,6 +57,9 @@ const { creerPurgeInvites } = require('./lib/purge_invites');
 const { creerResume } = require('./lib/resume');
 // Comparaison de secrets (jeton, ego) en temps constant : voir lib/timing.js.
 const { egaleTimingSafe } = require('./lib/timing');
+// Sessions persistantes des comptes (jeton long, stocke hache) : voir
+// lib/session.js. Elles remplacent l'ego de 24 h sur l'application installee.
+const sessions = require('./lib/session');
 // Plafond global des messages /send par heure (toutes IP confondues).
 const plafondGlobal = require('./lib/plafond_global');
 // Cache de reponses du small talk : question simple deja servie = zero
@@ -123,7 +126,9 @@ app.use((req, res, next) => {
           ? 'login'
           : route === 'register'
             ? 'register'
-            : route === 'profil' || route.startsWith('profil/')
+            : route === 'session'
+              ? 'session'
+              : route === 'profil' || route.startsWith('profil/')
               ? 'profil'
               : route === 'historique' || route.startsWith('historique/')
                 ? 'historique'
@@ -183,6 +188,18 @@ app.use((req, res, next) => {
       return res.status(429).json({
         ok: false,
         message: 'Trop de comptes essaies. Attendez ' + plafondRegister + ' req/min.'
+      });
+    }
+  } else if (routeNom === 'session') {
+    // Mise a niveau ego -> session persistante : appelee une fois par
+    // appareil, jamais dans une boucle. Le plafond evite qu'un client
+    // bricole en emette des milliers.
+    const ip = getIp(req);
+    const plafondSession = securite.limiterRoute('session').ip;
+    if (!checkRateLimit('session:' + ip, plafondSession)) {
+      return res.status(429).json({
+        ok: false,
+        message: 'Trop de demandes de session. Attendez ' + plafondSession + ' req/min.'
       });
     }
   }
@@ -302,7 +319,10 @@ app.use((req, res, next) => {
   }
   res.setHeader('Access-Control-Allow-Origin', corsOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-UID, X-EGO, X-Jeton');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, X-UID, X-EGO, X-Jeton, X-Session, X-Invite-Nonce'
+  );
   res.setHeader('Access-Control-Expose-Headers', 'Content-Length');
   // no-store : le corps d'une reponse API change d'un utilisateur a
   // l'autre, aucun entrepot ne doit la garder. Les assets publics de
@@ -575,6 +595,19 @@ function extraireAuth(req) {
   // repond un 500 HTML.
   let uid = String(req.headers['x-uid'] || req.query.uid || req.body?.uid || '');
   let ego = String(req.headers['x-ego'] || req.query.ego || req.body?.ego || '');
+  // SESSION PERSISTANTE (application installee) : le jeton long est
+  // prioritaire. Un jeton present mais invalide ou revoque REFUSE la
+  // requete, sans repli sur l'ego : sinon une deconnexion (qui revoque le
+  // jeton) laisserait l'ego de 24 h encore valable, et le bouton
+  // « Se deconnecter » ne deconnecterait rien.
+  const jetonSession = String(
+    req.headers['x-session'] || req.body?.session || req.query?.session || ''
+  );
+  if (jetonSession) {
+    const s = sessions.verifierSession(comptes, jetonSession);
+    if (!s) return { uid: '', ego: '', session: false };
+    return { uid: s.compte.uid, ego: s.compte.ego, session: true, sid: s.sid };
+  }
   if (ego) {
     const maintenant = Date.now();
     for (const cle of Object.keys(comptes)) {

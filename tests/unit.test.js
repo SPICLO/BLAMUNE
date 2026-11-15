@@ -302,6 +302,40 @@ test('installation : les nouvelles cles sont traduites dans les 4 langues', () =
   }
 });
 
+test('session persistante : client, serveur et secours hors ligne branches', () => {
+  // Regression : l'ego de 24 h obligeait l'application installee a redemander
+  // le mot de passe chaque jour. Le jeton X-Session est la reponse ; s'il
+  // manque d'un cote, la session ne peut pas etre restauree.
+  const app = lire('site/app.js');
+  assert.ok(app.includes("session: 'blamune_session'"), 'cle localStorage de session absente');
+  assert.ok(app.includes("h['X-Session'] = s;"), 'en-tete X-Session non envoye');
+  assert.ok(app.includes("fetch('/session'"), 'mise a niveau ego -> session absente');
+  assert.ok(
+    !/beforeunload[\s\S]{0,400}\/logout/.test(app),
+    'la fermeture de l onglet ne doit plus deconnecter la session persistante'
+  );
+
+  const serveur = lire('server.js');
+  assert.ok(serveur.includes("req.headers['x-session']"), 'serveur : X-Session non lu');
+  assert.ok(
+    serveur.includes('verifierSession(comptes, jetonSession)'),
+    'serveur : session non verifiee'
+  );
+
+  const compte = lire('lib/routes/compte.js');
+  assert.ok(compte.includes("app.post('/session'"), 'route /session absente');
+  assert.ok(compte.includes('sessions.revoquerSession'), 'deconnexion : session non revoquee');
+
+  const session = lire('lib/session.js');
+  assert.ok(session.includes('hashSecret(secret)'), 'jeton non hache au repos');
+
+  const admin = lire('lib/routes/admin.js');
+  assert.ok(
+    /hashMdpScrypt\(nouveauMdp, sel\);[\s\S]{0,500}comptes\[cle\]\.sessions = \{\}/.test(admin),
+    'un mot de passe change doit fermer les sessions ouvertes'
+  );
+});
+
 test("auth : les deux formulaires tiennent sans ascenseur", () => {
   // Mesure du 2026-11-14 : la carte d'inscription faisait 799 px de haut
   // sur un telephone et 781 px sur une fenetre courte — l'ascenseur
@@ -346,7 +380,8 @@ test('.env.example documente toutes les variables process.env du code', () => {
     'lib/rate_limit.js',
     'lib/memoire.js',
     'lib/historique.js',
-    'lib/resume.js'
+    'lib/resume.js',
+    'lib/session.js'
   ]) {
     const re = /process\.env\.([A-Z0-9_]+)/g;
     let m;

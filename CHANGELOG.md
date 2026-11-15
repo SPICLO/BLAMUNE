@@ -1,5 +1,31 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-15 (connexion automatique de l'application installée)
+
+### Ajout
+
+- **Session persistante des comptes** (`lib/session.js`, `server.js`,
+  `lib/routes/compte.js`) : `/login` et `/register` rendent un jeton long
+  (180 jours) stocké **haché** dans `comptes.json`. Le client le garde et
+  le renvoie dans `X-Session` : l'application installée se rouvre connectée,
+  sans redemander le mot de passe. L'ego seul expirait au bout de 24 h.
+- `POST /logout` révoque le jeton de l'appareil (les autres restent
+  connectés) ; `POST /session` échange un ego encore valable contre une
+  session longue pour les comptes créés avant cette version.
+- Le client ne se déconnecte plus à la fermeture de l'onglet et ne vide
+  plus sa session sur une panne réseau : seul un 401 ramène l'écran de
+  connexion.
+- Cache du service worker en `blamune-v27`.
+
+### Tests
+
+- `tests/session.test.js` : format, hachage au repos, mauvais secret,
+  expiration, révocation par appareil, plafond, purge.
+- Intégration : session seule acceptée, jeton altéré/inventé refusé, mise à
+  niveau ego → session, révocation après `/logout`, invitation sans droit.
+- Test statique : `X-Session` branché des deux côtés, plus de déconnexion
+  sur `beforeunload`.
+
 ## [Non publié] - 2026-11-14 (connexion et inscription sans ascenseur)
 
 ### Correction

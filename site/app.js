@@ -95,7 +95,13 @@ var AUTH_CLES = {
   jeton: 'blamune_invite_jeton',
   // Recette rendue par /invite (correctif A) : le seul moyen de retrouver
   // un jeton si le navigateur l'a perdu. Elle expire en 10 min cote serveur.
-  nonce: 'blamune_invite_nonce'
+  nonce: 'blamune_invite_nonce',
+  // SESSION PERSISTANTE : jeton long (180 jours) emis par /login et
+  // /register, garde hache cote serveur. C'est lui qui rouvre l'application
+  // installee sans redemander le mot de passe. L'ego seul n'est valable
+  // que 24 h : il ne suffisait pas a une application qu'on rouvre chaque
+  // jour.
+  session: 'blamune_session'
 };
 
 function getAuthEgo() {
@@ -111,13 +117,20 @@ function getAuthUserId() {
 function getAuthJeton() {
   return localStorage.getItem(AUTH_CLES.jeton) || '';
 }
-function setAuthInfo(ego, pseudo, uid) {
+function getAuthSession() {
+  return localStorage.getItem(AUTH_CLES.session) || '';
+}
+function setAuthInfo(ego, pseudo, uid, session) {
   localStorage.setItem(AUTH_CLES.ego, ego);
   localStorage.setItem(AUTH_CLES.pseudo, pseudo);
   localStorage.setItem(AUTH_CLES.userId, uid);
   // Un compte classique n'a pas besoin du jeton invite.
   localStorage.removeItem(AUTH_CLES.jeton);
   localStorage.removeItem(AUTH_CLES.nonce);
+  // Session persistante : sans elle, l'application installee redemanderait
+  // le mot de passe des que l'ego de 24 h a expire.
+  if (session) localStorage.setItem(AUTH_CLES.session, session);
+  else localStorage.removeItem(AUTH_CLES.session);
 }
 function clearAuth() {
   localStorage.removeItem(AUTH_CLES.ego);
@@ -125,9 +138,10 @@ function clearAuth() {
   localStorage.removeItem(AUTH_CLES.userId);
   localStorage.removeItem(AUTH_CLES.jeton);
   localStorage.removeItem(AUTH_CLES.nonce);
+  localStorage.removeItem(AUTH_CLES.session);
 }
 function estAuth() {
-  return !!getAuthEgo();
+  return !!(getAuthEgo() || getAuthSession());
 }
 
 // L'identite voyage dans les entetes (X-EGO / X-UID / X-Jeton). Le serveur
@@ -141,7 +155,35 @@ function authHeaders() {
   h['X-UID'] = getAuthUserId();
   var j = getAuthJeton();
   if (j) h['X-Jeton'] = j;
+  var s = getAuthSession();
+  if (s) h['X-Session'] = s;
   return h;
+}
+
+// Mise a niveau silencieuse : un compte connecte AVANT cette version n'a
+// que l'ego (24 h). Au chargement, on echange cet ego encore valable contre
+// une session longue, sans redemander le mot de passe. Une invite n'y a pas
+// droit (sa duree de vie est celle de son jeton).
+async function migrerSession() {
+  if (getAuthSession()) return;
+  if (!getAuthEgo()) return;
+  var uid = getAuthUserId();
+  if (!uid || uid.indexOf('inv_') === 0) return;
+  try {
+    var ctrl = new AbortController();
+    var minuteur = setTimeout(function () {
+      ctrl.abort();
+    }, 8000);
+    var r = await fetch('/session', {
+      method: 'POST',
+      headers: authHeaders(),
+      signal: ctrl.signal
+    });
+    clearTimeout(minuteur);
+    if (!r.ok) return;
+    var j = await r.json();
+    if (j && j.ok && j.session) localStorage.setItem(AUTH_CLES.session, j.session);
+  } catch (e) {}
 }
 
 // ==================== MENU DES LANGUES ====================
@@ -451,7 +493,7 @@ async function authRegister() {
     var j = (await Promise.all([req, delai(1500)]))[0];
     if (j.ok) {
       majEchec(false);
-      setAuthInfo(j.ego, j.pseudo, j.uid);
+      setAuthInfo(j.ego, j.pseudo, j.uid, j.session);
       jouerTransitionConnexion('Bienvenue' + (j.pseudo ? ', ' + j.pseudo : '') + ' !');
     } else {
       marquerChamp(pseudoEl, false, true);
@@ -508,7 +550,7 @@ async function authLogin() {
     var j = (await Promise.all([req, delai(1400)]))[0];
     if (j.ok) {
       majEchec(false);
-      setAuthInfo(j.ego, j.pseudo, j.uid);
+      setAuthInfo(j.ego, j.pseudo, j.uid, j.session);
       jouerTransitionConnexion('Content de te revoir' + (j.pseudo ? ', ' + j.pseudo : '') + ' !');
     } else {
       marquerChamp(emailEl, false, true);
@@ -544,6 +586,9 @@ async function authInvite() {
     if (j && j.ok) {
       localStorage.removeItem(AUTH_CLES.ego);
       localStorage.removeItem(AUTH_CLES.pseudo);
+      // Une session de compte encore stockee prendrait le dessus sur
+      // l'invite (X-Session est prioritaire) : on la retire.
+      localStorage.removeItem(AUTH_CLES.session);
       localStorage.setItem(AUTH_CLES.userId, j.uid);
       if (j.jeton) localStorage.setItem(AUTH_CLES.jeton, j.jeton);
       // Recette de reprise (correctif A) : sans elle, un jeton perdu
@@ -558,6 +603,7 @@ async function authInvite() {
       // Reellement injoignable : on retombe sur un uid local (fallback).
       localStorage.removeItem(AUTH_CLES.ego);
       localStorage.removeItem(AUTH_CLES.pseudo);
+      localStorage.removeItem(AUTH_CLES.session);
       if (!localStorage.getItem(AUTH_CLES.userId)) {
         localStorage.setItem(AUTH_CLES.userId, genererUserId());
       }
@@ -567,6 +613,7 @@ async function authInvite() {
     // Le fetch lui-meme a echoue (reseau mort) : fallback local, meme code.
     localStorage.removeItem(AUTH_CLES.ego);
     localStorage.removeItem(AUTH_CLES.pseudo);
+    localStorage.removeItem(AUTH_CLES.session);
     if (!localStorage.getItem(AUTH_CLES.userId)) {
       localStorage.setItem(AUTH_CLES.userId, genererUserId());
     }
@@ -858,27 +905,24 @@ function initAuth() {
       .then(function (j) {
         if (j.ok !== false) afficherApp();
         else {
+          // 401 : la session a vraiment ete refusee (jeton revoque ou
+          // expire). La, et seulement la, on redemande le mot de passe.
           clearAuth();
           afficherAuth();
         }
       })
       .catch(function () {
-        afficherAuth();
+        // Panne reseau, serveur endormi (Render), PWA hors ligne : ce n'est
+        // PAS une deconnexion. Vider la session ici obligerait l'utilisateur
+        // a retaper son mot de passe a cause d'un simple hoquet reseau.
+        // On entre dans l'app avec ce que le navigateur connait ; les
+        // requetes suivantes repartiront quand le serveur repondra.
+        if (estAuth()) afficherApp();
+        else afficherAuth();
       });
   } else {
     afficherAuth();
   }
-
-  // Deconnexion automatique a la fermeture de l'onglet
-  window.addEventListener('beforeunload', function () {
-    if (estAuth()) {
-      var headers = authHeaders();
-      headers['Content-Type'] = 'application/x-www-form-urlencoded';
-      fetch('/logout', { method: 'POST', headers: headers, body: '', keepalive: true }).catch(
-        function () {}
-      );
-    }
-  });
 }
 
 function getUserId() {
@@ -3183,6 +3227,12 @@ window.addEventListener('load', async function () {
   // "mode legacy" (correctif A).
   try {
     await migrerJetonInvite();
+  } catch (e) {}
+  // Compte connecte avant cette version (ego seul, 24 h) : on echange
+  // silencieusement l'ego contre une session longue AVANT de decider si
+  // l'ecran de connexion s'affiche.
+  try {
+    await migrerSession();
   } catch (e) {}
   initAuth();
   if ('serviceWorker' in navigator) {

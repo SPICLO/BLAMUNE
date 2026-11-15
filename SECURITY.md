@@ -29,6 +29,7 @@ utilisateurs, déni de service par requête.
 | **Aucun mot de passe dans le dépôt**                                  | `ADMIN_MDP`, sinon génération aléatoire                            |
 | Verrouillage après 5 échecs de connexion (15 min)                     | route `/login`                                                     |
 | Jeton secret par invite (256 bits, stocké **haché**)                  | `lib/routes/compte.js`                                             |
+| Session persistante des comptes (180 j, jeton 256 bits **haché**, révocable par appareil) | `lib/session.js`, `extraireAuth` |
 | Un uid d'invite seul ne suffit **jamais** : le jeton est exigé        | `extraireAuth`                                                     |
 | Re-inscription d'une invite : nonce de /invite (10 min, usage unique) | `lib/routes/compte.js`, `POST /invite/jeton`                       |
 | Limititation de débit par IP, par clé et par utilisateur              | `lib/rate_limit.js`                                                |
@@ -64,6 +65,37 @@ Les mesures suivantes ont été ajoutées lors de l'audit de sécurité :
 - **CSRF / origine des mutations** : les requêtes mutantes (POST/PUT/PATCH/DELETE) d'une origine tierce, `null`, ou d'un `Sec-Fetch-Site: cross-site` sans `Origin` reçoivent un 403 (`server.js`, section ORIGINE). Les origines de confiance se déclarent par `CORS_ORIGINS` (séparateur espace).
 
   _Supprimé le 2026-11-10_ : `lib/csrf.js` annonçait un jeton `X-CSRF-Token` dérivé de l'ego. Il n'était **importé par aucune ligne du serveur**, son `ALLOWED_ORIGINS` n'existait dans aucune configuration ni documentation, et le site n'envoyait évidemment pas le jeton qu'il exigeait. Un module de sécurité jamais monté ne protège rien ; il donne surtout la fausse impression que la question est traitée. Le seul contrôle réel — et suffisant ici, l'authentification passant par des en-têtes personnalisés que ni un formulaire tiers ni un appel `fetch` cross-origin simple ne peuvent poser — est le contrôle d'origine de `server.js`.
+
+## Nouveautés de sécurité (2026-11-15) : sessions persistantes
+
+L'ego d'un compte expirait **24 h** après la connexion. Sur l'application
+installée, il fallait donc retaper son mot de passe chaque jour — le
+frottement que cette version supprime.
+
+- `POST /login` et `POST /register` rendent un **jeton de session** de
+  256 bits (`v1.<sid>.<secret>`), valable **180 jours** par défaut
+  (`SESSION_DUREE_JOURS`).
+- Seul le **SHA-256** du secret est écrit dans `comptes.json` ; un vol de
+  la base ne donne aucune session utilisable.
+- Le jeton est **par appareil** : le plafond est de 8 par compte, les plus
+  anciens sont oubliés. `POST /logout` révoque **uniquement** le jeton
+  présenté ; les autres appareils restent connectés.
+- Le client le renvoie dans `X-Session`, en-tête personnalisé protégé par
+  le contrôle d'origine existant. S'il est présent mais invalide ou
+  révoqué, la requête est refusée **sans repli sur l'ego** : la
+  déconnexion est donc réelle.
+- `POST /session` échange un ego encore valable (24 h) contre une session
+  longue, pour les comptes créés avant cette version : aucune reconnexion
+  forcée. Une invitation (`inv_…`) n'y a pas droit.
+- Un **changement de mot de passe** ferme toutes les sessions du compte.
+- Le client ne se déconnecte plus à la fermeture de l'onglet et ne vide
+  plus sa session sur une simple panne réseau : seul un **401** du serveur
+  ramène l'écran de connexion.
+
+**Limite assumée** : un navigateur et une application installée peuvent
+avoir des stockages séparés (iOS en particulier). La session persiste dans
+le contexte où le compte a été créé ; un premier passage dans l'autre
+contexte demande encore une connexion, une seule fois.
 
 ## Points connus, à traiter avant une exposition publique
 
