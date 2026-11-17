@@ -450,3 +450,225 @@ test('fichiers cles du depot presents', () => {
     assert.ok(fs.existsSync(path.join(RACINE, f)), 'fichier manquant : ' + f);
   }
 });
+
+// ---------------------------------------------------------------------
+// PERSONNALISATION : profil complet, oubli cible, apprentissage, apparence
+// ---------------------------------------------------------------------
+
+test('profil complet : les 15 champs visibles sont proposes, les prives restent caches', () => {
+  const app = lire('site/app.js');
+  const bloc = app.match(/var CHAMPS_PROFIL = \[([\s\S]*?)\];/);
+  assert.ok(bloc, 'CHAMPS_PROFIL introuvable');
+  const cles = [...bloc[1].matchAll(/cle:\s*'([^']+)'/g)].map((m) => m[1]);
+  assert.strictEqual(cles.length, 15, 'le panneau doit exposer les 15 champs visibles');
+  for (const attendu of [
+    'nom',
+    'plat',
+    'hobby',
+    'sport',
+    'musique',
+    'serie',
+    'reve',
+    'genre',
+    'aime',
+    'aimePas',
+    'motsFavoris',
+    'anniversaire'
+  ]) {
+    assert.ok(cles.includes(attendu), 'champ visible manquant : ' + attendu);
+  }
+  // Ne JAMAIS proposer les champs internes : le serveur les refuse deja.
+  for (const prive of ['humeur', 'humeurUser', 'promesses']) {
+    assert.ok(!cles.includes(prive), 'champ interne expose dans le panneau : ' + prive);
+  }
+  // Chaque champ du panneau doit exister cote serveur (sinon « Champ inconnu »).
+  const serveur = lire('lib/memoire.js').match(/const CHAMPS_MEMOIRE = \[([\s\S]*?)\];/);
+  assert.ok(serveur, 'CHAMPS_MEMOIRE introuvable');
+  const clesServeur = [
+    ...serveur[1].replace(/\/\/[^\n]*/g, '').matchAll(/'([^']+)'/g)
+  ].map((m) => m[1]);
+  const inconnus = cles.filter((c) => !clesServeur.includes(c));
+  assert.deepStrictEqual(inconnus, [], 'champs refuses par le serveur : ' + inconnus.join(', '));
+});
+
+test("profil : l'oubli d'un seul champ est cable du client au disque", () => {
+  const app = lire('site/app.js');
+  assert.ok(app.includes('async function oublierChampProfil'), 'fonction cliente absente');
+  assert.ok(
+    app.includes("'/profil/' + encodeURIComponent(cle)"),
+    'le client doit appeler /profil/:champ'
+  );
+  assert.ok(app.includes('oublierChampProfil(cle, etiquette)'), 'la croix de ligne n appelle pas l oubli');
+  assert.ok(app.includes("classList.toggle('actif'"), 'etat visuel des options absent');
+
+  const consultation = lire('lib/routes/consultation.js');
+  assert.ok(consultation.includes("app.delete('/profil/:champ'"), 'route DELETE /profil/:champ absente');
+  // Les champs internes doivent etre refuses en 400, pas effaces.
+  assert.ok(
+    /prives\s*=\s*\{\s*humeur:\s*1,\s*humeurUser:\s*1,\s*promesses:\s*1\s*\}/.test(consultation),
+    'les champs prives ne sont pas filtres'
+  );
+
+  const memoire = lire('lib/memoire.js');
+  assert.ok(memoire.includes('function effacerMemoire(uid, champ)'), 'effacerMemoire absente');
+  assert.ok(memoire.includes('effacerMemoire,'), 'effacerMemoire non exportee');
+
+  const serveur = lire('server.js');
+  assert.ok(serveur.includes('effacerMemoire'), 'server.js ne cable pas effacerMemoire');
+});
+
+test('apprentissage : preference de compte, consignes explicites preservees', () => {
+  const compte = lire('lib/routes/compte.js');
+  assert.ok(compte.includes("app.get('/preferences'"), 'GET /preferences absent');
+  assert.ok(compte.includes("app.post('/preferences'"), 'POST /preferences absent');
+  assert.ok(compte.includes('compte.apprentissage'), 'la preference n est pas persistee');
+  // Une invite n'a pas de compte : elle doit etre refusee explicitement.
+  assert.ok(compte.includes("auth.uid.startsWith('inv_')"), 'cas invite non traite');
+
+  const serveur = lire('server.js');
+  assert.ok(serveur.includes('function apprentissageActif(uid)'), 'apprentissageActif absente');
+  assert.ok(serveur.includes('apprentissageActif,'), 'apprentissageActif non cablee');
+  assert.ok(serveur.includes("routeNom === 'preferences'"), 'rate limit /preferences absent');
+
+  const send = lire('lib/routes/send.js');
+  assert.ok(send.includes('apprentissageActif(auth.uid)'), "l'envoi ignore la preference");
+  assert.ok(
+    send.includes('consigneExplicite'),
+    'les consignes explicites doivent survivre a la coupure'
+  );
+  assert.ok(
+    /retiens\|apprends\|sache\|rappelle/.test(send),
+    'le motif des consignes explicites est absent'
+  );
+  // L'extraction par modele est elle aussi conditionnee.
+  assert.ok(
+    /apprentissageActif\(auth\.uid\) &&[\s\S]{0,40}!dejaAppris/.test(send) ||
+      /memoire_extraction &&[\s\S]{0,60}apprentissageActif/.test(send),
+    "l'extraction n'est pas conditionnee par la preference"
+  );
+
+  const html = lire('site/index.html');
+  const app = lire('site/app.js');
+  assert.ok(html.includes('id="profilApprentissage"'), 'case d apprentissage absente');
+  assert.ok(
+    html.includes('id="profilApprentissageNote"'),
+    'note « compte requis » absente pour les invites'
+  );
+  // Une panne (reseau, quota) ne prouve pas que le visiteur est une invite :
+  // le message « il faut un compte » doit alors laisser place a un repli.
+  assert.ok(
+    html.includes('id="profilApprentissageErreur"'),
+    'repli neutre absent : une panne afficherait « il faut un compte » a tort'
+  );
+  assert.ok(
+    /catch \(e\) \{[\s\S]{0,800}profilApprentissageErreur/.test(app),
+    'le repli neutre n est pas affiche en cas de panne'
+  );
+  // Une reponse en retard (changement de compte pendant la requete) ne doit
+  // pas peindre le panneau du compte suivant.
+  assert.ok(
+    /chargerProfil[\s\S]{0,800}uid !== getAuthUserId\(\)/.test(app) &&
+      /chargerPreferences[\s\S]{0,800}uid !== getAuthUserId\(\)/.test(app),
+    'les reponses en retard peuvent peindre un autre compte'
+  );
+});
+
+test('apparence : avatar, palette et taille appliques avant la premiere peinture', () => {
+  const app = lire('site/app.js');
+  for (const cle of [
+    "avatar: 'blamune_avatar'",
+    "palette: 'blamune_palette'",
+    "taille: 'blamune_taille'"
+  ]) {
+    assert.ok(app.includes(cle), 'cle localStorage manquante : ' + cle);
+  }
+  assert.ok(app.includes('function appliquerApparence()'), 'application globale absente');
+  const debutInit = app.indexOf('(function initApparence()');
+  assert.ok(debutInit !== -1, 'initialisation de l apparence absente');
+  assert.ok(
+    app.slice(debutInit, debutInit + 900).includes('appliquerApparence();'),
+    "l'apparence doit etre posee a l'initialisation, pas a l'ouverture du panneau"
+  );
+  // Les deux dessins reellement distincts de site/ sont proposes (les
+  // autres fichiers d'avatars sont des copies conformes).
+  for (const f of ['logo-repos', 'logo-anime']) {
+    assert.ok(app.includes(f + '.svg'), 'avatar non propose : ' + f);
+  }
+  // Les avatars dynamiques passent tous par cheminAvatarBot().
+  assert.ok(app.includes('function cheminAvatarBot()'), 'cheminAvatarBot absente');
+  assert.ok(app.includes("setAttribute('data-avatar-bot'"), 'avatars dynamiques non marques');
+
+  const html = lire('site/index.html');
+  assert.ok(html.includes('id="zoneApparence"'), 'panneau Apparence absent');
+  assert.ok(html.includes('id="btnApparence"'), 'bouton Apparence absent');
+  assert.strictEqual(
+    (html.match(/data-avatar="/g) || []).length,
+    2,
+    'les deux avatars distincts doivent etre cliquables'
+  );
+  assert.strictEqual((html.match(/data-palette="/g) || []).length, 5, 'cinq palettes attendues');
+  assert.strictEqual((html.match(/data-taille="/g) || []).length, 3, 'trois tailles attendues');
+  // Les avatars de la page portent le marqueur commun.
+  assert.ok(html.includes('data-avatar-bot'), 'avatars statiques non marques');
+
+  const css = lire('site/style.css');
+  assert.ok(css.includes("html[data-palette='ambre']"), 'palette ambre absente');
+  assert.ok(css.includes("html[data-palette='rose']"), 'palette rose absente');
+  assert.ok(css.includes("html[data-palette='vert']"), 'palette vert absente');
+  assert.ok(css.includes("html[data-palette='violet']"), 'palette violet absente');
+  assert.ok(css.includes("html[data-taille='grand']"), 'taille grand absente');
+  assert.ok(css.includes("html[data-taille='tres-grand']"), 'taille tres grand absente');
+  assert.ok(css.includes('--accent-rgb'), 'triplet RGB d accent absent');
+  for (const classe of [
+    '.profil-oublier-champ',
+    '.profil-apprentissage',
+    '.apparence-corps',
+    '.apparence-groupe',
+    '.avatar-option',
+    '.palette-option',
+    '.taille-option'
+  ]) {
+    assert.ok(css.includes(classe), 'style manquant : ' + classe);
+  }
+  // Aucune taille de texte en px : sinon le reglage ne ferait rien.
+  assert.ok(
+    !/font-size:\s*[0-9.]+px/.test(css),
+    'les font-size doivent rester en rem pour que la taille fonctionne'
+  );
+});
+
+test('apparence et oubli : les nouveaux libelles existent dans les 4 langues', () => {
+  const langues = lire('site/langues.js');
+  const cles = [
+    'Apparence',
+    'Avatar de BLAMUNE',
+    'Couleur d accent',
+    'Taille du texte',
+    'Tres grand',
+    'Plat prefere',
+    'Passe-temps',
+    'Serie ou film',
+    'Ce que tu aimes',
+    'Ce que tu n aimes pas',
+    'Oublier ce champ',
+    'Oublier ce souvenir ?',
+    'Souvenir oublie.',
+    'Apprendre automatiquement',
+    'Apprentissage automatique coupe.',
+    'Reglage impossible pour le moment.',
+    'Avatar, couleur et taille du texte'
+  ];
+  for (const cle of cles) {
+    const occurrences = langues.split(cle).length - 1;
+    assert.ok(occurrences >= 3, 'traduction manquante pour : ' + cle);
+  }
+});
+
+test('cache du service worker : la version suit les fichiers du site', () => {
+  const sw = lire('site/sw.js');
+  assert.ok(/const CACHE = 'blamune-v\d+';/.test(sw), 'nom de cache introuvable');
+  assert.ok(
+    sw.includes("'blamune-v28'"),
+    'le cache doit etre bumpe quand style.css, app.js et index.html changent'
+  );
+});

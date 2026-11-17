@@ -128,7 +128,9 @@ app.use((req, res, next) => {
             ? 'register'
             : route === 'session'
               ? 'session'
-              : route === 'profil' || route.startsWith('profil/')
+              : route === 'preferences'
+                ? 'preferences'
+                : route === 'profil' || route.startsWith('profil/')
               ? 'profil'
               : route === 'historique' || route.startsWith('historique/')
                 ? 'historique'
@@ -200,6 +202,18 @@ app.use((req, res, next) => {
       return res.status(429).json({
         ok: false,
         message: 'Trop de demandes de session. Attendez ' + plafondSession + ' req/min.'
+      });
+    }
+  } else if (routeNom === 'preferences') {
+    // Lecture/ecriture d'une preference de compte : quelques clics, jamais
+    // dans une boucle. Le plafond evite qu'un client bricole martele
+    // l'ecriture de comptes.json.
+    const ip = getIp(req);
+    const plafondPref = securite.limiterRoute('preferences').ip;
+    if (!checkRateLimit('preferences:' + ip, plafondPref)) {
+      return res.status(429).json({
+        ok: false,
+        message: 'Trop de demandes. Attendez ' + plafondPref + ' req/min.'
       });
     }
   }
@@ -475,6 +489,18 @@ function sauvegarderComptes() {
     loggerErreur('comptes', 'ecriture impossible: ' + ((e && e.message) || e));
   }
   if (storage.estConfigure()) storage.setComptes(comptes);
+}
+
+// L'apprentissage automatique est une preference de COMPTE (panneau
+// « Mon profil »). Absent = actif : un compte cree avant cette version n'a
+// pas a cocher quoi que ce soit pour garder le comportement d'hier. Une
+// invite n'est pas dans comptes.json : elle reste au defaut (actif).
+function apprentissageActif(uid) {
+  if (!uid) return true;
+  for (const cle of Object.keys(comptes)) {
+    if (comptes[cle].uid === uid) return comptes[cle].apprentissage !== false;
+  }
+  return true;
 }
 
 // ==================== STATE ====================
@@ -942,7 +968,13 @@ function extraireChamp(req, champ) {
 // ==================== USER DIR ====================
 // Implementation dans lib/memoire.js. USERS_DIR est defini plus haut, dans
 // CONFIG : c'est le seul point de contact avec le disque.
-const { dossierUser, lireMemoire, ecrireMemoire, sauvegarderMemoireComplete } = creerMemoire({
+const {
+  dossierUser,
+  lireMemoire,
+  ecrireMemoire,
+  effacerMemoire,
+  sauvegarderMemoireComplete
+} = creerMemoire({
   usersDir: USERS_DIR,
   storage,
   ecritures,
@@ -2590,6 +2622,9 @@ creerRouteSend(app, {
   avecHistorique,
   sauvegarderHistorique,
   autoApprentissage,
+  // Preference de compte : coupe l'apprentissage automatique sans bloquer
+  // les demandes explicites (voir lib/routes/send.js).
+  apprentissageActif,
   indiceMemoire,
   lireMemoire,
   lireEtat,
@@ -2642,6 +2677,8 @@ creerRoutesConsultation(app, {
   lireEtat,
   lireMemoire,
   ecrireMemoire,
+  // Oubli d'UN champ du profil (DELETE /profil/:champ).
+  effacerMemoire,
   // OUBLI complet du profil (DELETE /profil) : chaque champ repasse a vide.
   sauvegarderMemoireComplete,
   // /journal limite par IP : la factory ne peut pas atteindre getIp seul.

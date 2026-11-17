@@ -995,7 +995,8 @@ function ajouterMessage(qui, texte, confiance, epoch) {
   avatar.className = 'avatar ' + (qui === 'bot' ? 'avatar-bot' : 'avatar-moi');
   if (qui === 'bot') {
     var logo = document.createElement('img');
-    logo.src = 'logo-repos.svg';
+    logo.src = cheminAvatarBot();
+    logo.setAttribute('data-avatar-bot', '');
     logo.alt = '';
     avatar.appendChild(logo);
   } else {
@@ -1180,7 +1181,8 @@ function attente(on) {
     var av = document.createElement('div');
     av.className = 'avatar avatar-bot';
     var logo = document.createElement('img');
-    logo.src = 'logo-repos.svg';
+    logo.src = cheminAvatarBot();
+    logo.setAttribute('data-avatar-bot', '');
     logo.alt = '';
     av.appendChild(logo);
     var corps = document.createElement('div');
@@ -1324,7 +1326,8 @@ function afficherAccueil() {
   var gros = document.createElement('div');
   gros.className = 'gros-avatar';
   var grosLogo = document.createElement('img');
-  grosLogo.src = 'logo-repos.svg';
+  grosLogo.src = cheminAvatarBot();
+  grosLogo.setAttribute('data-avatar-bot', '');
   grosLogo.alt = 'BLAMUNE';
   gros.appendChild(grosLogo);
   var titre = document.createElement('h2');
@@ -1668,7 +1671,16 @@ var CHAMPS_PROFIL = [
   { cle: 'age', etiquette: 'Age' },
   { cle: 'ville', etiquette: 'Ville' },
   { cle: 'travail', etiquette: 'Metier' },
-  { cle: 'aime', etiquette: 'Gouts' },
+  { cle: 'plat', etiquette: 'Plat prefere' },
+  { cle: 'hobby', etiquette: 'Passe-temps' },
+  { cle: 'sport', etiquette: 'Sport' },
+  { cle: 'musique', etiquette: 'Musique' },
+  { cle: 'serie', etiquette: 'Serie ou film' },
+  { cle: 'reve', etiquette: 'Reve' },
+  { cle: 'genre', etiquette: 'Genre' },
+  { cle: 'aime', etiquette: 'Ce que tu aimes' },
+  { cle: 'aimePas', etiquette: 'Ce que tu n aimes pas' },
+  { cle: 'motsFavoris', etiquette: 'Mots favoris' },
   { cle: 'anniversaire', etiquette: 'Anniversaire (JJ-MM)' }
 ];
 
@@ -1681,6 +1693,7 @@ function ouvrirProfil() {
   z.hidden = false;
   z.classList.add('ouvert');
   chargerProfil();
+  chargerPreferences();
 }
 
 function fermerProfil() {
@@ -1713,6 +1726,10 @@ function humaniserCle(cle) {
 async function chargerProfil() {
   var liste = document.getElementById('listeProfil');
   if (!liste) return;
+  // Identite au moment de la demande : si elle change pendant la requete
+  // (deconnexion, passage en invite), la reponse concerne l'ancien compte et
+  // ne doit pas peindre le panneau du nouveau.
+  var uid = getAuthUserId();
   liste.textContent = '';
   var note = document.createElement('p');
   note.className = 'profil-note';
@@ -1722,6 +1739,12 @@ async function chargerProfil() {
     var r = await fetch('/profil', { headers: authHeaders() });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var j = await r.json();
+    if (uid !== getAuthUserId()) {
+      // L'identite a change pendant la requete : cette reponse ne concerne
+      // plus personne. On relit le profil du compte courant, une fois.
+      chargerProfil();
+      return;
+    }
     var profil = (j && j.profil) || {};
     liste.textContent = '';
     var connu = false;
@@ -1735,26 +1758,44 @@ async function chargerProfil() {
       if (Array.isArray(v)) return v.filter(Boolean).join(', ');
       return String(v);
     }
-    CHAMPS_PROFIL.forEach(function (c) {
+    // Une ligne = un champ. La croix oublie CE champ seulement
+    // (DELETE /profil/:champ) : retirer sa ville ne doit pas emporter son
+    // nom et son anniversaire.
+    function ajouterLigne(cle, etiquette) {
       var ligne = document.createElement('div');
       ligne.className = 'profil-ligne';
       var lab = document.createElement('label');
       lab.className = 'profil-label';
-      lab.setAttribute('for', 'prof_' + c.cle);
-      lab.textContent = T_(c.etiquette);
+      lab.setAttribute('for', 'prof_' + cle);
+      lab.textContent = etiquette;
+      lab.title = cle;
       var inp = document.createElement('input');
       inp.type = 'text';
-      inp.id = 'prof_' + c.cle;
+      inp.id = 'prof_' + cle;
       inp.className = 'profil-champ';
       inp.maxLength = 200;
-      inp.value = valeurTexte(profil[c.cle]);
+      inp.value = valeurTexte(profil[cle]);
       if (inp.value) {
         connu = true;
         nbConnus++;
       }
+      var oub = document.createElement('button');
+      oub.type = 'button';
+      oub.className = 'profil-oublier-champ';
+      oub.textContent = '\u00d7';
+      oub.title = T_('Oublier ce champ');
+      oub.setAttribute('aria-label', T_('Oublier ce champ') + ' : ' + etiquette);
+      oub.addEventListener('click', function () {
+        oublierChampProfil(cle, etiquette);
+      });
       ligne.appendChild(lab);
       ligne.appendChild(inp);
+      ligne.appendChild(oub);
       liste.appendChild(ligne);
+    }
+
+    CHAMPS_PROFIL.forEach(function (c) {
+      ajouterLigne(c.cle, T_(c.etiquette));
     });
     // Champs connus du bot hors grille (memoire libre) : visibles et
     // modifiables eux aussi — le visiteur controle TOUT ce qui est retenu.
@@ -1765,26 +1806,10 @@ async function chargerProfil() {
         })
       )
         return;
-      var ligne = document.createElement('div');
-      ligne.className = 'profil-ligne';
-      var lab = document.createElement('label');
-      lab.className = 'profil-label';
-      lab.setAttribute('for', 'prof_' + c);
       // Cle brute du bot (motsFavoris, aimePas...) : on l'humanise pour
       // l'affichage ("motsFavoris" -> "Mots favoris"), la cle technique
       // reste dans l'id du champ et dans le POST.
-      lab.textContent = T_(humaniserCle(c));
-      lab.title = c;
-      var inp = document.createElement('input');
-      inp.type = 'text';
-      inp.id = 'prof_' + c;
-      inp.className = 'profil-champ';
-      inp.maxLength = 200;
-      inp.value = valeurTexte(profil[c]);
-      if (inp.value) nbConnus++;
-      ligne.appendChild(lab);
-      ligne.appendChild(inp);
-      liste.appendChild(ligne);
+      ajouterLigne(c, T_(humaniserCle(c)));
     });
     majCompteProfil(nbConnus);
     if (!connu && !Object.keys(profil).length) {
@@ -1917,6 +1942,91 @@ async function oublierProfil() {
   }
 }
 
+// Oubli d'UN champ : la croix d'une ligne du profil. Le serveur garde les
+// autres souvenirs intacts (DELETE /profil/:champ).
+async function oublierChampProfil(cle, etiquette) {
+  if (!window.confirm(T_('Oublier ce souvenir ?') + ' (' + etiquette + ')')) return;
+  try {
+    var r = await fetch('/profil/' + encodeURIComponent(cle), {
+      method: 'DELETE',
+      headers: authHeaders()
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    afficherToastDeco(T_('Souvenir oublie.'), 'ok');
+    chargerProfil();
+  } catch (e) {
+    afficherToastDeco(T_('Profil indisponible pour le moment.'));
+  }
+}
+
+// Preference de compte : l'apprentissage automatique. Elle n'est pas dans
+// le profil (qui peut etre efface d'un clic) : elle vit dans comptes.json,
+// donc elle survit a « Tout oublier », a la reconnexion et a l'appareil.
+async function chargerPreferences() {
+  var cb = document.getElementById('profilApprentissage');
+  if (!cb) return;
+  // Meme garde que chargerProfil : une reponse arrivee apres un changement
+  // de compte (ou un passage en invite) ne doit pas regler la case du suivant.
+  var uid = getAuthUserId();
+  try {
+    var r = await fetch('/preferences', { headers: authHeaders() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var j = await r.json();
+    if (uid !== getAuthUserId()) {
+      chargerPreferences();
+      return;
+    }
+    cb.checked = j && j.apprentissage !== false;
+    // Une invite n'a pas de compte : la case est visible mais figee.
+    var sansCompte = !!(j && j.modifiable === false);
+    cb.disabled = sansCompte;
+    var note = document.getElementById('profilApprentissageNote');
+    if (note) note.classList.toggle('cache', !sansCompte);
+    var err = document.getElementById('profilApprentissageErreur');
+    if (err) err.classList.add('cache');
+  } catch (e) {
+    // Panne reseau ou quota : on ne sait pas si le compte existe, donc on ne
+    // reprend PAS le message « il faut un compte » (il serait faux pour un
+    // compte connecte) — un repli neutre, case figee le temps de reessayer.
+    cb.disabled = true;
+    var note2 = document.getElementById('profilApprentissageNote');
+    if (note2) note2.classList.add('cache');
+    var err2 = document.getElementById('profilApprentissageErreur');
+    if (err2) err2.classList.remove('cache');
+  }
+}
+
+async function changerApprentissage(cb) {
+  if (!cb) return;
+  var voulu = cb.checked;
+  cb.disabled = true;
+  try {
+    var r = await fetch('/preferences', {
+      method: 'POST',
+      headers: Object.assign(
+        { 'Content-Type': 'application/x-www-form-urlencoded' },
+        authHeaders()
+      ),
+      body: 'apprentissage=' + (voulu ? '1' : '0')
+    });
+    var j = null;
+    try {
+      j = await r.json();
+    } catch (e) {}
+    if (!r.ok || (j && j.ok === false)) throw new Error('HTTP ' + r.status);
+    afficherToastDeco(
+      voulu ? T_('Apprentissage automatique active.') : T_('Apprentissage automatique coupe.'),
+      'ok'
+    );
+  } catch (e) {
+    // Le serveur n'a pas suivi : la case doit dire la verite.
+    cb.checked = !voulu;
+    afficherToastDeco(T_('Reglage impossible pour le moment.'));
+  } finally {
+    cb.disabled = false;
+  }
+}
+
 (function initBoutonProfil() {
   var b = document.getElementById('btnProfil');
   if (!b) return;
@@ -1927,6 +2037,12 @@ async function oublierProfil() {
   if (s) s.addEventListener('click', sauverProfil);
   var o = document.getElementById('btnProfilOublier');
   if (o) o.addEventListener('click', oublierProfil);
+  var cb = document.getElementById('profilApprentissage');
+  if (cb) {
+    cb.addEventListener('change', function () {
+      changerApprentissage(cb);
+    });
+  }
 })();
 
 // ---------------- NOTIFICATIONS PUSH (sprint E) ----------------
@@ -2716,6 +2832,162 @@ function lireVoix(texte) {
     afficherToastDeco('Mode vocal : je t\u2019ecoute.', 'ok');
     ecouterVoix();
   });
+})();
+
+// ---------------- APPARENCE : avatar, palette, taille du texte ----------------
+// Trois choix par APPAREIL (localStorage), comme le theme : rien a
+// demander au serveur, et l'application se fait avant la premiere
+// peinture. L'avatar est celui de BLAMUNE (cinq dessins deja livres dans
+// site/) ; la palette ne touche qu'aux accents, le clair/sombre reste au
+// bouton Theme ; la taille passe par la racine en rem (style.css n'a plus
+// une seule taille de texte en px, sinon le reglage ne ferait rien).
+var APPARENCE_CLES = {
+  avatar: 'blamune_avatar',
+  palette: 'blamune_palette',
+  taille: 'blamune_taille'
+};
+// Les fichiers d'avatars de site/ ne contiennent que DEUX dessins
+// distincts : logo-repos.svg (perle immobile) et logo-anime.svg (la perle
+// parcourt le lien). logo-ecrit/perle/reflechit sont des copies de
+// logo-repos, d'ou deux choix seulement — en proposer cinq identiques
+// serait un faux choix. Ajouter un dessin = un fichier + une ligne ici.
+var AVATARS_BOT = {
+  repos: 'logo-repos.svg',
+  anime: 'logo-anime.svg'
+};
+var PALETTES_BOT = ['ciel', 'ambre', 'rose', 'vert', 'violet'];
+var TAILLES_TEXTE = ['normal', 'grand', 'tres-grand'];
+
+function choixApparence(cle, defaut, valides) {
+  var v = localStorage.getItem(cle) || '';
+  return valides.indexOf(v) >= 0 ? v : defaut;
+}
+
+function avatarBotChoisi() {
+  return choixApparence(APPARENCE_CLES.avatar, 'repos', Object.keys(AVATARS_BOT));
+}
+
+function cheminAvatarBot() {
+  return AVATARS_BOT[avatarBotChoisi()];
+}
+
+// Toutes les images de BLAMUNE portent data-avatar-bot : celles de la page
+// (connexion, en-tete) comme celles creees par ajouterMessage/attente. Un
+// seul selecteur les tient a jour.
+function appliquerAvatarBot() {
+  var src = cheminAvatarBot();
+  var imgs = document.querySelectorAll('[data-avatar-bot]');
+  for (var i = 0; i < imgs.length; i++) imgs[i].src = src;
+}
+
+function appliquerPalette(nom) {
+  document.documentElement.setAttribute('data-palette', nom);
+}
+
+function appliquerTailleTexte(nom) {
+  document.documentElement.setAttribute('data-taille', nom);
+}
+
+function appliquerApparence() {
+  appliquerAvatarBot();
+  appliquerPalette(choixApparence(APPARENCE_CLES.palette, 'ciel', PALETTES_BOT));
+  appliquerTailleTexte(choixApparence(APPARENCE_CLES.taille, 'normal', TAILLES_TEXTE));
+}
+
+// Etat visuel des boutons du panneau : aria-pressed dit ce qui est actif,
+// et le CSS s'en sert pour l'anneau. Appele a l'ouverture, apres chaque
+// choix, et au changement de langue (les libelles sont traduits ailleurs).
+function rafraichirApparence() {
+  var avatar = avatarBotChoisi();
+  var palette = choixApparence(APPARENCE_CLES.palette, 'ciel', PALETTES_BOT);
+  var taille = choixApparence(APPARENCE_CLES.taille, 'normal', TAILLES_TEXTE);
+  var groupes = [
+    ['#zoneApparence [data-avatar]', 'avatar', avatar],
+    ['#zoneApparence [data-palette]', 'palette', palette],
+    ['#zoneApparence [data-taille]', 'taille', taille]
+  ];
+  groupes.forEach(function (g) {
+    var els = document.querySelectorAll(g[0]);
+    for (var i = 0; i < els.length; i++) {
+      var actif = els[i].getAttribute('data-' + g[1]) === g[2];
+      els[i].setAttribute('aria-pressed', actif ? 'true' : 'false');
+      els[i].classList.toggle('actif', actif);
+    }
+  });
+}
+
+function choisirAvatar(nom) {
+  if (!AVATARS_BOT[nom]) return;
+  localStorage.setItem(APPARENCE_CLES.avatar, nom);
+  appliquerAvatarBot();
+  rafraichirApparence();
+}
+
+function choisirPalette(nom) {
+  if (PALETTES_BOT.indexOf(nom) < 0) return;
+  localStorage.setItem(APPARENCE_CLES.palette, nom);
+  appliquerPalette(nom);
+  rafraichirApparence();
+}
+
+function choisirTailleTexte(nom) {
+  if (TAILLES_TEXTE.indexOf(nom) < 0) return;
+  localStorage.setItem(APPARENCE_CLES.taille, nom);
+  appliquerTailleTexte(nom);
+  rafraichirApparence();
+}
+
+function ouvrirApparence() {
+  var z = document.getElementById('zoneApparence');
+  if (!z) return;
+  z.hidden = false;
+  z.classList.add('ouvert');
+  rafraichirApparence();
+}
+
+function fermerApparence() {
+  var z = document.getElementById('zoneApparence');
+  if (!z) return;
+  z.classList.remove('ouvert');
+  z.hidden = true;
+  var b = document.getElementById('btnApparence');
+  if (b) b.focus();
+}
+
+(function initApparence() {
+  // Applique AVANT tout le reste : pas de flash de l'ancien avatar ni du
+  // bleu par defaut quand un autre choix est enregistre.
+  appliquerApparence();
+  var b = document.getElementById('btnApparence');
+  if (b) b.addEventListener('click', ouvrirApparence);
+  var f = document.getElementById('btnFermerApparence');
+  if (f) f.addEventListener('click', fermerApparence);
+  var avatars = document.querySelectorAll('#zoneApparence [data-avatar]');
+  for (var i = 0; i < avatars.length; i++) {
+    (function (el) {
+      el.addEventListener('click', function () {
+        choisirAvatar(el.getAttribute('data-avatar'));
+      });
+    })(avatars[i]);
+  }
+  var palettes = document.querySelectorAll('#zoneApparence [data-palette]');
+  for (var j = 0; j < palettes.length; j++) {
+    (function (el) {
+      el.addEventListener('click', function () {
+        choisirPalette(el.getAttribute('data-palette'));
+      });
+    })(palettes[j]);
+  }
+  var tailles = document.querySelectorAll('#zoneApparence [data-taille]');
+  for (var k = 0; k < tailles.length; k++) {
+    (function (el) {
+      el.addEventListener('click', function () {
+        choisirTailleTexte(el.getAttribute('data-taille'));
+      });
+    })(tailles[k]);
+  }
+  rafraichirApparence();
+  window.addEventListener('blamune:langue', rafraichirApparence);
 })();
 
 // ---------------- THEME : clair / sombre ----------------

@@ -66,6 +66,37 @@ Les mesures suivantes ont été ajoutées lors de l'audit de sécurité :
 
   _Supprimé le 2026-11-10_ : `lib/csrf.js` annonçait un jeton `X-CSRF-Token` dérivé de l'ego. Il n'était **importé par aucune ligne du serveur**, son `ALLOWED_ORIGINS` n'existait dans aucune configuration ni documentation, et le site n'envoyait évidemment pas le jeton qu'il exigeait. Un module de sécurité jamais monté ne protège rien ; il donne surtout la fausse impression que la question est traitée. Le seul contrôle réel — et suffisant ici, l'authentification passant par des en-têtes personnalisés que ni un formulaire tiers ni un appel `fetch` cross-origin simple ne peuvent poser — est le contrôle d'origine de `server.js`.
 
+## Nouveautés de sécurité (2026-11-16) : oubli ciblé et préférences de compte
+
+Le profil était tout ou rien : « Tout oublier » effaçait les 17 champs d'un
+coup. Deux ajouts rendent la main au visiteur sans ouvrir de nouvelle
+surface.
+
+- **`DELETE /profil/:champ`** n'agit que sur le profil de l'`uid`
+  authentifié (jamais un `uid` passé en paramètre) et seulement sur les
+  champs **visibles**. `humeur`, `humeurUser` et `promesses` sont refusés
+  en **400** : ce sont des notes internes, pas des souvenirs que le
+  panneau affiche. Un nom de champ inconnu est refusé de la même façon,
+  donc la route ne peut pas créer de ligne au passage.
+- **`/preferences`** stocke une seule valeur par compte
+  (`apprentissage`), dans `comptes.json` et non dans le profil : elle
+  survit donc à « Tout oublier ». La route est refusée aux invitations
+  (`inv_…`, 403) et limitée à 30 requêtes/minute par IP
+  (`LIMITES_ROUTES.preferences`). Les valeurs acceptées sont une liste
+  fermée (`0/1/true/false/on/off`) ; tout le reste est un 400.
+- **Couper l'apprentissage ne rend pas le bot sourd aux ordres.** Les
+  captures automatiques (regex et extraction par modèle) s'arrêtent, mais
+  une consigne explicite (« retiens que… », « rappelle-moi… »,
+  « n'oublie pas… ») est toujours traitée : c'est une action demandée par
+  le visiteur, pas une collecte de fond.
+- **L'apparence ne quitte pas l'appareil** : avatar, palette et taille
+  vivent dans `localStorage`, aucun appel serveur, aucune donnée de profil
+  envoyée. Le réglage est purement local, comme le thème.
+
+Ces changements ne déplacent aucune frontière d'authentification : les
+trois routes concernées passent par `extraireAuth` et par les mêmes
+contrôles d'origine que le reste de l'application.
+
 ## Nouveautés de sécurité (2026-11-15) : sessions persistantes
 
 L'ego d'un compte expirait **24 h** après la connexion. Sur l'application

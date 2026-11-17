@@ -15,6 +15,9 @@
   --texte-faible: #6b7f97;
   --accent: #38bdf8;
   --accent-2: #22d3ee;
+  /* Meme accent en triplet RGB : les halos et bordures translucides
+     suivent la palette au lieu de rester bleu ciel. */
+  --accent-rgb: 56 189 248;
   --bot-bulle: #1c2a45;
   --bot-bordure: rgb(var(--blanc) / 0.06);
   --moi-debut: #0ea5a6;
@@ -48,6 +51,7 @@
   --texte-faible: #74879e;
   --accent: #0284c7;
   --accent-2: #0891b2;
+  --accent-rgb: 2 132 199;
   --bot-bulle: #ffffff;
   --bot-bordure: rgb(var(--blanc) / 0.12);
   --danger: #dc2626;
@@ -59,10 +63,67 @@
 }
 [data-theme='clair'] body {
   background:
-    radial-gradient(900px 500px at 85% -10%, rgb(2 132 199 / 0.1), transparent 60%),
+    radial-gradient(900px 500px at 85% -10%, rgb(var(--accent-rgb) / 0.1), transparent 60%),
     radial-gradient(800px 500px at -10% 110%, rgb(124 58 237 / 0.08), transparent 60%),
     radial-gradient(600px 400px at 50% 50%, rgb(16 185 129 / 0.06), transparent 70%),
     linear-gradient(165deg, var(--fond-2), var(--fond) 45%, #dfe7f2);
+}
+
+/* ======================= PALETTES D'ACCENT =======================
+   Le clair/sombre reste un choix separe (btnTheme). Une palette ne
+   remplace QUE les accents : --accent, --accent-2 et leur triplet RGB.
+   Les variantes claires sont plus sombres pour rester lisibles sur fond
+   blanc (contraste AA sur --fond-2). */
+html[data-palette='ambre'] {
+  --accent: #fbbf24;
+  --accent-2: #fb923c;
+  --accent-rgb: 251 191 36;
+}
+html[data-palette='ambre'][data-theme='clair'] {
+  --accent: #b45309;
+  --accent-2: #c2410c;
+  --accent-rgb: 180 83 9;
+}
+html[data-palette='rose'] {
+  --accent: #f472b6;
+  --accent-2: #fb7185;
+  --accent-rgb: 244 114 182;
+}
+html[data-palette='rose'][data-theme='clair'] {
+  --accent: #be185d;
+  --accent-2: #e11d48;
+  --accent-rgb: 190 24 93;
+}
+html[data-palette='vert'] {
+  --accent: #34d399;
+  --accent-2: #2dd4bf;
+  --accent-rgb: 52 211 153;
+}
+html[data-palette='vert'][data-theme='clair'] {
+  --accent: #047857;
+  --accent-2: #0d9488;
+  --accent-rgb: 4 120 87;
+}
+html[data-palette='violet'] {
+  --accent: #a78bfa;
+  --accent-2: #c084fc;
+  --accent-rgb: 167 139 250;
+}
+html[data-palette='violet'][data-theme='clair'] {
+  --accent: #6d28d9;
+  --accent-2: #7c3aed;
+  --accent-rgb: 109 40 217;
+}
+
+/* ======================= TAILLE DU TEXTE =======================
+   style.css n'exprime plus aucune taille de texte en px : tout est en
+   rem. Ces trois valeurs font donc grandir l'interface d'un bloc, sans
+   toucher aux marges ni aux cibles tactiles (qui restent en px). */
+html[data-taille='grand'] {
+  font-size: 1.0938rem;
+}
+html[data-taille='tres-grand'] {
+  font-size: 1.1875rem;
 }
 
 /* Surfaces du chat qui restaient PEINTES pour la nuit : les bulles du
@@ -146,7 +207,7 @@ body {
     sans-serif;
   color: var(--texte);
   background:
-    radial-gradient(900px 500px at 85% -10%, rgba(56, 189, 248, 0.14), transparent 60%),
+    radial-gradient(900px 500px at 85% -10%, rgb(var(--accent-rgb) / 0.14), transparent 60%),
     radial-gradient(800px 500px at -10% 110%, rgba(139, 92, 246, 0.14), transparent 60%),
     radial-gradient(600px 400px at 50% 50%, rgba(16, 185, 129, 0.05), transparent 70%),
     linear-gradient(165deg, var(--fond-2), var(--fond) 45%, #0a0f1e);
@@ -156,7 +217,7 @@ body {
   height: 100dvh;
   overflow: hidden;
   overscroll-behavior: contain;
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.4;
   animation: bgShift 20s ease-in-out infinite alternate;
 }
@@ -218,7 +279,7 @@ input:focus-visible {
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 17px;
+  font-size: 1.0625rem;
   color: #fff;
   user-select: none;
   transition:
@@ -296,7 +357,7 @@ input:focus-visible {
 }
 
 #tete h1 {
-  font-size: 17px;
+  font-size: 1.0625rem;
   letter-spacing: 0.4px;
   font-weight: 700;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
@@ -309,7 +370,7 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--texte-doux);
   margin-top: 1px;
   white-space: nowrap;
@@ -398,7 +459,7 @@ input:focus-visible {
 .segmente button {
   padding: 6px 14px;
   border-radius: 999px;
-  font-size: 12.5px;
+  font-size: 0.7813rem;
   font-weight: 600;
   color: var(--texte-doux);
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -508,7 +569,7 @@ input:focus-visible {
 .bulle {
   padding: 10px 14px;
   border-radius: var(--rayon-bulle);
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.45;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -557,7 +618,7 @@ input:focus-visible {
 /* Indicateur de confiance */
 .confiance {
   display: block;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-style: italic;
   margin-top: 4px;
   padding: 2px 6px;
@@ -574,7 +635,7 @@ input:focus-visible {
 
 .heure {
   margin-top: 3px;
-  font-size: 10.5px;
+  font-size: 0.6563rem;
   color: var(--texte-faible);
   padding: 0 4px;
   user-select: none;
@@ -588,7 +649,7 @@ input:focus-visible {
   background: transparent;
   border: none;
   color: var(--texte-faible);
-  font-size: 11px;
+  font-size: 0.6875rem;
   padding: 2px 6px;
   border-radius: 6px;
   cursor: pointer;
@@ -617,7 +678,7 @@ input:focus-visible {
   background: transparent;
   border: none;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1;
   padding: 2px 4px;
   cursor: pointer;
@@ -654,7 +715,7 @@ input:focus-visible {
   margin: 6px 0;
 }
 .msg.systeme span {
-  font-size: 11.5px;
+  font-size: 0.7188rem;
   color: var(--texte-faible);
   background: var(--surface);
   border: 1px solid var(--bordure);
@@ -671,7 +732,7 @@ input:focus-visible {
   background: var(--surface);
   border: 1px solid var(--bordure);
   color: var(--texte-doux);
-  font-size: 13px;
+  font-size: 0.8125rem;
   border-radius: 12px;
   max-width: 85%;
   text-align: center;
@@ -791,7 +852,7 @@ input:focus-visible {
 }
 
 .accueil h2 {
-  font-size: 22px;
+  font-size: 1.375rem;
   margin-bottom: 6px;
   background: linear-gradient(135deg, var(--texte), var(--accent));
   -webkit-background-clip: text;
@@ -801,7 +862,7 @@ input:focus-visible {
 
 .accueil p {
   color: var(--texte-doux);
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   margin-bottom: 18px;
 }
 
@@ -818,7 +879,7 @@ input:focus-visible {
   border: 1px solid var(--bordure);
   background: var(--surface);
   color: var(--texte);
-  font-size: 12.5px;
+  font-size: 0.7813rem;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -857,7 +918,7 @@ input:focus-visible {
   background: var(--surface);
   color: var(--texte);
   /* 16px minimum : en dessous, iOS zoome automatiquement sur le champ. */
-  font-size: 16px;
+  font-size: 1rem;
   font-family: inherit;
   outline: none;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -982,7 +1043,7 @@ button:disabled {
   border-radius: 8px;
   color: var(--texte-doux);
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: 0.75rem;
   cursor: pointer;
 }
 
@@ -996,7 +1057,7 @@ button:disabled {
   border-radius: 8px;
   color: var(--texte-doux);
   padding: 4px 8px;
-  font-size: 12px;
+  font-size: 0.75rem;
   cursor: pointer;
 }
 
@@ -1010,7 +1071,7 @@ button:disabled {
   border-radius: 8px;
   color: var(--texte-doux);
   padding: 4px 8px;
-  font-size: 12px;
+  font-size: 0.75rem;
   cursor: pointer;
 }
 
@@ -1097,7 +1158,7 @@ button:disabled {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.3;
   color: var(--texte-doux);
   text-align: center;
@@ -1109,7 +1170,7 @@ button:disabled {
 }
 .aide-ios-fleche {
   color: var(--texte-faible);
-  font-size: 16px;
+  font-size: 1rem;
 }
 .aide-chrome {
   display: block;
@@ -1124,7 +1185,7 @@ button:disabled {
 }
 .aide-boite p {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 19px;
   color: var(--texte-doux);
 }
@@ -1191,15 +1252,15 @@ button:disabled {
   .avatar {
     width: 34px;
     height: 34px;
-    font-size: 15px;
+    font-size: 0.9375rem;
   }
   .segmente button {
     padding: 5px 11px;
-    font-size: 11.5px;
+    font-size: 0.7188rem;
   }
   .bulle {
     max-width: 100%;
-    font-size: 14.5px;
+    font-size: 0.9063rem;
   }
   .corps {
     max-width: 84%;
@@ -1294,7 +1355,7 @@ button:disabled {
     border-radius: 10px;
     background: none;
     color: var(--texte);
-    font-size: 13.5px;
+    font-size: 0.8438rem;
     text-align: left;
   }
   #menuMobile .btn-petit:hover {
@@ -1312,7 +1373,7 @@ button:disabled {
     border-radius: 10px;
     background: var(--surface-2);
     color: var(--texte);
-    font-size: 13.5px;
+    font-size: 0.8438rem;
   }
   /* La regle-ID #btnIANav (bordures, padding, marge) cede devant le
      panneau ; l'eclair suit simplement le dosage des lignes. */
@@ -1448,7 +1509,7 @@ button:disabled {
 
 /* Quand la carte est large, le bouton suit la taille des champs */
 .auth-box.large .auth-btn {
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 @keyframes authSlide {
@@ -1492,7 +1553,7 @@ button:disabled {
 .auth-box h2 {
   margin: 0 0 4px;
   color: var(--texte);
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 700;
   background: linear-gradient(135deg, var(--texte), var(--accent));
   -webkit-background-clip: text;
@@ -1502,7 +1563,7 @@ button:disabled {
 
 .auth-sous {
   color: var(--texte-doux);
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin: 0 0 22px;
 }
 
@@ -1590,7 +1651,7 @@ button:disabled {
   color: var(--texte);
   /* 16px minimum : en dessous, iOS zoome automatiquement sur le champ
      (valable sur le formulaire de connexion ET d'inscription). */
-  font-size: 16px;
+  font-size: 1rem;
   outline: none;
   transition:
     border-color 0.3s ease,
@@ -1629,7 +1690,7 @@ button:disabled {
   border: none;
   border-radius: 12px;
   padding: 13px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -1674,7 +1735,7 @@ button:disabled {
   margin-top: 14px;
   background: rgb(var(--blanc) / 0.05);
   color: var(--texte);
-  border: 1px solid rgb(56 189 248 / 0.35);
+  border: 1px solid rgb(var(--accent-rgb) / 0.35);
   box-shadow: none;
 }
 .auth-install svg {
@@ -1683,9 +1744,9 @@ button:disabled {
   flex: 0 0 auto;
 }
 .auth-install:hover {
-  background: rgb(56 189 248 / 0.12);
-  border-color: rgb(56 189 248 / 0.6);
-  box-shadow: 0 4px 16px rgba(56, 189, 248, 0.2);
+  background: rgb(var(--accent-rgb) / 0.12);
+  border-color: rgb(var(--accent-rgb) / 0.6);
+  box-shadow: 0 4px 16px rgb(var(--accent-rgb) / 0.2);
 }
 .auth-install-note {
   margin-top: 6px;
@@ -1693,13 +1754,13 @@ button:disabled {
 
 .auth-err {
   color: #ef4444;
-  font-size: 13px;
+  font-size: 0.8125rem;
   min-height: 18px;
   margin: 0;
 }
 .auth-switch {
   color: var(--texte-doux);
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin: 4px 0 0;
 }
 .auth-switch a {
@@ -1718,7 +1779,7 @@ button:disabled {
   gap: 12px;
   margin: 18px 0;
   color: var(--texte-faible);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .auth-sep::before,
 .auth-sep::after {
@@ -1728,7 +1789,7 @@ button:disabled {
 }
 .auth-note {
   color: var(--texte-faible);
-  font-size: 11px;
+  font-size: 0.6875rem;
   margin: 8px 0 0;
 }
 
@@ -1752,11 +1813,11 @@ button:disabled {
     margin-bottom: 10px;
   }
   #ecranAuth .auth-box h2 {
-    font-size: 19px;
+    font-size: 1.1875rem;
     margin-bottom: 2px;
   }
   #ecranAuth .auth-sous {
-    font-size: 12px;
+    font-size: 0.75rem;
     line-height: 1.35;
     margin-bottom: 14px;
   }
@@ -1768,24 +1829,24 @@ button:disabled {
   }
   #ecranAuth .auth-btn {
     padding: 11px 12px;
-    font-size: 14px;
+    font-size: 0.875rem;
   }
   #ecranAuth .auth-box.large .auth-btn {
-    font-size: 15px;
+    font-size: 0.9375rem;
   }
   #ecranAuth .auth-err {
     min-height: 15px;
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   #ecranAuth .auth-switch {
-    font-size: 12px;
+    font-size: 0.75rem;
     margin-top: 2px;
   }
   #ecranAuth .auth-sep {
     margin: 10px 0;
   }
   #ecranAuth .auth-note {
-    font-size: 10.5px;
+    font-size: 0.6563rem;
     margin-top: 5px;
   }
   #ecranAuth .auth-install {
@@ -1802,7 +1863,7 @@ button:disabled {
     z-index: 2;
   }
   #ecranAuth #authLangue select {
-    font-size: 12px;
+    font-size: 0.75rem;
     padding: 3px 8px;
   }
 }
@@ -1820,7 +1881,7 @@ button:disabled {
     margin-bottom: 8px;
   }
   #ecranAuth .auth-box h2 {
-    font-size: 17px;
+    font-size: 1.0625rem;
   }
   #ecranAuth .auth-sous {
     display: none;
@@ -1853,7 +1914,7 @@ button:disabled {
     margin-bottom: 6px;
   }
   #ecranAuth .auth-box h2 {
-    font-size: 16px;
+    font-size: 1rem;
   }
   #ecranAuth .auth-sep {
     margin: 6px 0;
@@ -1939,7 +2000,7 @@ button:disabled {
 
 .success-texte {
   color: var(--texte);
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   opacity: 0;
   animation: formFade 0.4s ease-out 0.5s forwards;
@@ -2041,7 +2102,7 @@ button:disabled {
   color: var(--texte);
   padding: 10px 18px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   z-index: 1200;
@@ -2250,14 +2311,14 @@ html.console .auth-box::before {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--texte-doux);
 }
 .apercu-photo-x {
   background: none;
   border: none;
   color: var(--texte-doux);
-  font-size: 20px;
+  font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
   padding: 2px 6px;
@@ -2283,7 +2344,7 @@ html.console .auth-box::before {
   color: var(--texte-doux);
   padding: 4px 10px;
   margin-left: 8px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 #btnIANav svg {
   margin-right: 4px;
@@ -2306,14 +2367,14 @@ html.console .auth-box::before {
 .etat-ia {
   display: none;
   color: var(--texte-doux);
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 14px;
   max-width: 260px;
 }
 .note-invite {
   display: none;
   color: var(--texte-doux);
-  font-size: 11px;
+  font-size: 0.6875rem;
   margin-right: 8px;
 }
 .zone-repliable {
@@ -2327,11 +2388,11 @@ html.console .auth-box::before {
   border-radius: 8px;
   color: var(--texte);
   padding: 7px 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .note-recherche {
   color: var(--texte-doux);
-  font-size: 11px;
+  font-size: 0.6875rem;
   align-self: center;
 }
 .btn-fermer-recherche {
@@ -2340,7 +2401,7 @@ html.console .auth-box::before {
   border-radius: 8px;
   color: var(--texte-doux);
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .msg-noscript {
   text-align: center;
@@ -2433,7 +2494,7 @@ html.console .auth-box::before {
 
 .profil-tete strong {
   color: var(--texte);
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.3;
   letter-spacing: 0.15px;
 }
@@ -2445,7 +2506,7 @@ html.console .auth-box::before {
   align-items: center;
   min-height: 20px;
   color: var(--texte-faible);
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.2;
   padding: 3px 9px;
   border-radius: 999px;
@@ -2544,7 +2605,9 @@ html.console .auth-box::before {
 
 .profil-ligne {
   display: grid;
-  grid-template-columns: 148px minmax(0, 1fr);
+  /* Troisieme colonne : la croix d'oubli du champ. Elle reste etroite pour
+     que la valeur garde toute la largeur utile. */
+  grid-template-columns: 148px minmax(0, 1fr) 28px;
   align-items: center;
   gap: 10px;
   padding: 2px 0;
@@ -2591,7 +2654,7 @@ html.console .auth-box::before {
 
 .profil-label {
   color: var(--texte-doux);
-  font-size: 12.5px;
+  font-size: 0.7813rem;
   font-weight: 600;
   letter-spacing: 0.2px;
   /* Un long libelle libre (cle memoire du bot) ne doit jamais casser la
@@ -2610,7 +2673,7 @@ html.console .auth-box::before {
   background: var(--surface-2);
   color: var(--texte);
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   outline: none;
   transition:
     border-color 0.2s ease,
@@ -2627,11 +2690,12 @@ html.console .auth-box::before {
 }
 
 .profil-champ:focus {
-  border-color: rgba(56, 189, 248, 0.6);
+  /* Le halo suit la palette d'accent choisie (data-palette). */
+  border-color: rgb(var(--accent-rgb) / 0.6);
   background: rgb(var(--blanc) / 0.1);
   box-shadow:
-    0 0 0 3px rgba(56, 189, 248, 0.14),
-    0 0 16px rgba(56, 189, 248, 0.08);
+    0 0 0 3px rgb(var(--accent-rgb) / 0.14),
+    0 0 16px rgb(var(--accent-rgb) / 0.08);
 }
 
 .profil-champ:focus-visible {
@@ -2643,7 +2707,7 @@ html.console .auth-box::before {
 .profil-note {
   margin: 2px 0 4px;
   color: var(--texte-faible);
-  font-size: 12.5px;
+  font-size: 0.7813rem;
   line-height: 1.5;
   text-align: center;
   animation: profilLigne 0.3s ease both;
@@ -2662,7 +2726,7 @@ html.console .auth-box::before {
 .profil-btn {
   padding: 8px 16px;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
   border: 1px solid transparent;
@@ -2682,11 +2746,11 @@ html.console .auth-box::before {
 .profil-sauver {
   color: var(--sur-accent);
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  box-shadow: 0 3px 14px rgba(56, 189, 248, 0.32);
+  box-shadow: 0 3px 14px rgb(var(--accent-rgb) / 0.32);
 }
 
 .profil-sauver:hover {
-  box-shadow: 0 6px 22px rgba(56, 189, 248, 0.5);
+  box-shadow: 0 6px 22px rgb(var(--accent-rgb) / 0.5);
   transform: translateY(-1px);
 }
 
@@ -2703,7 +2767,7 @@ html.console .auth-box::before {
 @keyframes profilFlashOk {
   0%,
   100% {
-    box-shadow: 0 3px 14px rgba(56, 189, 248, 0.32);
+    box-shadow: 0 3px 14px rgb(var(--accent-rgb) / 0.32);
   }
   40% {
     box-shadow:
@@ -2716,7 +2780,7 @@ html.console .auth-box::before {
 @keyframes profilFlashErr {
   0%,
   100% {
-    box-shadow: 0 3px 14px rgba(56, 189, 248, 0.32);
+    box-shadow: 0 3px 14px rgb(var(--accent-rgb) / 0.32);
   }
   40% {
     box-shadow:
@@ -2758,15 +2822,15 @@ html.console .auth-box::before {
 }
 
 [data-theme='clair'] .profil-champ:hover {
-  border-color: rgba(2, 132, 199, 0.35);
+  border-color: rgb(var(--accent-rgb) / 0.35);
 }
 
 [data-theme='clair'] .profil-champ:focus {
   background: #fff;
-  border-color: rgba(2, 132, 199, 0.65);
+  border-color: rgb(var(--accent-rgb) / 0.65);
   box-shadow:
-    0 0 0 3px rgba(2, 132, 199, 0.15),
-    0 0 16px rgba(2, 132, 199, 0.08);
+    0 0 0 3px rgb(var(--accent-rgb) / 0.15),
+    0 0 16px rgb(var(--accent-rgb) / 0.08);
 }
 
 [data-theme='clair'] .profil-fermer:hover {
@@ -2783,11 +2847,14 @@ html.console .auth-box::before {
     border-radius: 14px;
   }
   .profil-ligne {
-    grid-template-columns: 1fr;
+    /* Libelle au-dessus, puis valeur + croix cote a cote sur la meme
+       rangee : la croix reste atteignable au pouce. */
+    grid-template-columns: minmax(0, 1fr) 28px;
     gap: 4px;
   }
   .profil-label {
-    font-size: 12px;
+    grid-column: 1 / -1;
+    font-size: 0.75rem;
   }
   .profil-liste {
     max-height: min(50vh, 300px);
@@ -2800,6 +2867,366 @@ html.console .auth-box::before {
     text-align: center;
     /* 44px : cible tactile recommandee. */
     padding: 11px 12px;
+  }
+}
+
+/* =====================================================================
+   PROFIL : OUBLI D'UN CHAMP + APPRENTISSAGE AUTOMATIQUE
+   ---------------------------------------------------------------------
+   La croix de chaque ligne appelle DELETE /profil/:champ : elle est
+   discrete au repos (une valeur se retire rarement) et rouge au survol,
+   comme « Tout oublier ». La case d'apprentissage vit sous la liste :
+   c'est une preference de COMPTE, pas un souvenir, donc elle ne part
+   pas avec le profil.
+   ===================================================================== */
+.profil-oublier-champ {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--texte-faible);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.profil-oublier-champ:hover {
+  color: #fff;
+  background: var(--danger);
+  border-color: transparent;
+  transform: scale(1.06);
+}
+
+.profil-oublier-champ:active {
+  transform: scale(0.92);
+}
+
+.profil-oublier-champ:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* La case et son texte forment UNE cible cliquable (label). */
+.profil-apprentissage {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bordure);
+  cursor: pointer;
+}
+
+.profil-apprentissage input {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.profil-apprentissage input:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.profil-apprentissage-texte {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.profil-apprentissage-texte strong {
+  color: var(--texte);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.profil-apprentissage-texte small {
+  color: var(--texte-faible);
+  font-size: 0.7188rem;
+  line-height: 1.45;
+}
+
+[data-theme='clair'] .profil-apprentissage input:disabled {
+  opacity: 0.5;
+}
+
+/* =====================================================================
+   PANNEAU "APPARENCE" (#zoneApparence)
+   ---------------------------------------------------------------------
+   Meme boite que « Mon profil » (.zone-repliable + .profil-boite), pour
+   que les deux panneaux se ressemblent. Trois groupes : avatar, palette,
+   taille. Aucune couleur en dur ici : les palettes sont definies en haut
+   du fichier, les options ne font que montrer leurs pastilles.
+   ===================================================================== */
+.apparence-corps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 2px 0 2px;
+  max-height: min(58vh, 420px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--blanc) / 0.14) transparent;
+}
+
+.apparence-corps::-webkit-scrollbar {
+  width: 6px;
+}
+
+.apparence-corps::-webkit-scrollbar-thumb {
+  background: rgb(var(--blanc) / 0.12);
+  border-radius: 8px;
+}
+
+/* fieldset sans le cadre par defaut : le groupe se voit par son titre. */
+.apparence-groupe {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.apparence-groupe legend {
+  padding: 0;
+  margin-bottom: 7px;
+  color: var(--texte-doux);
+  font-size: 0.7813rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+/* --- Avatars de BLAMUNE : deux vignettes rondes --- */
+.avatar-choix {
+  display: grid;
+  /* Deux dessins seulement : des tuiles fixes plutot que deux moities
+     d'ecran. auto-fill laisse la place a un troisieme sans retoucher le
+     CSS le jour ou un nouveau SVG arrive. */
+  grid-template-columns: repeat(auto-fill, minmax(76px, 92px));
+  gap: 8px;
+}
+
+.avatar-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  min-height: 44px;
+  /* 44px : cible tactile minimale, meme a 360px de large. */
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--bordure);
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.avatar-option img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.avatar-option:hover {
+  background: var(--surface-2);
+  border-color: rgb(var(--accent-rgb) / 0.45);
+  transform: translateY(-1px);
+}
+
+.avatar-option:active {
+  transform: scale(0.95);
+}
+
+.avatar-option.actif,
+.avatar-option[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: rgb(var(--accent-rgb) / 0.12);
+  box-shadow:
+    0 0 0 2px rgb(var(--accent-rgb) / 0.35),
+    0 4px 14px rgb(var(--accent-rgb) / 0.18);
+}
+
+.avatar-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- Palettes : pastille + nom --- */
+.palette-choix {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.palette-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--bordure);
+  background: var(--surface);
+  color: var(--texte-doux);
+  font-family: inherit;
+  font-size: 0.7813rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.palette-option:hover {
+  color: var(--texte);
+  background: var(--surface-2);
+  border-color: var(--accent);
+}
+
+.palette-option.actif,
+.palette-option[aria-pressed='true'] {
+  color: var(--texte);
+  border-color: var(--accent);
+  background: rgb(var(--accent-rgb) / 0.12);
+  box-shadow: 0 0 0 2px rgb(var(--accent-rgb) / 0.28);
+}
+
+.palette-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.palette-pastille {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(var(--blanc) / 0.22);
+}
+
+/* Chaque option montre SA couleur, quel que soit le theme actif : c'est
+   un apercu, pas une surface de l'interface. */
+.palette-ciel .palette-pastille {
+  background: linear-gradient(135deg, #38bdf8, #22d3ee);
+}
+
+.palette-ambre .palette-pastille {
+  background: linear-gradient(135deg, #fbbf24, #fb923c);
+}
+
+.palette-rose .palette-pastille {
+  background: linear-gradient(135deg, #f472b6, #fb7185);
+}
+
+.palette-vert .palette-pastille {
+  background: linear-gradient(135deg, #34d399, #2dd4bf);
+}
+
+.palette-violet .palette-pastille {
+  background: linear-gradient(135deg, #a78bfa, #c084fc);
+}
+
+/* --- Taille du texte : trois segments --- */
+.taille-choix {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--bordure);
+  background: var(--surface);
+}
+
+.taille-option {
+  flex: 1 1 0;
+  min-height: 36px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--texte-doux);
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+/* Les boutons montrent la taille qu'ils annoncent. */
+.taille-option[data-taille='normal'] {
+  font-size: 0.7813rem;
+}
+
+.taille-option[data-taille='grand'] {
+  font-size: 0.875rem;
+}
+
+.taille-option[data-taille='tres-grand'] {
+  font-size: 0.9688rem;
+}
+
+.taille-option:hover {
+  color: var(--texte);
+  background: var(--surface-2);
+}
+
+.taille-option.actif,
+.taille-option[aria-pressed='true'] {
+  color: var(--sur-accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 3px 12px rgb(var(--accent-rgb) / 0.3);
+}
+
+.taille-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+[data-theme='clair'] .avatar-option {
+  background: #fff;
+}
+
+[data-theme='clair'] .palette-option,
+[data-theme='clair'] .taille-choix {
+  background: #fff;
+}
+
+/* --- 360px : les vignettes passent sur deux rangees, les pastilles
+     gardent deux colonnes lisibles. --- */
+@media (max-width: 420px) {
+  .palette-choix {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .palette-option {
+    justify-content: center;
+  }
+  .taille-choix {
+    flex-direction: column;
+  }
+  .apparence-corps {
+    max-height: min(62vh, 460px);
   }
 }
 

@@ -220,8 +220,25 @@ function requeteBrute(port, chemin, entetes) {
     });
   }
 
-  const enTete = (ego, uid) => ({ 'X-EGO': ego || '', 'X-UID': uid || '' });
-  const session = (corps) => {
+  // DELETE sans corps : l'oubli d'un champ de profil passe par la.
+  function supprimer(chemin, entetes) {
+    return new Promise((resolve) => {
+      const req = http.request(
+        { host: '127.0.0.1', port, path: chemin, method: 'DELETE', headers: entetes || {} },
+        (res) => {
+          let t = '';
+          res.on('data', (d) => (t += d));
+          res.on('end', () =>
+            resolve({ code: res.statusCode, type: res.headers['content-type'] || '', corps: t })
+          );
+        }
+      );
+      req.on('error', (e) => resolve({ code: 0, type: '', corps: String(e) }));
+      req.end();
+    });
+  }
+
+  const enTete = (ego, uid) => ({ 'X-EGO': ego || '', 'X-UID': uid || '' });  const session = (corps) => {
     try {
       const d = JSON.parse(corps);
       return { ego: d.ego, uid: d.uid };
@@ -280,6 +297,8 @@ function requeteBrute(port, chemin, entetes) {
       'profil : champ inconnu'
     ],
     ['/profil', 'GET', hUtilisateur, null, 'profil : lecture'],
+    ['/preferences', 'GET', hUtilisateur, null, 'preferences : lecture'],
+    ['/preferences', 'POST', hUtilisateur, { apprentissage: '1' }, 'preferences : ecriture'],
     ['/historique', 'GET', hUtilisateur, null, 'historique (session reelle)'],
     ['/stats-perso', 'GET', hUtilisateur, null, 'stats perso (session reelle)'],
     ['/tous-les-messages', 'GET', hUtilisateur, null, 'messages du demandeur'],
@@ -340,6 +359,102 @@ function requeteBrute(port, chemin, entetes) {
             r.corps.slice(0, 70).replace(/\s+/g, ' ')
         );
       }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // 2e partie bis : PERSONNALISATION.
+  //
+  // Deux contrats verifies ici, pas seulement l'existence des routes :
+  //  - DELETE /profil/:champ oublie UN champ et laisse les autres ;
+  //  - /preferences enregistre la coupure de l'apprentissage, refuse une
+  //    valeur invalide, et reste en lecture seule pour une invite.
+  // Ces tests passent AVANT la suppression de compte (3e partie) : le
+  // compte de test existe encore.
+  // ------------------------------------------------------------------
+  console.log('');
+  console.log('  -- personnalisation : oubli cible et preferences --');
+  let extraP = 0;
+  const verifP = (bon, libelle, detail) => {
+    extraP++;
+    if (bon) {
+      ok++;
+      console.log('  [OK ] ' + libelle.padEnd(36) + (detail || ''));
+    } else {
+      ko.push('personnalisation : ' + libelle);
+      console.log('  [KO ] ' + libelle.padEnd(36) + (detail || ''));
+    }
+  };
+  if (u.ego) {
+    await poster('/profil', { champ: 'nom', valeur: 'Alice' }, hUtilisateur);
+    // ville vaut « Lyon » a ce stade (ecrite par la 2e partie).
+    const rDel = await supprimer('/profil/ville', hUtilisateur);
+    verifP(rDel.code === 200, 'oubli de la ville (200)', '-> HTTP ' + rDel.code);
+    const rApres = await requete(port, '/profil', 'GET', hUtilisateur);
+    let profil = {};
+    try {
+      profil = JSON.parse(rApres.corps).profil || {};
+    } catch (e) {}
+    verifP(!profil.ville, 'la ville oubliee disparait du profil');
+    verifP(
+      profil.nom === 'Alice',
+      "le nom survit a l'oubli de la ville",
+      '-> nom = ' + String(profil.nom)
+    );
+
+    const rPrive = await supprimer('/profil/humeur', hUtilisateur);
+    verifP(rPrive.code === 400, 'champ prive refuse (400)', '-> HTTP ' + rPrive.code);
+    const rInconnu = await supprimer('/profil/inexistant', hUtilisateur);
+    verifP(rInconnu.code === 400, 'champ inconnu refuse (400)', '-> HTTP ' + rInconnu.code);
+
+    const rGet0 = await requete(port, '/preferences', 'GET', hUtilisateur);
+    let p0 = {};
+    try {
+      p0 = JSON.parse(rGet0.corps);
+    } catch (e) {}
+    verifP(
+      p0.apprentissage === true && p0.modifiable === true,
+      'preferences : defaut actif et modifiable'
+    );
+
+    const rOff = await poster('/preferences', { apprentissage: '0' }, hUtilisateur);
+    verifP(rOff.code === 200, 'preferences : coupure acceptee', '-> HTTP ' + rOff.code);
+    const rGet1 = await requete(port, '/preferences', 'GET', hUtilisateur);
+    let p1 = {};
+    try {
+      p1 = JSON.parse(rGet1.corps);
+    } catch (e) {}
+    verifP(p1.apprentissage === false, 'preferences : la coupure est persistee');
+
+    const rInvalide = await poster('/preferences', { apprentissage: 'peut-etre' }, hUtilisateur);
+    verifP(rInvalide.code === 400, 'preferences : valeur invalide refusee (400)');
+    // Remettre l'apprentissage actif : la suite du test ne doit pas
+    // dependre de l'ordre des sections.
+    await poster('/preferences', { apprentissage: '1' }, hUtilisateur);
+  } else {
+    verifP(false, 'compte de test disponible');
+  }
+
+  // Une invite n'a pas d'enregistrement dans comptes.json : la lecture dit
+  // « non modifiable », l'ecriture est refusee en 403 (jamais 500).
+  {
+    const rInv = await poster('/invite', {}, {});
+    let inv = {};
+    try {
+      inv = JSON.parse(rInv.corps);
+    } catch (e) {}
+    if (inv.uid && inv.jeton) {
+      const hInv = { 'X-UID': inv.uid, 'X-JETON': inv.jeton };
+      const rGetInv = await requete(port, '/preferences', 'GET', hInv);
+      let pInv = {};
+      try {
+        pInv = JSON.parse(rGetInv.corps);
+      } catch (e) {}
+      verifP(pInv.modifiable === false, 'invite : preferences en lecture seule');
+      const rPostInv = await poster('/preferences', { apprentissage: '0' }, hInv);
+      verifP(rPostInv.code === 403, 'invite : ecriture refusee (403)', '-> HTTP ' + rPostInv.code);
+    } else {
+      verifP(false, 'invitation creee pour le test');
     }
   }
 
@@ -475,7 +590,7 @@ function requeteBrute(port, chemin, entetes) {
   }
 
   console.log('');
-  const total = CAS.length + (u.ego ? AUTH.length : 1) + extra + extraC;
+  const total = CAS.length + (u.ego ? AUTH.length : 1) + extra + extraC + extraP;
   console.log(ok + '/' + total + ' controles reussis');
   if (ko.length) {
     console.log('PROBLEMES :');

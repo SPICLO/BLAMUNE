@@ -1,5 +1,67 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-16 (profil complet et apparence)
+
+### Ajout
+
+- **Profil complet** (`site/app.js`, `site/index.html`) : le panneau « Mon
+  profil » expose les **15 champs visibles** de la mémoire (`nom`, `age`,
+  `ville`, `travail`, `plat`, `hobby`, `sport`, `musique`, `serie`, `reve`,
+  `genre`, `aime`, `aimePas`, `motsFavoris`, `anniversaire`) au lieu de 6.
+  Les champs internes (`humeur`, `humeurUser`, `promesses`) restent hors
+  de l'écran.
+- **Oubli d'un seul souvenir** : `DELETE /profil/:champ`
+  (`lib/routes/consultation.js`, `lib/memoire.js#effacerMemoire`). Une croix
+  par ligne du profil retire ce champ sans toucher aux autres ; un champ
+  interne ou inconnu est refusé en 400.
+- **Apprentissage automatique par compte** : `GET/POST /preferences`
+  (`lib/routes/compte.js`), préférence `compte.apprentissage` dans
+  `comptes.json`. Coupée, elle arrête les captures regex et l'extraction
+  par modèle, mais les consignes **explicites** (« retiens que… »,
+  « rappelle-moi… ») gardent leur effet. Une invitation, qui n'a pas de
+  profil enregistré, lit la préférence mais ne peut pas la modifier (403).
+  Le panneau affiche alors « ce réglage demande un compte » ; si la route
+  échoue pour une autre raison (panne, quota), un repli neutre s'affiche à
+  la place — une panne ne prouve pas que le visiteur est une invitation.
+  Une réponse arrivée après un changement de compte (ou un passage en
+  invitation) est ignorée : le panneau relit l'identité courante au lieu de
+  mélanger deux profils.
+- **Apparence** (`site/app.js`, `site/style.css`, `site/index.html`) :
+  - avatar de BLAMUNE au choix — les deux dessins réellement distincts de
+    `site/` (`logo-repos.svg` immobile, `logo-anime.svg` animé) ; les autres
+    SVG du dossier sont des copies conformes et ne sont donc pas proposés ;
+  - **cinq palettes d'accent** (`ciel`, `ambre`, `rose`, `vert`, `violet`),
+    avec une variante plus sombre en mode clair ;
+  - **trois tailles de texte** (`normal`, `grand` 17,5 px, `très grand`
+    19 px).
+  Ces trois réglages vivent dans `localStorage` (`blamune_avatar`,
+  `blamune_palette`, `blamune_taille`), donc par appareil, et sont appliqués
+  **avant la première peinture**. Le clair/sombre reste un réglage séparé.
+- `--accent-rgb` : les halos, bordures et ombres d'accent suivent la palette
+  au lieu de rester bleu ciel. Les **65 tailles de texte en px** de
+  `style.css` passent en `rem`, sinon le réglage de taille n'aurait aucun
+  effet.
+- Cache du service worker en `blamune-v28`.
+
+### Tests
+
+- Test statique du profil complet : 15 champs, aucun champ interne, chaque
+  clé existe dans `CHAMPS_MEMOIRE`.
+- Test statique de l'oubli ciblé : croix cliente, route serveur, champs
+  privés filtrés, `effacerMemoire` exportée et câblée.
+- Test statique de l'apprentissage : routes, persistance, 403 invite,
+  consignes explicites, extraction conditionnée.
+- Test statique de l'apparence : clés `localStorage`, deux avatars, cinq
+  palettes, trois tailles, styles des nouveaux composants, aucune
+  `font-size` en px, clés traduites en fr/en/es/ar.
+- Intégration (`tests/routes_smoke.test.js`) : `GET/POST /preferences`
+  (défaut, coupure persistée, valeur invalide, invitation en lecture
+  seule), `DELETE /profil/:champ` (le champ part, les autres restent),
+  champ privé et champ inconnu refusés.
+- Vérification navigateur : bascule avatar/palette/taille, persistance
+  après rechargement, palette ambre en mode clair, oubli de la ville sans
+  perte du nom, case d'apprentissage conservée après rechargement.
+
 ## [Non publié] - 2026-11-15 (connexion automatique de l'application installée)
 
 ### Ajout

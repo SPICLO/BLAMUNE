@@ -64,7 +64,7 @@
     <!-- ECRAN D'AUTHENTIFICATION -->
     <div id="ecranAuth">
       <div class="auth-box">
-        <div class="auth-avatar"><img src="logo-repos.svg" alt="BLAMUNE" /></div>
+        <div class="auth-avatar"><img src="logo-repos.svg" alt="BLAMUNE" data-avatar-bot /></div>
         <h2 data-i18n="Bienvenue sur BLAMUNE">Bienvenue sur BLAMUNE</h2>
         <p
           class="auth-sous"
@@ -229,7 +229,7 @@
       <header id="tete">
         <div class="infos">
           <div class="avatar avatar-bot" aria-hidden="true">
-            <img src="logo-repos.svg" alt="" />
+            <img src="logo-repos.svg" alt="" data-avatar-bot />
           </div>
           <div class="titres">
             <h1>BLAMUNE</h1>
@@ -282,6 +282,16 @@
               type="button"
             >
               Mon profil
+            </button>
+            <button
+              id="btnApparence"
+              class="btn-petit"
+              title="Avatar, couleur et taille du texte"
+              data-i18n-title="Avatar, couleur et taille du texte"
+              data-i18n="Apparence"
+              type="button"
+            >
+              Apparence
             </button>
             <button
               id="btnRechercher"
@@ -427,6 +437,37 @@
           <div id="listeProfil" class="profil-liste">
             <p class="profil-note" data-i18n="Charger le profil...">Charger le profil...</p>
           </div>
+          <!-- Apprentissage automatique : preference de COMPTE (elle survit
+               a « Tout oublier » et suit le compte d un appareil a l autre).
+               Les consignes explicites (« retiens que… ») restent actives
+               meme quand la case est decochee. -->
+          <label class="profil-apprentissage">
+            <input type="checkbox" id="profilApprentissage" />
+            <span class="profil-apprentissage-texte">
+              <strong data-i18n="Apprendre automatiquement">Apprendre automatiquement</strong>
+              <small
+                data-i18n="BLAMUNE retient ce que tu racontes. Les consignes explicites marchent toujours."
+                >BLAMUNE retient ce que tu racontes. Les consignes explicites marchent
+                toujours.</small
+              >
+            </span>
+          </label>
+          <p
+            id="profilApprentissageNote"
+            class="profil-note cache"
+            data-i18n="Ce reglage demande un compte : une invitation n a pas de profil enregistre."
+          >
+            Ce reglage demande un compte : une invitation n a pas de profil enregistre.
+          </p>
+          <!-- Panne reseau ou quota atteint : le message ci-dessus serait faux
+               (le visiteur a peut-etre un compte), on affiche un repli neutre. -->
+          <p
+            id="profilApprentissageErreur"
+            class="profil-note cache"
+            data-i18n="Reglage indisponible pour le moment : reessaie dans un instant."
+          >
+            Reglage indisponible pour le moment : reessaie dans un instant.
+          </p>
           <div class="profil-pied">
             <button
               id="btnProfilSauver"
@@ -444,6 +485,150 @@
             >
               Tout oublier
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- APPARENCE : avatar de BLAMUNE, palette d'accent, taille du texte.
+           Trois choix par APPAREIL (localStorage), appliques avant la
+           premiere peinture par app.js. Le clair/sombre garde son bouton
+           dedie dans le menu : deux reglages, pas un melange. -->
+      <div
+        id="zoneApparence"
+        class="zone-repliable zone-profil zone-apparence"
+        role="dialog"
+        aria-modal="false"
+        aria-labelledby="titreApparence"
+      >
+        <div class="profil-boite">
+          <div class="profil-tete">
+            <div class="profil-titres">
+              <strong id="titreApparence" data-i18n="Apparence">Apparence</strong>
+            </div>
+            <button
+              id="btnFermerApparence"
+              class="profil-fermer"
+              type="button"
+              aria-label="Fermer"
+              data-i18n-title="Fermer"
+              title="Fermer"
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M6 6l12 12M18 6 6 18"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+          <div class="apparence-corps">
+            <fieldset class="apparence-groupe">
+              <legend data-i18n="Avatar de BLAMUNE">Avatar de BLAMUNE</legend>
+              <div class="avatar-choix">
+                <button
+                  type="button"
+                  class="avatar-option"
+                  data-avatar="repos"
+                  data-i18n-title="Avatar Repos"
+                  aria-pressed="false"
+                >
+                  <img src="logo-repos.svg" alt="" />
+                </button>
+                <button
+                  type="button"
+                  class="avatar-option"
+                  data-avatar="anime"
+                  data-i18n-title="Avatar Anime"
+                  aria-pressed="false"
+                >
+                  <img src="logo-anime.svg" alt="" />
+                </button>
+              </div>
+            </fieldset>
+            <fieldset class="apparence-groupe">
+              <legend data-i18n="Couleur d accent">Couleur d accent</legend>
+              <div class="palette-choix">
+                <button
+                  type="button"
+                  class="palette-option palette-ciel"
+                  data-palette="ciel"
+                  aria-pressed="false"
+                >
+                  <span class="palette-pastille" aria-hidden="true"></span>
+                  <span data-i18n="Ciel">Ciel</span>
+                </button>
+                <button
+                  type="button"
+                  class="palette-option palette-ambre"
+                  data-palette="ambre"
+                  aria-pressed="false"
+                >
+                  <span class="palette-pastille" aria-hidden="true"></span>
+                  <span data-i18n="Ambre">Ambre</span>
+                </button>
+                <button
+                  type="button"
+                  class="palette-option palette-rose"
+                  data-palette="rose"
+                  aria-pressed="false"
+                >
+                  <span class="palette-pastille" aria-hidden="true"></span>
+                  <span data-i18n="Rose">Rose</span>
+                </button>
+                <button
+                  type="button"
+                  class="palette-option palette-vert"
+                  data-palette="vert"
+                  aria-pressed="false"
+                >
+                  <span class="palette-pastille" aria-hidden="true"></span>
+                  <span data-i18n="Vert">Vert</span>
+                </button>
+                <button
+                  type="button"
+                  class="palette-option palette-violet"
+                  data-palette="violet"
+                  aria-pressed="false"
+                >
+                  <span class="palette-pastille" aria-hidden="true"></span>
+                  <span data-i18n="Violet">Violet</span>
+                </button>
+              </div>
+            </fieldset>
+            <fieldset class="apparence-groupe">
+              <legend data-i18n="Taille du texte">Taille du texte</legend>
+              <div class="taille-choix">
+                <button
+                  type="button"
+                  class="taille-option"
+                  data-taille="normal"
+                  aria-pressed="false"
+                  data-i18n="Normal"
+                >
+                  Normal
+                </button>
+                <button
+                  type="button"
+                  class="taille-option"
+                  data-taille="grand"
+                  aria-pressed="false"
+                  data-i18n="Grand"
+                >
+                  Grand
+                </button>
+                <button
+                  type="button"
+                  class="taille-option"
+                  data-taille="tres-grand"
+                  aria-pressed="false"
+                  data-i18n="Tres grand"
+                >
+                  Tres grand
+                </button>
+              </div>
+            </fieldset>
           </div>
         </div>
       </div>
