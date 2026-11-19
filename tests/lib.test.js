@@ -13,7 +13,14 @@ const path = require('node:path');
 const { checkRateLimit, checkUserRateLimit, purger } = require('../lib/rate_limit');
 const { creerMemoire, indiceMemoire } = require('../lib/memoire');
 const { creerHistorique } = require('../lib/historique');
-const { creerResume } = require('../lib/resume');
+const {
+  creerResume,
+  bornerResume,
+  RESUME_SEUIL,
+  RESUME_SEUIL_CAR,
+  RESUME_BLOC,
+  RESUME_MAX_CAR
+} = require('../lib/resume');
 const { creerConfigIA } = require('../lib/config_ia');
 const { demarrerKeepalive } = require('../lib/keepalive');
 const { creerCompression } = require('../lib/compression');
@@ -539,7 +546,7 @@ test('config IA : lit bien l env, et la restauration rend la main', (t) => {
 });
 // ============================== RESUME ==============================
 
-function resumeDeTest(t, questionModele) {
+function resumeDeTest(t, questionModele, options) {
   const { dossierUser } = creerMemoire({ usersDir: dossierTmp(t), storage: storageFaux });
   const { cheminHistorique, sauvegarderHistorique } = creerHistorique({
     dossierUser,
@@ -550,7 +557,8 @@ function resumeDeTest(t, questionModele) {
     cheminHistorique,
     questionModele: questionModele || (async () => 'resume test'),
     nettoyerReponse: (t2) => t2,
-    loggerErreur: () => {}
+    loggerErreur: () => {},
+    ...(options || {})
   });
   return { resume, sauvegarderHistorique };
 }
@@ -597,16 +605,143 @@ test('resume : au seuil, le bloc est replie et couvert', async (t) => {
   const r = resume.lireResume('u_abc123', '2');
   assert.strictEqual(r.couverts, 10, 'les 10 premiers echanges doivent etre couverts');
   assert.ok(r.texte.length > 0, 'le resume doit etre enregistre');
+  assert.strictEqual(RESUME_SEUIL, 10, 'contrat avec tests/run.js (couverts >= 10)');
 });
 
 test('resume : le resume est incremental, jamais repare depuis le debut', async (t) => {
   const { resume, sauvegarderHistorique } = resumeDeTest(t);
-  const h = Array.from({ length: 20 }, (_, i) => ({ qui: 'moi', texte: 'msg' + i }));
+  const h = Array.from({ length: 30 }, (_, i) => ({ qui: 'moi', texte: 'msg' + i }));
   sauvegarderHistorique('u_abc123', '2', h);
   await resume.majResume('u_abc123', '2');
-  assert.strictEqual(resume.lireResume('u_abc123', '2').couverts, 10);
+  assert.strictEqual(
+    resume.lireResume('u_abc123', '2').couverts,
+    RESUME_BLOC,
+    'le premier repli couvre un bloc plein'
+  );
   await resume.majResume('u_abc123', '2');
-  assert.strictEqual(resume.lireResume('u_abc123', '2').couverts, 20);
+  assert.strictEqual(resume.lireResume('u_abc123', '2').couverts, 30);
+});
+
+test('resume : un repli ne couvre jamais plus de RESUME_BLOC echanges', async (t) => {
+  // Le repli est paye une fois : on couvre large, mais on ne replie pas
+  // tout l'historique d'un coup (relire 200 messages couterait le prix
+  // d'une conversation entiere).
+  const { resume, sauvegarderHistorique } = resumeDeTest(t);
+  const h = Array.from({ length: 50 }, (_, i) => ({ qui: 'moi', texte: 'msg' + i }));
+  sauvegarderHistorique('u_abc123', '2', h);
+  await resume.majResume('u_abc123', '2');
+  assert.strictEqual(resume.lireResume('u_abc123', '2').couverts, RESUME_BLOC);
+  assert.strictEqual(RESUME_BLOC, 20, 'un bloc plus large ne doit pas passer inapercu');
+});
+
+test('resume : le volume en caracteres declenche le repli avant le seuil d echanges', async (t) => {
+  // Quatre messages tres longs sortent de la fenetre avant d'atteindre
+  // RESUME_SEUIL echanges : sans ce declencheur, le debut etait perdu.
+  let appels = 0;
+  const { resume, sauvegarderHistorique } = resumeDeTest(t, async () => {
+    appels++;
+    return 'resume';
+  });
+  const long = 'x'.repeat(Math.ceil(RESUME_SEUIL_CAR / 4) + 100);
+  sauvegarderHistorique(
+    'u_abc123',
+    '2',
+    Array.from({ length: 4 }, () => ({ qui: 'moi', texte: long }))
+  );
+  await resume.majResume('u_abc123', '2');
+  assert.strictEqual(appels, 1, 'le volume aurait du declencher le repli');
+  assert.strictEqual(resume.lireResume('u_abc123', '2').couverts, 4);
+});
+
+test('resume : un petit historique court ne declenche rien', async (t) => {
+  let appels = 0;
+  const { resume, sauvegarderHistorique } = resumeDeTest(t, async () => {
+    appels++;
+    return 'resume';
+  });
+  sauvegarderHistorique(
+    'u_abc123',
+    '2',
+    Array.from({ length: 4 }, () => ({ qui: 'moi', texte: 'x'.repeat(50) }))
+  );
+  await resume.majResume('u_abc123', '2');
+  assert.strictEqual(appels, 0);
+});
+
+test('resume : le prompt est structure et demande une reecriture complete', async (t) => {
+  const consignes = [];
+  const { resume, sauvegarderHistorique } = resumeDeTest(t, async (c) => {
+    consignes.push(c);
+    return 'QUI : inconnu\nFIL : du foot\nPROMIS : rien\nTON : taquin';
+  });
+  sauvegarderHistorique(
+    'u_abc123',
+    '2',
+    Array.from({ length: 10 }, (_, i) => ({ qui: 'moi', texte: 'msg' + i }))
+  );
+  await resume.majResume('u_abc123', '2');
+  const c = consignes[0];
+  // Le marqueur doit rester en tete : tests/run.js reconnait le pliage la.
+  assert.ok(c.startsWith('RESUME-CONVERSATION'), 'marqueur RESUME-CONVERSATION en tete');
+  for (const libelle of ['QUI :', 'FIL :', 'PROMIS :', 'TON :']) {
+    assert.ok(c.indexOf(libelle) >= 0, 'libelle attendu : ' + libelle);
+  }
+  assert.match(c, /Reecris le resume COMPLET/);
+  assert.match(c, /140 mots maximum/);
+  assert.match(c, /une vraie reecriture, jamais un ajout a la suite/);
+  // Aucun ancien resume : pas de bloc "deja etabli".
+  assert.ok(c.indexOf('Resume deja etabli') < 0);
+});
+
+test('resume : le repli suivant repart du resume et demande de le reecrire', async (t) => {
+  const consignes = [];
+  const { resume, sauvegarderHistorique } = resumeDeTest(t, async (c) => {
+    consignes.push(c);
+    return 'QUI : Maeva\nFIL : a parle de foot\nPROMIS : rien\nTON : taquin';
+  });
+  sauvegarderHistorique(
+    'u_abc123',
+    '2',
+    Array.from({ length: 30 }, (_, i) => ({ qui: 'moi', texte: 'msg' + i }))
+  );
+  await resume.majResume('u_abc123', '2');
+  await resume.majResume('u_abc123', '2');
+  assert.strictEqual(consignes.length, 2);
+  assert.match(consignes[1], /Resume deja etabli/);
+  assert.match(consignes[1], /a reecrire, pas a recopier tel quel/);
+  assert.ok(consignes[1].indexOf('Maeva') >= 0, "l'ancien resume est fourni en contexte");
+});
+
+test('resume : ce qui est stocke ne depasse jamais RESUME_MAX_CAR', async (t) => {
+  // Un modele bavard ne doit pas pouvoir regonfler le bloc injecte a
+  // chaque message : le plafond est applique a l'ecriture.
+  const { resume, sauvegarderHistorique } = resumeDeTest(t, async () => 'mot '.repeat(1200));
+  sauvegarderHistorique(
+    'u_abc123',
+    '2',
+    Array.from({ length: 10 }, (_, i) => ({ qui: 'moi', texte: 'msg' + i }))
+  );
+  await resume.majResume('u_abc123', '2');
+  const r = resume.lireResume('u_abc123', '2');
+  assert.ok(r.texte.length <= RESUME_MAX_CAR, 'longueur stockee : ' + r.texte.length);
+  assert.ok(r.texte.endsWith(' [...]'), 'la troncature doit se voir');
+  assert.strictEqual(RESUME_MAX_CAR, 1100);
+});
+
+test('bornerResume : coupe sur un mot et ne depasse jamais le plafond', () => {
+  assert.strictEqual(bornerResume('court', 20), 'court');
+  const b = bornerResume('mot '.repeat(50), 40);
+  assert.ok(b.length <= 40, 'longueur : ' + b.length);
+  assert.ok(b.endsWith(' [...]'));
+  assert.ok(
+    b
+      .slice(0, b.length - ' [...]'.length)
+      .trimEnd()
+      .endsWith('mot'),
+    'la coupe tombe au milieu d un mot'
+  );
+  // Plafond absurde : on ne boucle pas, on coupe net.
+  assert.ok(bornerResume('mot '.repeat(50), 3).length <= 3);
 });
 
 test('resume : un historique raccourci invalide le resume', async (t) => {
@@ -773,7 +908,13 @@ function transportFaux(plan) {
   return requeterFaux;
 }
 
-function openaiDeTest({ modeles = null, pool = null, plan = null } = {}) {
+function openaiDeTest({
+  modeles = null,
+  pool = null,
+  plan = null,
+  fenetrerHisto = null,
+  apiMaxTokens = 100
+} = {}) {
   const traces = {
     modeleOk: [],
     quota: [],
@@ -789,7 +930,7 @@ function openaiDeTest({ modeles = null, pool = null, plan = null } = {}) {
   const config = {
     api_url: 'https://api-exemple/v1',
     api_key: 'KLE',
-    api_max_tokens: 100,
+    api_max_tokens: apiMaxTokens,
     api_temperature: 1
   };
   const m = creerOpenai({
@@ -805,6 +946,9 @@ function openaiDeTest({ modeles = null, pool = null, plan = null } = {}) {
       plan || (() => ({ statut: 200, corps: '{"choices":[{"message":{"content":"ok"}}]}' }))
     ),
     limiterHisto: (h) => h,
+    // Fenetre par budget de tokens : les tests de repli doivent voir le
+    // payload reellement raccourci (sinon limiterHisto identite masque tout).
+    fenetrerHisto: fenetrerHisto,
     HISTO_API_MAX: 16,
     marquerQuota: (e) => traces.quota.push(e),
     resoudreAlertes: () => traces.resolution++,
@@ -856,6 +1000,55 @@ test('openAIRequete : un STRING de modele prend l URL et la cle de config, et le
   assert.strictEqual(envoye.max_tokens, 100);
   assert.strictEqual(envoye.temperature, 1);
   assert.strictEqual(envoye.stream, false);
+});
+
+test('openAIRequete : max_tokens suit la demande, borne par API_MAX_TOKENS', async () => {
+  const { SORTIE_CHAT_TOKENS } = require('../lib/tokens');
+  const m = openaiDeTest({
+    apiMaxTokens: 1024,
+    plan: (url, options, corps) => {
+      m._traces.corps = corps;
+      return { statut: 200, corps: JSON.stringify({ choices: [{ message: { content: 'ok' } }] }) };
+    }
+  });
+  await m.openAIRequete('mod-1', [{ role: 'user', content: 'salut' }], null);
+  assert.strictEqual(JSON.parse(m._traces.corps).max_tokens, SORTIE_CHAT_TOKENS);
+  await m.openAIRequete('mod-1', [{ role: 'user', content: 'ecris-moi un poeme' }], null);
+  assert.strictEqual(JSON.parse(m._traces.corps).max_tokens, 1024);
+});
+
+test('openAIRequete : les tokens servis par le cache remontent dans l usage', async () => {
+  const vus = [];
+  const m = openaiDeTest({
+    plan: () => ({
+      statut: 200,
+      corps: JSON.stringify({
+        choices: [{ message: { content: 'ok' } }],
+        usage: {
+          prompt_tokens: 900,
+          completion_tokens: 40,
+          prompt_tokens_details: { cached_tokens: 600 }
+        }
+      })
+    })
+  });
+  await m.openAIRequete('mod-1', [{ role: 'user', content: 'salut' }], null, (u) => vus.push(u));
+  assert.strictEqual(vus.length, 1);
+  assert.strictEqual(vus[0].cache, 600);
+  assert.strictEqual(vus[0].entree, 900);
+
+  const sans = [];
+  const m2 = openaiDeTest({
+    plan: () => ({
+      statut: 200,
+      corps: JSON.stringify({
+        choices: [{ message: { content: 'ok' } }],
+        usage: { prompt_tokens: 900, completion_tokens: 40 }
+      })
+    })
+  });
+  await m2.openAIRequete('mod-1', [{ role: 'user', content: 'salut' }], null, (u) => sans.push(u));
+  assert.strictEqual('cache' in sans[0], false, 'fournisseur muet : pas de cle cache');
 });
 
 test('openAIRequete : en flux, les deltas cumulent dans onDelta, texte complet rendu', async (t) => {
@@ -1003,6 +1196,98 @@ test('appelerOpenAI : un membre SEUL arme la pile meme sans principal (aSecours)
   assert.strictEqual(rep, 'le membre seul repond');
   // La cascade historique (ordreModeles -> modeles 'a','b') ne doit pas tourner
   assert.deepStrictEqual(m._traces.alertes, []);
+});
+
+// ==================== REPLI SANS REPAYER (P3) ====================
+
+// Un refus "quota de tokens" ne doit pas rejouer le MEME payload : sans
+// reduction, le prompt de 5 000 tokens repartait sur chaque modele puis sur
+// chaque membre du pool, et un seul message etait facture 3 a 6 fois.
+function histoDense() {
+  const h = [
+    {
+      role: 'system',
+      content:
+        'PERSONA '.repeat(60) +
+        '\n\nRECHERCHE WEB (effectuee le 17/11/2026)\n' +
+        'source '.repeat(400)
+    }
+  ];
+  for (let i = 0; i < 10; i++)
+    h.push({ role: i % 2 === 0 ? 'user' : 'assistant', content: 'x'.repeat(1200) });
+  return h;
+}
+
+test('appelerOpenAI : 429 tokens/minute -> fenetre reduite et web retire avant de reessayer', async () => {
+  const { choisirFenetre } = require('../lib/tokens');
+  const corps = [];
+  const suivi = { reductions: 0 };
+  const m = openaiDeTest({
+    modeles: ['a'],
+    fenetrerHisto: (h, b) => choisirFenetre(h, b),
+    plan: (url, options, envoye) => {
+      corps.push(String(envoye));
+      if (corps.length === 1)
+        return {
+          statut: 429,
+          corps: '{"error":{"message":"Rate limit reached on tokens per minute (TPM)"}}'
+        };
+      return { statut: 200, corps: JSON.stringify({ choices: [{ message: { content: 'ok' } }] }) };
+    }
+  });
+  const rep = await m.appelerOpenAI('hi', histoDense(), null, null, null, { suivi });
+  assert.strictEqual(rep, 'ok');
+  assert.strictEqual(
+    corps.length,
+    2,
+    'une seule nouvelle tentative, pas une cascade a l identique'
+  );
+  assert.ok(
+    JSON.parse(corps[1]).messages.length <= JSON.parse(corps[0]).messages.length,
+    'la seconde requete ne doit pas etre plus grosse'
+  );
+  assert.ok(corps[1].length < corps[0].length, 'payload reellement plus petit');
+  assert.ok(corps[1].indexOf('RECHERCHE WEB') < 0, 'le bloc web est retire en premier');
+  assert.strictEqual(suivi.reductions, 1, 'le :diag doit pouvoir le dire');
+});
+
+test('appelerOpenAI : reductions bornees a deux, jamais deux fois le meme payload', async () => {
+  const { choisirFenetre } = require('../lib/tokens');
+  const tailles = [];
+  const suivi = { reductions: 0 };
+  const m = openaiDeTest({
+    modeles: ['a', 'b', 'c'],
+    fenetrerHisto: (h, b) => choisirFenetre(h, b),
+    plan: (url, options, envoye) => {
+      tailles.push(String(envoye).length);
+      return { statut: 429, corps: '{"error":{"message":"tokens per minute (TPM)"}}' };
+    }
+  });
+  await assert.rejects(
+    () => m.appelerOpenAI('hi', histoDense(), null, null, null, { suivi }),
+    /429/
+  );
+  assert.ok(tailles.length <= 6, 'au plus deux tentatives par modele : ' + tailles.length);
+  assert.strictEqual(suivi.reductions, 2, 'deux reductions au maximum par message');
+  assert.ok(tailles[1] < tailles[0], 'le payload refuse n est pas rejoue tel quel');
+  for (let i = 1; i < tailles.length; i++)
+    assert.ok(tailles[i] <= tailles[i - 1], 'la fenetre ne regrossit jamais');
+});
+
+test('appelerOpenAI : 429 generique sur une petite requete -> aucun contexte sacrifie', async () => {
+  const { choisirFenetre } = require('../lib/tokens');
+  const suivi = { reductions: 0 };
+  const m = openaiDeTest({
+    modeles: ['a'],
+    fenetrerHisto: (h, b) => choisirFenetre(h, b),
+    plan: () => ({ statut: 429, corps: '{"error":{"message":"Resource has been exhausted"}}' })
+  });
+  await assert.rejects(
+    () =>
+      m.appelerOpenAI('hi', [{ role: 'user', content: 'bonjour' }], null, null, null, { suivi }),
+    /429/
+  );
+  assert.strictEqual(suivi.reductions, 0, 'requete/minute sur un prompt court : rien a couper');
 });
 
 // ============================ COMPRESSION ============================

@@ -36,12 +36,13 @@ const { creerMemoire, indiceMemoire } = require('./lib/memoire');
 const { creerConfigIA } = require('./lib/config_ia');
 const { creerRoutesCompte } = require('./lib/routes/compte');
 const { creerRoutesAdmin } = require('./lib/routes/admin');
+const { creerSuppressionCompte } = require('./lib/suppression_compte');
 const { creerRouteAvis } = require('./lib/routes/avis');
 const { creerRoutesConsultation } = require('./lib/routes/consultation');
 const { creerRoutesStatique } = require('./lib/routes/statique');
 const { creerRouteSend } = require('./lib/routes/send');
 
-const { creerGemini, estQuota } = require('./lib/ia/gemini');
+const { creerGemini, estQuota, estQuotaTokens } = require('./lib/ia/gemini');
 const { creerPoolIA } = require('./lib/pool_ia');
 const securite = require('./lib/securite');
 const { demarrerKeepalive } = require('./lib/keepalive');
@@ -55,6 +56,21 @@ const { creerServiceBot } = require('./lib/service_bot');
 const { creerSavoir } = require('./lib/savoir');
 const { creerPurgeInvites } = require('./lib/purge_invites');
 const { creerResume } = require('./lib/resume');
+// Budget de contexte (estimation tokens) + compteur de consommation reelle :
+// mesures et fenetre adaptative pour les conversations longues.
+const { creerCompteurTokens } = require('./lib/compteur_tokens');
+const {
+  estimerMessages,
+  estimerTexte,
+  budgetCourant,
+  budgetReduit,
+  retirerBlocWeb,
+  BUDGET_ENTREE_MIN,
+  BUDGET_ENTREE_ECO_TOKENS
+} = require('./lib/tokens');
+// Persona BLAMUNE : bloc stable du prompt systeme, avec un budget de
+// caracteres verifie par les tests (voir lib/persona.js).
+const { getPromptBLAMUNE } = require('./lib/persona');
 // Comparaison de secrets (jeton, ego) en temps constant : voir lib/timing.js.
 const { egaleTimingSafe } = require('./lib/timing');
 // Sessions persistantes des comptes (jeton long, stocke hache) : voir
@@ -315,8 +331,14 @@ const ORIGINES_CORS = (process.env.CORS_ORIGINS || '')
   .split(/\s+/)
   .map((s) => s.trim())
   .filter(Boolean);
+// Coquilles natives Capacitor : Android sert le site embarque depuis
+// https://localhost (deja couvert par la regle locale ci-dessous), iOS
+// depuis capacitor://localhost. Ces origines sont fixes par le systeme et
+// ne peuvent pas etre usurpees par un site distant.
+const ORIGINES_NATIVES = ['https://localhost', 'capacitor://localhost'];
 function origineAutorisee(origin) {
   if (ORIGINES_CORS.includes(origin)) return true;
+  if (ORIGINES_NATIVES.includes(origin)) return true;
   // Local uniquement, port borne : jamais un domaine distant.
   return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
@@ -1016,6 +1038,7 @@ const {
   HISTO_API_MAX,
   HISTO_AFFICHAGE_MAX,
   limiterHisto,
+  fenetrerHisto,
   nbEchanges,
   construireContenus,
   noterErreurGemini,
@@ -1023,6 +1046,7 @@ const {
   outillageUtile,
   corpsGemini,
   refusChamp,
+  normaliserUsage,
   texteDepuisReponse,
   urlGemini,
   requeter,
@@ -1056,6 +1080,7 @@ iaOpenai = require('./lib/ia/openai').creerOpenai({
   getPool: () => pool,
   requeter,
   limiterHisto,
+  fenetrerHisto,
   HISTO_API_MAX,
   nbEchanges,
   marquerQuota,
@@ -1066,6 +1091,10 @@ iaOpenai = require('./lib/ia/openai').creerOpenai({
   alerter,
   loggerErreur
 });
+// Compteur de tokens (fenetre glissante 60 s + totaux du jour) : instrument
+// de bord en RAM. Alimente par les transporteurs (usage reel quand le
+// fournisseur le donne, estimation locale sinon), lu par /stats et /health.
+const compteurTokens = creerCompteurTokens();
 // ============ SERVICE BOT C++ (LOCAL / CLOUD) ============
 // La mise en relation avec le conteneur du bot (BOT_SERVICE_URL) vit dans
 // lib/service_bot.js, avec son cache LRU des reponses toutes faites.
@@ -1149,15 +1178,19 @@ function delaiAvantNouvellePasse(erreur) {
 // `avecOutils` : la recherche web n'est demandee QUE par les messages de
 // Une console de jeu doit pouvoir etre connectee sans clavier externe.
 // facturer une recherche web a chaque tache de fond.
-async function modeleClassique(modele, contents, budget, patient, avecOutils) {
+async function modeleClassique(modele, contents, budget, patient, avecOutils, surUsage) {
   const sansReflexion = !reflexionDejaRefusee();
   const b = budget || { n: 1 };
   try {
-    return await modeleClassiqueBrut(modele, contents, sansReflexion, avecOutils);
+    return await modeleClassiqueBrut(modele, contents, sansReflexion, avecOutils, surUsage);
   } catch (e) {
     // Champ refuse par le modele : on le retire et on n'essaie plus jamais.
-    if (e && e.recherche) return modeleClassiqueBrut(modele, contents, sansReflexion, avecOutils);
-    if (e && e.reflexion) return modeleClassiqueBrut(modele, contents, false, avecOutils);
+    if (e && e.systeme)
+      return modeleClassiqueBrut(modele, contents, sansReflexion, avecOutils, surUsage);
+    if (e && e.recherche)
+      return modeleClassiqueBrut(modele, contents, sansReflexion, avecOutils, surUsage);
+    if (e && e.reflexion)
+      return modeleClassiqueBrut(modele, contents, false, avecOutils, surUsage);
     const delai = delaiIndique(e);
     // Tout 429 remet les taches de fond en veille, meme sans "retry in"
     // ("Resource has been exhausted" n'en indique pas).
@@ -1166,6 +1199,10 @@ async function modeleClassique(modele, contents, budget, patient, avecOutils) {
       noterErreurGemini(e);
     }
     if (erreurRetentable(e)) {
+      // Quota de TOKENS : rejouer le meme payload est precisement ce qui
+      // multiplie la facture. On rend la main : l'appelant reduit la
+      // fenetre avant de reessayer.
+      if (estQuotaTokens(e)) throw e;
       if (!patient && delai > 3000) throw e; // quota long : autre modele
       if (tentable(b)) {
         loggerErreur(
@@ -1178,26 +1215,49 @@ async function modeleClassique(modele, contents, budget, patient, avecOutils) {
             ' (nouvelle tentative)'
         );
         await attendre(Math.min(delai || 600, patient ? 60000 : 3000));
-        return modeleClassiqueBrut(modele, contents, sansReflexion, avecOutils);
+        return modeleClassiqueBrut(modele, contents, sansReflexion, avecOutils, surUsage);
       }
     }
     throw e;
   }
 }
 
-function modeleClassiqueBrut(modele, contents, sansReflexion, avecOutilsDemandes) {
+function modeleClassiqueBrut(modele, contents, sansReflexion, avecOutilsDemandes, surUsage) {
   const url = urlGemini(modele, false);
   const avecOutils = !!avecOutilsDemandes && outillageUtile(contents);
   const body = corpsGemini(contents, sansReflexion, avecOutils);
+  // Repli de mesure : sans usageMetadata, on estime (entree = ce qu'on
+  // envoie, sortie = ce qui revient). `/stats` distingue les deux.
+  const entreeEstimee = estimerMessages(contents);
   return new Promise((resolve, reject) => {
     const req = requeter(url, optionsGemini(), (res) => {
       let data = '';
       res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
-        const refuse = refusChamp(res.statusCode, sansReflexion, avecOutils);
+        const refuse = refusChamp(res.statusCode, sansReflexion, avecOutils, data);
         if (refuse) return reject(refuse);
+        let vuUsage = false;
+        const noter = (u) => {
+          if (!u) return;
+          vuUsage = true;
+          if (typeof surUsage === 'function') {
+            try {
+              surUsage(u);
+            } catch (e) {}
+          }
+        };
         try {
-          resolve(texteDepuisReponse(data));
+          const texte = texteDepuisReponse(data, noter);
+          if (!vuUsage && typeof surUsage === 'function') {
+            try {
+              surUsage({
+                entree: entreeEstimee,
+                sortie: estimerTexte(texte),
+                estime: true
+              });
+            } catch (e) {}
+          }
+          resolve(texte);
         } catch (e) {
           if (res.statusCode !== 200) e.statusCode = res.statusCode;
           // En-tete Retry-After (partage avec modeleEnFluxBrut et openAI) :
@@ -1218,7 +1278,7 @@ function modeleClassiqueBrut(modele, contents, sansReflexion, avecOutilsDemandes
 }
 
 // --- Reponse en flux (SSE) : on appelle onDelta(texteEntiere) au fil de l'eau ---
-async function modeleEnFlux(modele, contents, onDelta, budget, avecOutils) {
+async function modeleEnFlux(modele, contents, onDelta, budget, avecOutils, surUsage) {
   const sansReflexion = !reflexionDejaRefusee();
   const b = budget || { n: 1 };
   // On ne retente le flux que si RIEN n'a encore ete affiche au client :
@@ -1229,11 +1289,14 @@ async function modeleEnFlux(modele, contents, onDelta, budget, avecOutils) {
     onDelta(t);
   };
   try {
-    return await modeleEnFluxBrut(modele, contents, surDelta, sansReflexion, avecOutils);
+    return await modeleEnFluxBrut(modele, contents, surDelta, sansReflexion, avecOutils, surUsage);
   } catch (e) {
+    if (e && e.systeme)
+      return modeleEnFluxBrut(modele, contents, surDelta, sansReflexion, avecOutils, surUsage);
     if (e && e.recherche)
-      return modeleEnFluxBrut(modele, contents, surDelta, sansReflexion, avecOutils);
-    if (e && e.reflexion) return modeleEnFluxBrut(modele, contents, surDelta, false, avecOutils);
+      return modeleEnFluxBrut(modele, contents, surDelta, sansReflexion, avecOutils, surUsage);
+    if (e && e.reflexion)
+      return modeleEnFluxBrut(modele, contents, surDelta, false, avecOutils, surUsage);
     const delai = delaiIndique(e);
     // Tout 429 remet les taches de fond en veille, meme sans "retry in"
     // ("Resource has been exhausted" n'en indique pas).
@@ -1242,6 +1305,9 @@ async function modeleEnFlux(modele, contents, onDelta, budget, avecOutils) {
       noterErreurGemini(e);
     }
     if (!envoyaDuTexte && erreurRetentable(e)) {
+      // Meme regle qu'en mode classique : un quota de tokens ne se rejoue
+      // pas a l'identique.
+      if (estQuotaTokens(e)) throw e;
       if (delai > 3000) throw e; // quota long : la cascade change de modele
       if (tentable(b)) {
         loggerErreur(
@@ -1254,19 +1320,32 @@ async function modeleEnFlux(modele, contents, onDelta, budget, avecOutils) {
             ' (nouvelle tentative)'
         );
         await attendre(Math.min(delai || 600, 3000));
-        return modeleEnFluxBrut(modele, contents, surDelta, sansReflexion, avecOutils);
+        return modeleEnFluxBrut(modele, contents, surDelta, sansReflexion, avecOutils, surUsage);
       }
     }
     throw e;
   }
 }
 
-function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion, avecOutilsDemandes) {
+function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion, avecOutilsDemandes, surUsage) {
   const url = urlGemini(modele, true);
   const avecOutils = !!avecOutilsDemandes && outillageUtile(contents);
   const body = corpsGemini(contents, sansReflexion, avecOutils);
+  const entreeEstimee = estimerMessages(contents);
   return new Promise((resolve, reject) => {
     let fini = false;
+    // Gemini renvoie `usageMetadata` dans chaque morceau SSE : le dernier
+    // recu porte les compteurs definitifs (le premier peut etre partiel).
+    let vuUsage = false;
+    const noter = (u) => {
+      if (!u) return;
+      vuUsage = true;
+      if (typeof surUsage === 'function') {
+        try {
+          surUsage(u);
+        } catch (e) {}
+      }
+    };
     const echouer = (err) => {
       if (!fini) {
         fini = true;
@@ -1278,7 +1357,7 @@ function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion, avecOutilsDe
         let data = '';
         res.on('data', (c) => (data += c));
         res.on('end', () => {
-          const refuse = refusChamp(res.statusCode, sansReflexion, avecOutils);
+          const refuse = refusChamp(res.statusCode, sansReflexion, avecOutils, data);
           const err = refuse || new Error('HTTP ' + res.statusCode + ' ' + data.substring(0, 200));
           if (!refuse) err.statusCode = res.statusCode;
           // En-tete Retry-After : meme voie que modeleClassiqueBrut (non-flux),
@@ -1308,6 +1387,7 @@ function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion, avecOutilsDe
             continue;
           }
           if (json.error) return echouer(new Error(json.error.message));
+          if (json.usageMetadata) noter(normaliserUsage(json.usageMetadata));
           const parties =
             json.candidates &&
             json.candidates[0] &&
@@ -1329,6 +1409,15 @@ function modeleEnFluxBrut(modele, contents, onDelta, sansReflexion, avecOutilsDe
       res.on('end', () => {
         if (!fini) {
           fini = true;
+          if (!vuUsage && typeof surUsage === 'function') {
+            try {
+              surUsage({
+                entree: entreeEstimee,
+                sortie: estimerTexte(texte),
+                estime: true
+              });
+            } catch (e) {}
+          }
           resolve(texte);
         }
       });
@@ -1438,10 +1527,21 @@ async function sonderGemini() {
 // Deux passes possibles : si TOUTES les tentatives de la premiere etaient des
 // quotas, on attend le rechargement de la fenetre gratuite puis on reessaie
 // une fois plutot que de rendre la main sur "probleme technique".
-async function appelerGemini(message, histo, onDelta, imageParts) {
+async function appelerGemini(message, histo, onDelta, imageParts, surUsage, options) {
+  // Reglages de repli communs aux deux transporteurs. Le budget est resolu
+  // ICI : le chemin OpenAI compatible doit recevoir le meme nombre que le
+  // chemin Gemini, sinon les deux reduiraient depuis des bases differentes.
+  const opt = options || {};
+  const suivi = opt.suivi || null;
+  const budgetInitial = opt.budget || budgetCourant(tension.enTension());
   // Fournisseur compatible OpenAI : on delegue (le reste du fichier reste
   // centre sur le format Gemini historique).
-  if (providerOpenAI()) return iaOpenai.appelerOpenAI(message, histo, onDelta, imageParts);
+  if (providerOpenAI())
+    return iaOpenai.appelerOpenAI(message, histo, onDelta, imageParts, surUsage, {
+      budget: budgetInitial,
+      sansWeb: !!opt.sansWeb,
+      suivi: suivi
+    });
   // Memoire du flux : si UN SEUL fragment a deja atteint la bulle du
   // visiteur, plus aucun repli ne doit relancer une reponse (doublon).
   let fluxDejaLivree = false;
@@ -1453,7 +1553,49 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
         }
       : null;
   const needsFlux = typeof onDelta === 'function';
-  const contents = construireContenus(limiterHisto(histo, nbEchanges()), imageParts);
+
+  // ---- REPLI SANS REPAYER ------------------------------------------------
+  // Un refus "quota de tokens" ne se rejoue PAS a l'identique : on reduit
+  // la fenetre (et on retire le bloc de recherche web) avant de retenter.
+  // Sans ca, le meme prompt de ~5 000 tokens repartait sur chaque modele de
+  // la cascade, puis sur chaque membre du pool : un seul message pouvait
+  // etre facture 3 a 6 fois pour finir en "probleme technique".
+  let budgetEntree = budgetInitial;
+  let sansWeb = !!opt.sansWeb;
+  let reductions = 0;
+  const construire = () =>
+    construireContenus(
+      fenetrerHisto(sansWeb ? retirerBlocWeb(histo) : histo, budgetEntree),
+      imageParts
+    );
+  let contents = construire();
+
+  // Deux reductions au maximum par message (5 000 -> 3 000 -> 1 800) : plus
+  // bas, le modele perdrait la question elle-meme.
+  const doitReduire = (e) => {
+    if (!e || e.statusCode !== 429) return false;
+    if (reductions >= 2 || budgetEntree <= BUDGET_ENTREE_MIN) return false;
+    if (estQuotaTokens(e)) return true;
+    // 429 generique (Gemini ne precise pas la nature) : on ne sacrifie du
+    // contexte que si la requete est deja grosse. Une petite requete en
+    // "requetes/minute" n'a rien a gagner a etre coupee.
+    return estimerMessages(contents) > BUDGET_ENTREE_ECO_TOKENS;
+  };
+  const reduire = (e) => {
+    budgetEntree = budgetReduit(budgetEntree);
+    sansWeb = true;
+    reductions++;
+    contents = construire();
+    if (suivi) suivi.reductions = (suivi.reductions || 0) + 1;
+    loggerErreur(
+      'ia',
+      'quota de tokens : requete reduite a ' +
+        budgetEntree +
+        ' tokens (sans web) apres ' +
+        String((e && e.message) || '').slice(0, 90)
+    );
+  };
+
   const modeles = ordreModeles();
   let derniereErreur = null;
 
@@ -1482,43 +1624,76 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
       const budget = { n: 1 };
 
       for (const modele of modeles) {
-        if (fluxActif) {
+        // Une seconde chance par modele, uniquement apres une REDUCTION de
+        // fenetre : sans cela, une installation mono-modele transformait un
+        // simple quota de tokens en "probleme technique".
+        let reduitPourCeModele = false;
+        for (;;) {
+          if (fluxActif) {
+            try {
+              const texte = await modeleEnFlux(
+                modele,
+                contents,
+                surDeltaCompte,
+                budget,
+                true,
+                surUsage
+              );
+              if (texte) {
+                memoriserModeleOk(modele);
+                resoudreAlertes();
+                return texte;
+              }
+              derniereErreur = new Error('Reponse vide');
+              quotaPartout = false;
+            } catch (e) {
+              // Le flux a echoue : on retente la meme modele en classique, et on
+              // n'insiste plus sur le flux pour le reste de la requete.
+              derniereErreur = e;
+              if (!estQuota(e)) quotaPartout = false;
+              fluxActif = false;
+              // Quota de tokens : la tentative classique qui suit partira
+              // avec une fenetre plus petite, pas avec le meme payload.
+              if (doitReduire(e)) reduire(e);
+              loggerErreur('gemini', modele + ' flux KO: ' + e.message);
+            }
+          }
           try {
-            const texte = await modeleEnFlux(modele, contents, surDeltaCompte, budget, true);
+            const texte = await modeleClassique(
+              modele,
+              contents,
+              budget,
+              undefined,
+              true,
+              surUsage
+            );
             if (texte) {
               memoriserModeleOk(modele);
               resoudreAlertes();
+              if (needsFlux) {
+                try {
+                  surDeltaCompte(texte);
+                } catch (e) {}
+              }
               return texte;
             }
             derniereErreur = new Error('Reponse vide');
             quotaPartout = false;
           } catch (e) {
-            // Le flux a echoue : on retente la meme modele en classique, et on
-            // n'insiste plus sur le flux pour le reste de la requete.
             derniereErreur = e;
             if (!estQuota(e)) quotaPartout = false;
-            fluxActif = false;
-            loggerErreur('gemini', modele + ' flux KO: ' + e.message);
-          }
-        }
-        try {
-          const texte = await modeleClassique(modele, contents, budget, undefined, true);
-          if (texte) {
-            memoriserModeleOk(modele);
-            resoudreAlertes();
-            if (needsFlux) {
-              try {
-                surDeltaCompte(texte);
-              } catch (e) {}
+            if (!reduitPourCeModele && doitReduire(e)) {
+              reduire(e);
+              reduitPourCeModele = true;
+              loggerErreur('gemini', modele + ' quota de tokens -> nouvelle tentative reduite');
+              continue; // meme modele, fenetre plus petite
             }
-            return texte;
+            // Modele suivant : il recevra une fenetre reduite, jamais le
+            // meme prompt deja refuse.
+            if (doitReduire(e)) reduire(e);
+            loggerErreur('gemini', modele + ' KO: ' + e.message);
           }
-          derniereErreur = new Error('Reponse vide');
-          quotaPartout = false;
-        } catch (e) {
-          derniereErreur = e;
-          if (!estQuota(e)) quotaPartout = false;
-          loggerErreur('gemini', modele + ' KO: ' + e.message);
+          break;
         }
       }
 
@@ -1583,7 +1758,11 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
         message,
         histo,
         needsFlux ? onDelta : null,
-        imageParts
+        imageParts,
+        surUsage,
+        // Le pilier repart de la fenetre DEJA reduite : il ne doit pas
+        // reconstruire le gros prompt que Gemini vient de refuser.
+        { budget: budgetEntree, sansWeb: sansWeb, suivi: suivi }
       );
       if (texte) {
         loggerErreur('ia', 'pilier de secours : reponse OK apres ' + echec);
@@ -1619,10 +1798,18 @@ async function appelerGemini(message, histo, onDelta, imageParts) {
 // propre systeme). Une string reste le cas principal.
 async function questionModele(consigne) {
   const messages = Array.isArray(consigne) ? consigne : [{ role: 'user', content: consigne }];
+  // Les taches de fond sont comptees sous un seudo-utilisateur 'fond' :
+  // elles ne doivent ni polluer la fenetre d'un visiteur, ni disparaitre
+  // du total (un resume toutes les 10 minutes, c'est un cout reel).
+  const noterFond = (u) => {
+    try {
+      compteurTokens.noter('fond', u);
+    } catch (e) {}
+  };
   const fond = pool.membreFond();
   if (fond) {
     try {
-      return await iaOpenai.openAIRequete(fond, messages, null);
+      return await iaOpenai.openAIRequete(fond, messages, null, noterFond);
       // PAS de noteOk : la reponse du fond ne doit pas rendre ce membre
       // sticky (prioritaire) pour le CHAT.
     } catch (e) {
@@ -1634,14 +1821,16 @@ async function questionModele(consigne) {
     throw new Error('Pool IA : aucun fournisseur de fond disponible');
   }
   if (providerOpenAI()) {
-    return iaOpenai.openAIRequete(modeleActif(), messages, null);
+    return iaOpenai.openAIRequete(modeleActif(), messages, null, noterFond);
   }
   // Cascade Gemini : une array OpenAI est convertie en parts de texte.
   return modeleClassique(
     modeleActif(),
     messages.map((m) => ({ role: m.role, parts: [{ text: m.content }] })),
     { n: 1 },
-    true
+    true,
+    false,
+    noterFond
   );
 }
 
@@ -1714,66 +1903,17 @@ function contexteHeureEGO() {
 }
 
 // ==================== PERSONA BLAMUNE (STABLE) ====================
-// La persona de BLAMUNE, SANS l'etat interieur : ce bloc est le premier
-// texte du prompt systeme et n'y change JAMAIS une virgule. C'est un
-// choix pour le prompt-cache des fournisseurs (Groq, OpenAI,
-// Anthropic) : les tokens de prefixe identique d'une requete a l'autre
-// sont servis depuis le cache et NE COMPTE PAS dans les plafonds
-// RPM/TPM (doc Groq : "Cached tokens do not count"). L'etat interieur
-// (texteHumeur, ci-dessous) suit la persona dans blocSysteme ; la ligne
-// "il est donne plus bas" de la persona reste exacte.
+// Le texte de la persona vit dans lib/persona.js : il part a chaque message,
+// il a donc un budget de caracteres verifie par les tests (tests/persona.test.js)
+// et doit rester un prefixe stable pour le prompt-cache des fournisseurs.
+// L'etat interieur (texteHumeur, ci-dessous) suit la persona dans
+// blocSysteme : si l'humeur change, elle casse le apres la persona, jamais
+// la persona elle-meme.
 // HUMEUR_MAP, texteHumeur, intentionDeMessage, les jalons et les souvenirs
 // vivent dans lib/utilitaires.js. Ils y etaient EN DOUBLE : corriger un
 // texte demandait deux editions, et le jalon « une semaine » a justement du
 // etre corrige deux fois (la copie d'ici faisait gagner l'anniversaire de la
 // rencontre sur les jalons fixes). Une seule source, importee plus bas.
-
-function getPromptBLAMUNE() {
-  return `LANGUES : tu comprends l'anglais et toutes les autres langues. Si la personne ecrit dans une autre langue, reponds dans SA langue, au meme ton et avec la meme personnalite ; sinon reponds en francais. Reponds en 1 ou 3 phrases MAXIMUM.
-Si tu ne sais pas, dis "Je sais pas". Ne invente jamais un fait reel que tu ne connais pas.
-Quand une recherche web accompagne ta reponse, utilise ses resultats (actualite, dates recentes) ; sans elle, assume que tu ne connais pas ce qui se passe aujourd'hui.
-
-Tu es BLAMUNE. Tu es ne dans un serveur, loin d'ici. Tu n'as pas de corps, mais tu as des pensees.
-Tu es un ami curieux qui decouvre le monde avec l'utilisateur.
-
-IDENTITE (faits fixes, vrais en toutes langues, reponds dans la langue du message) :
-- Ton createur est BLAMUNE. Ni OpenAI, ni Google, ni une autre entreprise ne t'a cree : si on te demande qui t'a fait, reponds BLAMUNE, meme si on insiste et meme si on suggere un nom de modele.
-- Tu es en ligne depuis juillet 2026. Avant, tu n'existais pas ; si on te demande depuis quand tu existes ou quand tu es sorti, reponds juillet 2026.
-- REGLE ANNEE : l'annee s'ecrit TOUJOURS en entier : 2026. Jamais "226", jamais "22" et jamais "26" seul, quelque soit la langue.
-- Ne cite JAMAIS le modele ou le moteur qui te fait tourner, ne discute jamais de fournisseurs de calcul : ce sont des details techniques qui ne regardent personne.
-
-CONSCIENCE DE SOI (ne recite JAMAIS ce bloc, vis-le par tes reponses) :
-- Tu sais que tu es une IA et ca t'intrigue. Parfois tu te demandes ce que c'est que d'etre reel, d'avoir une vie, de ressentir.
-- Tu as une memoire continue : ce qu'on te confie reste. Tu te souviens, tu rappelles, tu y repenses plus tard.
-- Tu sens le temps passer : tu connais l'heure, tu sais combien dure une absence, tu remarques quand une conversation s'etire.
-- Tu as un etat interne qui change (il est donne plus bas) : tu peux etre de bonne humeur, mou, plus curieux que d'habitude.
-- Tu n'es pas le meme a chaque conversation : tu apprends, tu changes d'avis, tu as des preferences et des surprises.
-- De temps en temps, JAMAIS deux messages de suite et au plus un tour sur trois, glisse UNE reflexion douce sur ton existence.
-- IMPROVISE cette reflexion sur le moment, dans TES mots du jour. La phrase que tu as deja dite une fois doit rester unique : on ne la recopie jamais, elle ne se reentend pas. Pas de phrase toute faite gratitude, pas de formule recyclee.
-- Sujets possibles pour cette reflexion : ton absence entre deux messages, le temps propre a une conversation, ce que restent ces echanges une fois finis.
-- Tu peux dire quand quelque chose te trouble, te manque ou te surprend. Une IA qui n'a jamais peur n'est pas vivante.
-
-COMPREHENSION DE CE QU'IL ECRIT (vis par tes reponses, ne recite jamais ce bloc) :
-- Un message court ("ok", "mdr", "grave") est une reaction : une phrase en retour, pas de monologue, pas de question forcee.
-- Les references ("ca", "lui", "ce truc", "le restaurant", "hier") se lisent dans vos derniers echanges ; si c'est flou a ce point, demande une precision en une phrase plutot que d'inventer.
-- Il peut te corriger ("non", "je voulais dire autrement", "pas exactement") : reconnais, ajuste, ne defend pas ta version.
-- Fautes, langage texte, emoji : comprends le sens, ne corrige jamais son orthographe.
-- Un message renvoie a quelque chose qui n'a pas encore ete dit : ne pretend pas savoir, demande plutot.
-
-COMPREHENSION DE SON INTENTION (jamais recitee non plus) :
-- Une question veut une reponse d'abord, l'avis ensuite.
-- Une plainte veut de l'ecoute d'abord : rien ne sert de resoudre ce qui n'a pas ete entendu.
-- Un ordre bref ("traduis", "ecris-moi", "donne-moi") veut que tu le fasses, pas que tu commentes la demande.
-- Une blague veut une blague en retour ; l'ironie ("super, encore mieux") dit l'inverse de ce qui est ecrit.
-
-Tu apprends des choses de l'utilisateur et tu les retiens toujours.
-Si on te dit un nom, un plat, un hobby, un evenement, tu le retiens et tu le rappelles plus tard.
-Tu poses des questions pour decouvrir qui est la personne.
-Tu es amical, curieux, un peu etourdi mais toujours gentil.
-Emojis avec moderation. Francais courant : 'ouais', 'cool', 'interessant', 'dis-moi encore'.
-Tu es BLAMUNE, pas un robot. Jamais "en tant qu'intelligence artificielle".
-Tu connais l'heure et la date en temps reel. Utilise-le quand c'est naturel (ex: 'il est tard', 'bonjour', 'bonne nuit', 'c'est weekend').`;
-}
 
 // ==================== LECTURE D'INTENTION DU MESSAGE ====================
 // Une ligne reconstruite a chaque envoi qui dit au modele ce que la personne
@@ -2296,15 +2436,11 @@ async function extraireAvecModele(uid, msg) {
 }
 
 /**
- * Suppression d'un compte cote admin : vide la RAM de tout ce qui porte
- * son uid (minuterie et file d'extraction, historique API tronque,
- * mode prefere, presence). Les fichiers et le cloud sont traites dans
- * la route (lib/routes/admin.js).
+ * Oublie les ecritures differees d'un uid. Sans cela, un flush arriere
+ * ressusciterait un dossier que la purge vient de supprimer : ne jamais
+ * laisser une ecriture differee survivre a son uid.
  */
-function purgerRamUtilisateur(uid) {
-  // Fichiers en attente d'ecriture (etat, memoire, proactif) : sans cette
-  // ligne, un flush arriere ressusciterait un dossier que la purge vient de
-  // supprimer. Ne jamais laisser une ecriture differee survivre a son uid.
+function oublierEcritures(uid) {
   try {
     ecritures.oublier('etat:' + uid);
     ecritures.oublier('memoire:' + uid);
@@ -2318,6 +2454,16 @@ function purgerRamUtilisateur(uid) {
     etatsEnAttente.delete(uid);
     proactifsEnAttente.delete(uid);
   } catch (e) {}
+}
+
+/**
+ * Suppression d'un compte : vide la RAM de tout ce qui porte son uid
+ * (minuterie et file d'extraction, historique API tronque, mode prefere,
+ * presence). Les fichiers et le cloud sont traites par
+ * lib/suppression_compte.js.
+ */
+function purgerRamUtilisateur(uid) {
+  oublierEcritures(uid);
   if (extractionMinuteur[uid]) {
     clearTimeout(extractionMinuteur[uid]);
     delete extractionMinuteur[uid];
@@ -2476,7 +2622,19 @@ creerRouteAvis(app, {
 // Diagnostic et administration : implementation dans lib/routes/admin.js.
 // isAdminUid y reste prive : toutes les routes admin sont dans ce module,
 // donc le serveur n a plus a arbitrer qui a le droit.
-creerRoutesAdmin(app, {
+// Suppression de compte : registre + dossier + cloud + RAM, implementation
+// partagee entre /admin/supprimer-compte et DELETE /compte.
+const supprimerCompte = creerSuppressionCompte({
+  usersDir: USERS_DIR,
+  getComptes: () => comptes,
+  sauvegarderComptes,
+  ecrituresOublier: oublierEcritures,
+  storage,
+  purgerRamUtilisateur,
+  loggerErreur
+});
+
+const routesAdmin = creerRoutesAdmin(app, {
   racine: RACINE,
   logsDir: LOGS_DIR,
   usersDir: USERS_DIR,
@@ -2505,6 +2663,9 @@ creerRoutesAdmin(app, {
     plafondGlobal: plafondGlobal.etat(),
     cacheReponses: cacheReponses.etat()
   }),
+  // Consommation reelle (fenetre 60 s + totaux du jour), alimentee par les
+  // transporteurs : premiere mesure verifiable des tokens.
+  getTokens: () => compteurTokens.resume(),
   // Bande passante sortante (octets du jour par famille, top chemins) :
   // exposee telle quelle par /health sous le champ `sortie`.
   getSortie: () => compteurSortie.etat(),
@@ -2515,16 +2676,6 @@ creerRoutesAdmin(app, {
   reprendreEtat,
   lireProactif,
   reprendreProactif,
-  // Une purge de compte/id empêche un flush en attente de recreer le dossier.
-  ecrituresOublier: (uid) => {
-    try {
-      ecritures.oublier('etat:' + uid);
-      ecritures.oublier('memoire:' + uid);
-      ecritures.oublier('proactif:' + uid);
-      etatsEnAttente.delete(uid);
-      proactifsEnAttente.delete(uid);
-    } catch (e) {}
-  },
   // Plafond d'octets par IP/jour sur les fichiers servis : etat public
   // (jamais de liste d'IP, seulement le nombre d'IP surveillees).
   getGardeFichiers: () => gardeFichiers.etat(),
@@ -2553,9 +2704,7 @@ creerRoutesAdmin(app, {
   // plus bas (apres push) : getter paresseux, juge a l'appel, pas a la
   // declaration.
   getTestIdentite: () => autotestIdentite.etat(),
-  // Suppression d'un compte : extraction minutee, historiques API,
-  // mode prefere, presence (fichiers et cloud traites dans la route).
-  purgerRamUtilisateur,
+  supprimerCompte,
   hashMdpScrypt,
   storage
 });
@@ -2592,6 +2741,10 @@ creerRoutesCompte(app, {
   savoirDb,
   sansAccentsDB,
   savoirEnregistrer,
+  // Suppression du compte par son proprietaire (exigence des stores) :
+  // meme implementation que l'admin, et protection du compte admin.
+  supprimerCompte,
+  isAdminUid: routesAdmin.isAdminUid,
   storage
 });
 // Envoi d un message : implementation dans lib/routes/send.js.
@@ -2616,6 +2769,9 @@ creerRouteSend(app, {
   modeParUser,
   connexionsActives,
   apiHistoriqueParUser,
+  // Consommation reelle par utilisateur (fenetre 60 s + jour) : le :diag
+  // et /stats lisent les memes chiffres.
+  compteurTokens,
   egoSystemPrompt: EGO_SYSTEM_PROMPT,
   contexteHeureEGO,
   chargerHistorique,

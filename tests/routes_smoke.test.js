@@ -152,6 +152,8 @@ function requeteBrute(port, chemin, entetes) {
     ['/admin', 'GET', 'html', 'panneau admin'],
     ['/admin/admin.js', 'GET', 'js', 'asset du panneau admin'],
     ['/', 'GET', 'html', 'accueil du site'],
+    ['/confidentialite', 'GET', 'html', 'politique de confidentialite (URL propre)'],
+    ['/conditions', 'GET', 'html', 'conditions d utilisation (URL propre)'],
     ['/app.js', 'GET', 'js', 'asset du site'],
     ['/manifest.json', 'GET', 'manifest', 'manifeste PWA (type installabilite)'],
     ['/nexiste_pas', 'GET', '404', 'catcher : page inconnue'],
@@ -234,6 +236,29 @@ function requeteBrute(port, chemin, entetes) {
         }
       );
       req.on('error', (e) => resolve({ code: 0, type: '', corps: String(e) }));
+      req.end();
+    });
+  }
+
+  // DELETE avec corps JSON : DELETE /compte exige { confirmation: 'SUPPRIMER' }.
+  function supprimerAvecCorps(chemin, corps, entetes) {
+    const h = Object.assign({}, entetes || {}, {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(JSON.stringify(corps))
+    });
+    return new Promise((resolve) => {
+      const req = http.request(
+        { host: '127.0.0.1', port, path: chemin, method: 'DELETE', headers: h },
+        (res) => {
+          let t = '';
+          res.on('data', (d) => (t += d));
+          res.on('end', () =>
+            resolve({ code: res.statusCode, type: res.headers['content-type'] || '', corps: t })
+          );
+        }
+      );
+      req.on('error', (e) => resolve({ code: 0, type: '', corps: String(e) }));
+      req.write(JSON.stringify(corps));
       req.end();
     });
   }
@@ -510,6 +535,69 @@ function requeteBrute(port, chemin, entetes) {
   }
 
   // ------------------------------------------------------------------
+  // 3e partie bis : SUPPRESSION PAR LE PROPRIETAIRE (DELETE /compte).
+  //
+  // Exigence Google Play et App Store 5.1.1(v) : l'utilisateur doit pouvoir
+  // effacer SON compte depuis l'application. Ce bloc verifie le contrat
+  // complet : refus sans confirmation, refus d'une invite, protection de
+  // l'admin, puis le vrai effacement verifie AU SYSTEME DE FICHIERS, et
+  // l'obsolescence de la cible.
+  // ------------------------------------------------------------------
+  console.log('');
+  console.log('  -- suppression par le proprietaire (DELETE /compte) --');
+  let extraS = 0;
+  const verifS = (bon, libelle, detail) => {
+    extraS++;
+    if (bon) {
+      ok++;
+      console.log('  [OK ] ' + libelle.padEnd(36) + (detail || ''));
+    } else {
+      ko.push('suppression proprietaire : ' + libelle);
+      console.log('  [KO ] ' + libelle.padEnd(36) + (detail || ''));
+    }
+  };
+  // Le compte principal a ete efface par l'admin ci-dessus : on en cree un
+  // neuf pour ne dependre d'aucun etat anterieur.
+  const compteEph = await poster(
+    '/register',
+    { pseudo: 'testeur2', mdp: 'motdepasse2', email: 'testeur2@exemple.fr' },
+    {}
+  );
+  const eph = session(compteEph.corps);
+  const hEph = enTete(eph.ego, eph.uid);
+  if (eph.ego && eph.uid) {
+    const sansConf = await supprimer('/compte', hEph);
+    verifS(sansConf.code === 400, 'sans confirmation refusee (400)', '-> HTTP ' + sansConf.code);
+
+    // Une invitation n'a pas de compte : rien a effacer, et la route le dit
+    // (400) au lieu de faire semblant.
+    const rInv = await poster('/invite', {}, {});
+    let inv = {};
+    try {
+      inv = JSON.parse(rInv.corps);
+    } catch (e) {}
+    const invite = await supprimerAvecCorps(
+      '/compte',
+      { confirmation: 'SUPPRIMER' },
+      { 'X-UID': inv.uid, 'X-JETON': inv.jeton }
+    );
+    verifS(invite.code === 400, 'invite : rien a supprimer (400)', '-> HTTP ' + invite.code);
+
+    // Le compte administrateur ne peut pas disparaitre par cette porte.
+    const admin = await supprimerAvecCorps('/compte', { confirmation: 'SUPPRIMER' }, hAdmin);
+    verifS(admin.code === 403, 'compte admin protege (403)', '-> HTTP ' + admin.code);
+
+    const dossierEph = path.join(dataDir, 'users', eph.uid);
+    const rSuppr = await supprimerAvecCorps('/compte', { confirmation: 'SUPPRIMER' }, hEph);
+    verifS(rSuppr.code === 200, 'auto-suppression reussie (200)', '-> HTTP ' + rSuppr.code);
+    verifS(!fs.existsSync(dossierEph), 'dossier efface du disque');
+    const rDeja = await supprimerAvecCorps('/compte', { confirmation: 'SUPPRIMER' }, hEph);
+    verifS(rDeja.code === 404, 'compte deja parti -> introuvable (404)', '-> HTTP ' + rDeja.code);
+  } else {
+    verifS(false, 'compte ephemere cree pour le test');
+  }
+
+  // ------------------------------------------------------------------
   // 4e partie : COMPRESSION DES REPONSES.
   //
   // Vraie mesure : le meme fichier, demande sans puis avec
@@ -590,7 +678,7 @@ function requeteBrute(port, chemin, entetes) {
   }
 
   console.log('');
-  const total = CAS.length + (u.ego ? AUTH.length : 1) + extra + extraC + extraP;
+  const total = CAS.length + (u.ego ? AUTH.length : 1) + extra + extraC + extraP + extraS;
   console.log(ok + '/' + total + ' controles reussis');
   if (ko.length) {
     console.log('PROBLEMES :');

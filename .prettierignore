@@ -54,6 +54,11 @@ agent/
 .github/hooks/
 *.umd.js
 
+# Coquilles natives Capacitor : projets generes (Gradle/Xcode) et copie de
+# site/, pas du code source du depot.
+android/
+ios/
+
 # Généré par un verrou d'outils : le format EST le fichier.
 skills-lock.json
 .obsidian/

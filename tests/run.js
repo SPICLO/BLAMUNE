@@ -146,7 +146,10 @@ const mock = http.createServer((req, res) => {
     try {
       corps = JSON.parse(data);
     } catch (e) {}
-    const demande = corps && corps.contents ? JSON.stringify(corps.contents) : '';
+    // Le bloc systeme voyage dans `systemInstruction` (cache de prompt) et
+    // non plus dans `contents` : les deux doivent etre lus, sinon le prompt
+    // de conversation devient invisible pour le stub.
+    const demande = corps ? textePrompt(corps) : '';
     // Les taches de fond (extraction, resume) ne doivent jamais absorber le
     // 429 injecte : seul un appel de conversation doit le consommer.
     const tacheDeFond =
@@ -252,12 +255,24 @@ function envoiFils(pid) {
   });
 }
 
+// Texte complet d'une requete Gemini : `contents` + `systemInstruction`.
+// Depuis le cache de prompt, la persona et l'etat ne sont plus dans les
+// tours de conversation : ignorer `systemInstruction` ferait croire que le
+// prompt BLAMUNE a disparu.
+function textePrompt(corps) {
+  if (!corps) return '';
+  const morceaux = [];
+  if (corps.systemInstruction) morceaux.push(JSON.stringify(corps.systemInstruction));
+  if (corps.contents) morceaux.push(JSON.stringify(corps.contents));
+  return morceaux.join('\n');
+}
+
 function promptTexte() {
-  return dernierChat && dernierChat.contents ? JSON.stringify(dernierChat.contents) : '';
+  return textePrompt(dernierChat);
 }
 
 function promptEgo() {
-  return dernierEgo && dernierEgo.contents ? JSON.stringify(dernierEgo.contents) : '';
+  return textePrompt(dernierEgo);
 }
 
 // Reecrit l'etat interieur pour tester les dates de la relation
@@ -717,7 +732,11 @@ async function main() {
     );
     const hSession = { 'X-Session': jetonSession };
     const histSession = await requete(PORT_APP, '/historique', 'GET', null, hSession);
-    assert.strictEqual(histSession.status, 200, 'session seule acceptee: HTTP ' + histSession.status);
+    assert.strictEqual(
+      histSession.status,
+      200,
+      'session seule acceptee: HTTP ' + histSession.status
+    );
     const histSessionBricole = await requete(PORT_APP, '/historique', 'GET', null, {
       'X-Session': jetonSession.slice(0, -1) + (jetonSession.endsWith('0') ? '1' : '0')
     });

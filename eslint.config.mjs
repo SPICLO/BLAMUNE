@@ -146,7 +146,11 @@ export default [
       '.agents/**',
       '.claude/**',
       '.codex/**',
-      '.github/skills/**'
+      '.github/skills/**',
+      // Coquilles natives Capacitor : contenu genere (dont une copie de
+      // site/) et projets Gradle/Xcode, pas du code du depot.
+      'android/**',
+      'ios/**'
     ]
   }
 ];

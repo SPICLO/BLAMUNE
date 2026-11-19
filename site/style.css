@@ -1793,6 +1793,37 @@ button:disabled {
   margin: 8px 0 0;
 }
 
+/* Liens legaux : acceptation a l'inscription, rappel en bas du profil.
+   Discrets, mais avec une cible tactile suffisante (padding vertical) :
+   11px de texte seul serait penible au pouce sur mobile. */
+.auth-legal,
+.profil-legal {
+  margin: 10px 0 0;
+  color: var(--texte-faible);
+  font-size: 0.6875rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.auth-legal a,
+.profil-legal a {
+  padding: 2px 1px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.auth-legal a:hover,
+.profil-legal a:hover {
+  text-decoration: underline;
+}
+
+.auth-legal a:focus-visible,
+.profil-legal a:focus-visible {
+  outline: 2px solid rgb(var(--accent-rgb) / 0.6);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
 /* ==================== CARTE D'AUTHENTIFICATION COMPACTE ==================== */
 /* Le contenu complet (logo, accroche, formulaire, invitation, installation,
    langue) depassait la hauteur d'un telephone : la connexion et surtout
@@ -2804,6 +2835,70 @@ html.console .auth-box::before {
   border-color: transparent;
   box-shadow: 0 4px 16px rgba(248, 113, 113, 0.4);
   transform: translateY(-1px);
+}
+
+/* --- Suppression du compte : zone distincte, repliee par defaut --- */
+.profil-danger {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bordure);
+}
+
+.profil-danger-btn {
+  align-self: flex-end;
+  color: var(--danger);
+  background: transparent;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.profil-danger-btn:hover {
+  color: #fff;
+  background: var(--danger);
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(248, 113, 113, 0.4);
+  transform: translateY(-1px);
+}
+
+.profil-danger-confirme {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 12px;
+  background: rgba(248, 113, 113, 0.06);
+}
+
+.profil-danger .profil-note {
+  margin: 0;
+  text-align: left;
+}
+
+.profil-danger-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.profil-annuler {
+  color: var(--texte-faible);
+  background: transparent;
+  border-color: var(--bordure);
+}
+
+/* Rappel legal en pied de carte : meme discret que dans l'auth, mais
+   separe du formulaire par un filet pour ne pas se confondre avec un
+   bouton d'action. */
+.profil-legal {
+  margin: 2px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--bordure);
+}
+
+.profil-legal span {
+  margin: 0 4px;
 }
 
 /* --- Mode clair : surfaces re-choisies, pas inversees --- */

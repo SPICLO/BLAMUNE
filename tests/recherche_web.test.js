@@ -175,7 +175,7 @@ test('mise en forme du prompt : entete datee, host cite, consignes honnetes', ()
     ...recherche,
     pages: [{ url: 'u', texte: 'x'.repeat(20000) }]
   });
-  assert.ok(gros.length < 15000, 'bloc plafonne : ' + gros.length);
+  assert.ok(gros.length < 4200, 'bloc plafonne a ~4 000 caracteres : ' + gros.length);
 });
 
 test('faits a apprendre : 2 max, dedup par site, extraits courts rejetes', () => {

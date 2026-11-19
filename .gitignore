@@ -131,3 +131,24 @@ health_live.json
 2026-11-05.md
 Sans titre.base
 Sans titre.canvas
+
+# Coquilles natives Capacitor. Le code source reste site/ : tout ce que
+# produisent `cap sync` et les builds Gradle/Xcode est regenere a la
+# demande et ne doit pas polluer le depot.
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/.idea/
+android/captures/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+ios/App/Pods/
+ios/App/build/
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/DerivedData/
+android/keystore.properties
+android/*.jks
+android/*.keystore

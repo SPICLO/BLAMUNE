@@ -1,5 +1,105 @@
 # Journal des modifications
 
+## [Non publié] - 2026-11-17 (budget de contexte et mesure des tokens)
+
+### Ajout
+
+- **Fenêtre de contexte pilotée par un budget de tokens**
+  (`lib/tokens.js`, `lib/ia/gemini.js`, `lib/ia/openai.js`) : les
+  `HISTO_API_MAX` messages ne sont plus le mètre de la requête. La fenêtre
+  empile les messages depuis la fin jusqu'à `BUDGET_ENTREE_TOKENS`
+  (5 000 par défaut, 3 000 sous tension), garde toujours le bloc système
+  (persona, mémoire, résumé, sources web) et commence sur un tour
+  utilisateur. Un message démesuré est tronqué à 12 000 caractères au lieu
+  d'être envoyé entier. `limiterHisto` reste disponible (tests, appelants
+  qui comptent encore en messages).
+- **Mesure réelle de la consommation** (`lib/compteur_tokens.js`,
+  `server.js`, `lib/routes/send.js`, `lib/routes/admin.js`) : `usage` et
+  `usageMetadata` ne sont plus jetés. Fenêtre glissante de 60 s et totaux
+  du jour par utilisateur, tâches de fond comptées sous `fond`. Exposé par
+  `/stats` et `/health` (champ `tokens`) et par la ligne `:diag` de chaque
+  réponse (`tokens=entrée/sortie`, préfixe `~` quand c'est une estimation).
+  `USAGE_STREAM=1` active `stream_options.include_usage` pour mesurer aussi
+  les réponses en flux (opt-in : certains proxys le refusent en 400).
+- **Bloc de recherche web plafonné** (`lib/recherche_web.js`,
+  `lib/routes/send.js`) : `BLOC_MAX` 14 000 → 4 000 caractères, texte lu
+  par page 6 000 → 1 800, deux pages lues par `/cherche` au lieu de quatre.
+  Le principal pic de tokens (≈ 3 900 → ≈ 1 100) tombe sans perte utile.
+- **Repli sans repayer** (`lib/tokens.js`, `lib/ia/gemini.js`,
+  `lib/ia/openai.js`, `server.js`, `lib/routes/send.js`) : un 429
+  « tokens/minute » (TPM/TPD, reconnu par `estQuotaTokens`) ne rejoue plus
+  le même payload. La fenêtre passe de 5 000 à 3 000 puis 1 800 tokens
+  (plancher 1 200, deux réductions au maximum) et le bloc de recherche web
+  est retiré avant la nouvelle tentative. Le même modèle est retenté une
+  fois avec la fenêtre réduite ; les modèles suivants et les membres du pool
+  repartent de ce budget, jamais du prompt d'origine. Un 429
+  « requêtes/minute » sur une petite requête ne coupe rien. La ligne `:diag`
+  expose `reduit=N`.
+
+- **Persona compressée** (`lib/persona.js`, `server.js`) : le bloc stable
+  du prompt système passe de 4 452 à 2 504 caractères (≈ 1 240 → ≈ 696
+  tokens, −44 %), sans perdre de règle : identité (créateur BLAMUNE,
+  juillet 2026, année en entier, aucun nom de modèle), honnêteté, lecture
+  du message, ton, rythme des réflexions. Ce sont les redites qui sont
+  parties. La persona reste un préfixe stable pour le prompt-cache.
+  Invariants verrouillés par `tests/persona.test.js` (budget 2 600 car.,
+  titres `LANGUES` et `CONSCIENCE DE SOI` uniques, texte identique d'un
+  appel à l'autre).
+- **Résumé structuré et borné** (`lib/resume.js`) : le résumé n'est plus
+  demandé en « 60 mots, à compléter » (le modèle collait le nouveau bloc à
+  l'ancien, et le résumé devenait une liste de redites qui grossissait sans
+  se réorganiser). Il est demandé en réécriture complète sur quatre lignes
+  fixes — `QUI`, `FIL`, `PROMIS`, `TON` —, 140 mots, avec un plafond dur de
+  `RESUME_MAX_CAR = 1100` appliqué à l'écriture (troncature ` [...]`).
+  Deux déclencheurs de repli : `RESUME_SEUIL = 10` échanges ou
+  `RESUME_SEUIL_CAR = 3000` caractères non couverts (rattrape les messages
+  très longs) ; le bloc replié passe de 10 à `RESUME_BLOC = 20` pour ne
+  pas repayer un appel. Les seuils sont injectables dans `creerResume`
+  pour les tests. Coût assumé : ~200 tokens de plus par message quand un
+  résumé existe, mais borné — l'ancien format ne l'était pas. Vérifié par
+  `tests/lib.test.js` (volume, bloc, plafond, structure du prompt,
+  réécriture vs ajout).
+- **Plafond de sortie adaptatif** (`lib/tokens.js`, `lib/ia/gemini.js`,
+  `lib/ia/openai.js`) : `API_MAX_TOKENS` était envoyé tel quel à chaque
+  appel (1 024 par défaut) alors que le prompt impose « 1 à 3 phrases ».
+  `plafondSortie()` choisit maintenant 384 tokens pour un chat, 768 pour
+  une demande de développement (`explique`, `liste`, question > 600 car.)
+  et le plafond configuré pour un livrable (`écris`, `traduis`, code,
+  poème). Détection insensible aux accents et à la casse, appliquée aux
+  deux transports (`maxOutputTokens` et `max_tokens`). `API_MAX_TOKENS`
+  reste un maximum. Le gain porte sur le pire cas (~600 tokens de moins
+  quand une génération dérive), pas sur la réponse moyenne.
+- **Élagage des vieux messages** (`lib/tokens.js`) : les trois dernières
+  réponses de BLAMUNE partent verbatim, les plus anciennes sont coupées à
+  400 caractères (` [...]`) ; les messages utilisateur ne sont jamais
+  touchés. L'élagage se fait **avant** le calcul du budget, donc la place
+  libérée profite à des messages plus utiles. Sur une conversation dense
+  (30 échanges, réponses ~1 200 car., budget 5 000), la fenêtre passe de
+  19 à **37 messages** à budget égal. L'historique relu du disque n'est
+  jamais muté (copies). Vérifié par `tests/tokens.test.js`.
+- **Cache de prompt** (`lib/ia/gemini.js`, `lib/compteur_tokens.js`,
+  `server.js`, `lib/routes/send.js`) : le bloc système (persona, état,
+  profil, sources web) n'est plus collé en tête du premier message
+  utilisateur. Il part dans `systemInstruction`, le champ Gemini prévu pour
+  les instructions stables, mis en cache de façon implicite (seuil
+  ~1 024 tokens). Les blocs système multiples sont joints ; les tours
+  `user/model` ne changent pas. Repli automatique et définitif si un modèle
+  refuse le champ (400 nommant `systemInstruction`) : retour à l'ancienne
+  fusion, comme pour `tools` et `thinkingConfig`.
+  `cachedContentTokenCount` / `prompt_tokens_details.cached_tokens`
+  alimentent `usage.cache`, cumulé sous `cache` / `jourCache` et exposé par
+  `/stats` et `/health` uniquement s'il est non nul. `:diag` ajoute
+  `cachePrompt=N` ; le `cache=oui|non` existant reste le cache de
+  réponses. Vérifié par `tests/tokens.test.js` (séparation, blocs
+  multiples, repli, 400 sans rapport, usage, compteur).
+
+### Documentation
+
+- `CONTEXTE.md` : chiffres avant/après, réglages, lecture des mesures,
+  politique de repli sans repayer, persona et résumé bornés, élagage des
+  vieux messages, plafond de sortie adaptatif, cache de prompt
+  (`systemInstruction`), pistes non planifiées.
+
 ## [Non publié] - 2026-11-16 (profil complet et apparence)
 
 ### Ajout
@@ -34,9 +134,9 @@
     avec une variante plus sombre en mode clair ;
   - **trois tailles de texte** (`normal`, `grand` 17,5 px, `très grand`
     19 px).
-  Ces trois réglages vivent dans `localStorage` (`blamune_avatar`,
-  `blamune_palette`, `blamune_taille`), donc par appareil, et sont appliqués
-  **avant la première peinture**. Le clair/sombre reste un réglage séparé.
+    Ces trois réglages vivent dans `localStorage` (`blamune_avatar`,
+    `blamune_palette`, `blamune_taille`), donc par appareil, et sont appliqués
+    **avant la première peinture**. Le clair/sombre reste un réglage séparé.
 - `--accent-rgb` : les halos, bordures et ombres d'accent suivent la palette
   au lieu de rester bleu ciel. Les **65 tailles de texte en px** de
   `style.css` passent en `rem`, sinon le réglage de taille n'aurait aucun

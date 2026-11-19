@@ -668,7 +668,7 @@ test('cache du service worker : la version suit les fichiers du site', () => {
   const sw = lire('site/sw.js');
   assert.ok(/const CACHE = 'blamune-v\d+';/.test(sw), 'nom de cache introuvable');
   assert.ok(
-    sw.includes("'blamune-v28'"),
+    sw.includes("'blamune-v29'"),
     'le cache doit etre bumpe quand style.css, app.js et index.html changent'
   );
 });

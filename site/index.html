@@ -203,6 +203,15 @@
           </p>
         </div>
 
+        <p class="auth-legal">
+          <span data-i18n="En continuant, tu acceptes les">En continuant, tu acceptes les</span>
+          <a href="/conditions" data-i18n="conditions d'utilisation">conditions d'utilisation</a>
+          <span data-i18n="et la">et la</span>
+          <a href="/confidentialite" data-i18n="politique de confidentialité"
+            >politique de confidentialité</a
+          >.
+        </p>
+
         <p class="auth-note" id="authLangue">
           <select id="choixLangue" aria-label="Langue">
             <option value="fr">Français</option>
@@ -486,6 +495,51 @@
               Tout oublier
             </button>
           </div>
+          <!-- Suppression du COMPTE (exigence Google Play et App Store),
+               distincte de « Tout oublier » qui n'efface que le profil.
+               Deux temps : ouvrir, puis confirmer. -->
+          <div id="profilDanger" class="profil-danger cache">
+            <button
+              id="btnProfilSupprimer"
+              class="profil-btn profil-danger-btn"
+              type="button"
+              data-i18n="Supprimer mon compte"
+            >
+              Supprimer mon compte
+            </button>
+            <div id="profilDangerConfirme" class="profil-danger-confirme cache">
+              <p
+                class="profil-note"
+                data-i18n="Cette action efface definitivement ton compte, tes messages et tout ce que BLAMUNE a retenu. Elle est irreversible."
+              >
+                Cette action efface definitivement ton compte, tes messages et tout ce que
+                BLAMUNE a retenu. Elle est irreversible.
+              </p>
+              <div class="profil-danger-actions">
+                <button
+                  id="btnAnnulerSuppression"
+                  class="profil-btn profil-annuler"
+                  type="button"
+                  data-i18n="Annuler"
+                >
+                  Annuler
+                </button>
+                <button
+                  id="btnConfirmerSuppression"
+                  class="profil-btn profil-oublier"
+                  type="button"
+                  data-i18n="Supprimer definitivement"
+                >
+                  Supprimer definitivement
+                </button>
+              </div>
+            </div>
+          </div>
+          <p class="profil-legal">
+            <a href="/confidentialite" data-i18n="Confidentialité">Confidentialité</a>
+            <span aria-hidden="true">·</span>
+            <a href="/conditions" data-i18n="Conditions d'utilisation">Conditions d'utilisation</a>
+          </p>
         </div>
       </div>
 
@@ -821,6 +875,7 @@
     </div>
 
     <script defer src="langues.js"></script>
+    <script defer src="natif.js"></script>
     <script defer src="ia-secours.js"></script>
     <script defer src="app.js"></script>
   </body>

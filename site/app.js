@@ -143,6 +143,12 @@ function clearAuth() {
 function estAuth() {
   return !!(getAuthEgo() || getAuthSession());
 }
+// Un compte enregistre (pas une invitation) : seul un compte peut etre
+// supprime. L'uid est la seule source fiable, y compris apres reconnexion.
+function estCompteEnregistre() {
+  var uid = getAuthUserId();
+  return !!uid && uid.indexOf('inv_') !== 0 && estAuth();
+}
 
 // L'identite voyage dans les entetes (X-EGO / X-UID / X-Jeton). Le serveur
 // les lit avant le corps et le query string : un "authBody" qui recopierait
@@ -1694,6 +1700,16 @@ function ouvrirProfil() {
   z.classList.add('ouvert');
   chargerProfil();
   chargerPreferences();
+  // Suppression du compte : visible pour un compte enregistre seulement,
+  // et toujours repliee a l'ouverture du panneau.
+  var danger = document.getElementById('profilDanger');
+  if (danger) {
+    danger.classList.toggle('cache', !estCompteEnregistre());
+    var confirme = document.getElementById('profilDangerConfirme');
+    var bouton = document.getElementById('btnProfilSupprimer');
+    if (confirme) confirme.classList.add('cache');
+    if (bouton) bouton.classList.remove('cache');
+  }
 }
 
 function fermerProfil() {
@@ -1959,6 +1975,58 @@ async function oublierChampProfil(cle, etiquette) {
   }
 }
 
+// Suppression du compte : la seule action qui efface le COMPTE (et non le
+// profil). Le serveur exige la confirmation textuelle et protege l'admin.
+async function supprimerMonCompte() {
+  var bouton = document.getElementById('btnConfirmerSuppression');
+  if (bouton) bouton.disabled = true;
+  try {
+    var r = await fetch('/compte', {
+      method: 'DELETE',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+      body: JSON.stringify({ confirmation: 'SUPPRIMER' })
+    });
+    var j = {};
+    try {
+      j = await r.json();
+    } catch (e) {}
+    if (!r.ok) {
+      afficherToastDeco(j.message || T_('Suppression impossible pour le moment.'));
+      if (bouton) bouton.disabled = false;
+      return;
+    }
+    clearAuth();
+    afficherToastDeco(T_('Compte supprime. A bientot.'), 'ok');
+    setTimeout(function () {
+      window.location.reload();
+    }, 700);
+  } catch (e) {
+    afficherToastDeco(T_('Suppression impossible pour le moment.'));
+    if (bouton) bouton.disabled = false;
+  }
+}
+
+(function initSuppressionCompte() {
+  var ouvrir = document.getElementById('btnProfilSupprimer');
+  var confirme = document.getElementById('profilDangerConfirme');
+  var annuler = document.getElementById('btnAnnulerSuppression');
+  var valider = document.getElementById('btnConfirmerSuppression');
+  if (ouvrir && confirme) {
+    ouvrir.addEventListener('click', function () {
+      confirme.classList.remove('cache');
+      ouvrir.classList.add('cache');
+    });
+  }
+  if (annuler && confirme && ouvrir) {
+    annuler.addEventListener('click', function () {
+      confirme.classList.add('cache');
+      ouvrir.classList.remove('cache');
+      if (valider) valider.disabled = false;
+    });
+  }
+  if (valider) valider.addEventListener('click', supprimerMonCompte);
+})();
+
 // Preference de compte : l'apprentissage automatique. Elle n'est pas dans
 // le profil (qui peut etre efface d'un clic) : elle vit dans comptes.json,
 // donc elle survit a « Tout oublier », a la reconnexion et a l'appareil.
@@ -2061,6 +2129,10 @@ function clesDeApplicationServerKey(b64url) {
 async function initialiserNotifications() {
   var btn = document.getElementById('btnNotifications');
   if (!btn) return;
+  // Le Web Push du navigateur n'existe pas dans une WebView. Les
+  // notifications natives (APNs/FCM) viendront dans un second temps avec
+  // leur propre bouton.
+  if (estApplicationNative()) return;
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   try {
     var rc = await fetch('/push/config');
@@ -3190,6 +3262,12 @@ function exporterHistorique() {
   var b = document.getElementById('btnJournal');
   if (!b) return;
   b.addEventListener('click', function () {
+    // Dans l'application native, window.open ouvrirait une fenetre que la
+    // WebView ne sait pas toujours afficher : on navigue dans la meme vue.
+    if (estApplicationNative()) {
+      window.location.href = '/journal.html';
+      return;
+    }
     window.open('/journal.html', '_blank', 'noopener');
   });
 })();
@@ -3215,7 +3293,18 @@ var REFUS_INSTALL_JOURS = 7;
 var installPromptDiffere = null;
 var dernierFocusAide = null;
 
+// Application native (Capacitor) : le site est embarque, il n'y a rien a
+// installer et le service worker n'a pas de sens dans la WebView. Le drapeau
+// est pose par site/natif.js, charge avant ce fichier.
+function estApplicationNative() {
+  return (
+    window.BLAMUNE_NATIF === true ||
+    !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
+  );
+}
+
 function installationDejaFaite() {
+  if (estApplicationNative()) return true;
   return (
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
     window.navigator.standalone === true
@@ -3507,7 +3596,9 @@ window.addEventListener('load', async function () {
     await migrerSession();
   } catch (e) {}
   initAuth();
-  if ('serviceWorker' in navigator) {
+  // En application native, les assets sont deja locaux : pas de service
+  // worker (les schemes capacitor:// ne l'autorisent pas sur iOS).
+  if ('serviceWorker' in navigator && !estApplicationNative()) {
     navigator.serviceWorker.register('/sw.js').catch(function () {});
   }
 });
